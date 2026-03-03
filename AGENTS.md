@@ -1,0 +1,26 @@
+# AGENTS.md
+
+## Purpose
+- This repository is for experimenting with a WebUI for Codex.
+- At the current stage, the repository is documentation-first and may not yet contain the actual application code.
+
+## Working Rules
+- Keep changes small and scoped to the user request.
+- Do not rewrite or delete existing documents unless the user explicitly asks for it.
+- Prefer adding new formal documents under `docs/`.
+- Use `docs/draft/` only for notes, drafts, and incomplete materials.
+
+## Documentation Conventions
+- Use clear, stable file names. Prefer ASCII file names for formal documents.
+- Put implementation-independent architecture and operational decisions in `docs/`.
+- When replacing a draft with a formal document, keep the draft only if it still has value as working notes.
+- If a document contains operational assumptions, state them explicitly near the top.
+
+## Git Conventions
+- Use English Conventional Commit messages.
+- Avoid bundling unrelated changes into a single commit.
+
+## Design Expectations
+- Treat `codex app-server` as non-public unless a document explicitly says otherwise.
+- Prefer `stdio` transport over experimental network transports for the default design.
+- Prefer secure-by-default LAN designs: authenticated access, HTTPS, and a narrow public boundary.
