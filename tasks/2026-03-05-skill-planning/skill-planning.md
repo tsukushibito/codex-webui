@@ -57,12 +57,41 @@
   - Criteria for small, medium, and large changes.
 - `references/requirements-review.md`
   - Review checklist for scope, acceptance criteria, constraints, and unresolved points.
+  - Passing conditions for moving from requirements into design or implementation.
 - `references/design-review.md`
   - Review checklist for structure, boundaries, dependencies, and risk.
+  - Passing conditions for moving from design into implementation planning.
 - `references/planning-review.md`
   - Review checklist for sequencing, verification strategy, rollback, and risk handling.
+  - Passing conditions for moving from planning into implementation.
 - `references/tdd-decision.md`
   - Rules for when TDD should be preferred, optional, or skipped.
+
+### Review Passing Conditions
+
+#### Requirements Review
+- The goal can be stated clearly in one or two sentences.
+- The in-scope and out-of-scope boundaries are explicit enough to avoid accidental expansion.
+- Acceptance criteria are testable or otherwise verifiable.
+- Constraints and assumptions are listed.
+- Open questions are either resolved or explicitly marked as blockers or non-blockers.
+- No obvious contradiction remains between the requested outcome and the proposed requirements.
+
+#### Design Review
+- Each material requirement has a corresponding design response.
+- Component boundaries and responsibilities are clear enough to start implementation.
+- Main dependencies, integration points, and impact areas are identified.
+- Security, operational, and migration concerns are addressed when relevant.
+- The design is detailed enough to plan implementation tasks without guessing the main structure.
+- No unresolved design issue remains that is likely to block implementation immediately.
+
+#### Planning Review
+- The implementation sequence is coherent and avoids unnecessary rework.
+- Each planned step has a validation method, such as tests, manual checks, or observable behavior.
+- The TDD decision is recorded with a short rationale.
+- Risks, unknowns, and deferred items are listed.
+- The task breakdown is small enough to execute without losing track of progress.
+- No missing prerequisite remains that would stop implementation after work begins.
 
 ### Optional Later Resources
 - `assets/requirements-template.md`
