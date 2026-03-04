@@ -9,6 +9,7 @@
 - Do not rewrite or delete existing documents unless the user explicitly asks for it.
 - Prefer adding new formal documents under `docs/`.
 - Use `tasks/` for temporary work artifacts and move completed task directories to `tasks/archived/`.
+- When using `task-execution`, record repeated friction or missing guidance as a candidate improvement for the skill.
 - Follow [docs/task-management.md](/workspace/codex-webui/docs/task-management.md) for repository task-tracking rules.
 - Follow [docs/work-product-rules.md](/workspace/codex-webui/docs/work-product-rules.md) for rules on preserving requirements, design documents, and task artifacts.
 

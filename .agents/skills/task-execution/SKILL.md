@@ -22,7 +22,8 @@ Follow a single repository-local execution workflow for coding tasks. Keep issue
 9. Self-evaluate against the reviewed requirements, design, and plan.
 10. Run tests or other validation and report any unverified items.
 11. Promote durable decisions back into GitHub Issues or `docs/`.
-12. Move completed task artifacts into `tasks/archived/`.
+12. Record any repeated friction, missing guidance, or repeated manual wording as a candidate improvement for this skill.
+13. Move completed task artifacts into `tasks/archived/`.
 
 ## Task Artifacts
 
@@ -42,6 +43,13 @@ Follow a single repository-local execution workflow for coding tasks. Keep issue
 - Treat TDD as a decision point, not as a blanket rule.
 - Prefer TDD when behavior, interfaces, or state transitions should be fixed before implementation.
 - Skip or defer TDD when the task is exploratory, environment-bringing-up, or heavily visual, but record the reason.
+
+## Skill Feedback Loop
+
+- At the end of the task, note whether the skill caused confusion, missed a decision point, or forced repeated manual explanation.
+- Prefer updating the skill only when the same issue recurs or when the gap clearly affects execution quality.
+- Put workflow changes in `SKILL.md`.
+- Put detailed review criteria or decision rules in `references/`.
 
 ## References
 
