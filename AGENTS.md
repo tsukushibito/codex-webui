@@ -9,6 +9,7 @@
 - Do not rewrite or delete existing documents unless the user explicitly asks for it.
 - Prefer adding new formal documents under `docs/`.
 - Use `docs/draft/` only for notes, drafts, and incomplete materials.
+- Follow [docs/task-management.md](/workspace/codex-webui/docs/task-management.md) for repository task-tracking rules.
 
 ## Documentation Conventions
 - Use clear, stable file names. Prefer ASCII file names for formal documents.
