@@ -8,13 +8,12 @@
 - Keep changes small and scoped to the user request.
 - Do not rewrite or delete existing documents unless the user explicitly asks for it.
 - Prefer adding new formal documents under `docs/`.
-- Use `docs/draft/` only for notes, drafts, and incomplete materials.
 - Follow [docs/task-management.md](/workspace/codex-webui/docs/task-management.md) for repository task-tracking rules.
+- Follow [docs/work-product-rules.md](/workspace/codex-webui/docs/work-product-rules.md) for rules on preserving requirements, design documents, and task artifacts.
 
 ## Documentation Conventions
 - Use clear, stable file names. Prefer ASCII file names for formal documents.
 - Put implementation-independent architecture and operational decisions in `docs/`.
-- When replacing a draft with a formal document, keep the draft only if it still has value as working notes.
 - If a document contains operational assumptions, state them explicitly near the top.
 
 ## Git Conventions

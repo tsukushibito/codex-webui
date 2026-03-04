@@ -6,7 +6,7 @@
 
 ## 2. Operational Assumptions
 - GitHub Issues and GitHub Projects are available for this repository.
-- This repository is currently documentation-first and may include local working notes during implementation.
+- This repository is currently documentation-first.
 - The repository is primarily used by a single maintainer, but task records should remain understandable to other collaborators.
 
 ## 3. Source of Truth
@@ -26,15 +26,10 @@
 - Do not split review follow-up into a new Issue unless the scope becomes independent from the original deliverable.
 
 ## 6. Local Task Management
-- Use local files for active work management during implementation.
-- Keep incomplete or temporary working notes under `docs/draft/`.
-- Local notes may include:
-  - investigation notes
-  - temporary checklists
-  - implementation order
-  - review response notes
-  - unresolved questions to fold back into an Issue or formal document later
-- If a local note contains an important long-term decision, copy that decision back into the relevant Issue or a formal document under `docs/`.
+- Use temporary local notes only when implementation work needs active step-by-step tracking.
+- Do not treat temporary task notes as formal repository documentation.
+- Keep durable decisions in GitHub Issues or formal documents under `docs/`.
+- Follow `docs/work-product-rules.md` for rules on which implementation artifacts should be preserved.
 
 ## 7. Recommended Workflow
 1. Define the deliverable in a GitHub Issue.
@@ -53,5 +48,4 @@
 - Keep the detailed task-management policy in `docs/`.
 - Add only short repository-level guardrails to `AGENTS.md` when agent behavior must consistently follow them.
 - For this repository, it is reasonable for `AGENTS.md` to point agents toward this document, but the full policy does not need to be duplicated there.
-- Do not create a Skill for this policy unless the same workflow must be reused across multiple repositories or teams.
-- A Skill is appropriate for reusable cross-repository workflows; this document is currently repository-local policy.
+- Keep issue-tracking policy in documents, and define repeatable execution workflows in Skills when the workflow becomes stable enough to standardize.
