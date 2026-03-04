@@ -8,6 +8,7 @@
 - GitHub Issues and GitHub Projects are available for this repository.
 - This repository is currently documentation-first.
 - The repository is primarily used by a single maintainer, but task records should remain understandable to other collaborators.
+- Temporary execution artifacts may be stored in the repository under `tasks/`.
 
 ## 3. Source of Truth
 - Use GitHub Issues and GitHub Projects as the system of record for repository work.
@@ -26,8 +27,11 @@
 - Do not split review follow-up into a new Issue unless the scope becomes independent from the original deliverable.
 
 ## 6. Local Task Management
-- Use temporary local notes only when implementation work needs active step-by-step tracking.
-- Do not treat temporary task notes as formal repository documentation.
+- Use `tasks/` for temporary local work artifacts when implementation needs active step-by-step tracking.
+- Store active work under a dated task directory name such as `tasks/2026-03-05-issue-4-session-sse/`.
+- Prefer including a date and a short task identifier, and include an Issue number when one exists.
+- Move completed task directories into `tasks/archived/`.
+- Do not treat files under `tasks/` or `tasks/archived/` as formal repository documentation.
 - Keep durable decisions in GitHub Issues or formal documents under `docs/`.
 - Follow `docs/work-product-rules.md` for rules on which implementation artifacts should be preserved.
 
@@ -35,8 +39,9 @@
 1. Define the deliverable in a GitHub Issue.
 2. Add the Issue to the GitHub Project.
 3. Set Priority, Status, and Area in the Project.
-4. Use a local note only if the implementation needs temporary task breakdown or investigation tracking.
+4. Create a task directory under `tasks/` if the implementation needs temporary requirements, design, or plan artifacts.
 5. Fold durable conclusions back into the Issue or formal documentation before closing the work.
+6. Move the completed task directory into `tasks/archived/`.
 
 ## 8. When to Create a New Issue
 - Create a new Issue when new work has its own acceptance criteria.

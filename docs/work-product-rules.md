@@ -7,7 +7,7 @@
 ## 2. Operational Assumptions
 - GitHub Issues and GitHub Projects are used for repository-level task and priority tracking.
 - This repository preserves stable requirements and stable architectural decisions in `docs/`.
-- Short-lived implementation aids may exist during work, but they are not part of the repository's lasting documentation set.
+- Short-lived implementation aids may exist during work under `tasks/`, but they are not part of the repository's lasting documentation set.
 
 ## 3. Requirements Documents
 - Preserve requirements and specifications in `docs/`.
@@ -23,12 +23,16 @@
 ## 5. Task Lists and Execution Notes
 - Do not preserve task checklist documents as formal repository documentation.
 - Treat implementation task lists, sequencing notes, and temporary review-response notes as short-lived execution aids.
+- Store active temporary execution artifacts under `tasks/`.
+- Move completed temporary execution artifacts into `tasks/archived/`.
 - Once the work is complete, the authoritative record should be the GitHub Issue, GitHub Project state, the merged code, tests, and any durable documentation updates.
 
 ## 6. Placement Rules
 - Store preserved requirements and high-level design documents under `docs/`.
 - Keep repository-level task and status tracking in GitHub Issues and GitHub Projects.
-- Do not create persistent formal documents for temporary detailed design or task checklists.
+- Store temporary requirements drafts, detailed design notes, and task checklists under `tasks/`.
+- Move completed task artifacts into `tasks/archived/` unless they should be promoted into `docs/`.
+- Do not treat `tasks/` or `tasks/archived/` as sources of truth for formal repository documentation.
 
 ## 7. Promotion Rule
 - Promote a work artifact into `docs/` only when it has durable reference value after implementation.
@@ -37,6 +41,7 @@
   - it records an architectural or operational decision
   - it will be reused by future work
   - it affects multiple issues or implementation units
+- If a task artifact is not promoted, archive it instead of rewriting repository policy around it.
 
 ## 8. Relationship to Skills
 - Use repository documents to define preservation policy.
