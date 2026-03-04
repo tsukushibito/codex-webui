@@ -287,7 +287,51 @@ Notes:
 7. Implement `/api/git/diff` and `/api/git/show`.
 8. Add reconnect handling, approval redisplay, and turn snapshot diffing.
 
-## 16. Future Work
+## 16. Project and Issue Management
+
+### 16.1 Tracking Model
+- Create one GitHub Project for this repository named `codex-webui implementation`.
+- Use repository Issues for execution units and add them to the Project.
+- Keep one parent planning Issue for the MVP and track the implementation issues as linked execution work.
+
+### 16.2 Recommended Project Fields
+- `Status`
+  - `Todo`
+  - `In Progress`
+  - `Done`
+- `Priority`
+  - `P0`
+  - `P1`
+  - `P2`
+- `Area`
+  - `Infra`
+  - `Backend`
+  - `Frontend`
+  - `Security`
+
+### 16.3 Initial Issue Breakdown
+- `P0` `Infra`: Bootstrap Docker Compose, `edge`, and `codexbox`
+- `P0` `Infra`: Configure local CA TLS and reverse proxy with Caddy
+- `P0` `Backend`: Implement session lifecycle and SSE endpoint
+- `P0` `Backend`: Bridge `codex app-server` over stdio
+- `P0` `Backend`: Support `thread/start` and `turn/start`
+- `P0` `Frontend`: Render streaming chat output in the WebUI
+- `P0` `Backend`: Implement approval request handling
+- `P1` `Backend`: Add read-only file tree and file content APIs
+- `P1` `Backend`: Add read-only Git diff APIs
+- `P1` `Frontend`: Add file tree and diff panes
+- `P1` `Backend`: Add reconnect and pending approval recovery
+- `P2` `Backend`: Compute turn-local changed files from snapshots
+- `P2` `Backend`: Add optional one-shot `codex exec --json` path
+
+### 16.4 Working Rules
+- Complete `P0` items before starting `P1`, unless blocked by external setup.
+- Each implementation branch should map to one Issue.
+- If one Issue becomes too large, split it before implementation rather than carrying hidden subtasks in a branch.
+- Keep the Project ordered primarily by `Priority`, then by dependency order.
+- If stricter queue control becomes necessary later, add a separate workflow field such as `Backlog`, `Ready`, `Blocked`, and `Done` instead of overloading `Priority`.
+
+## 17. Future Work
 - Replace Basic auth with OIDC.
 - Split `codexbox` per repo.
 - Fully isolate sessions and workspaces for multi-user deployments.
