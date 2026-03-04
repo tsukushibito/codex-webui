@@ -27,4 +27,4 @@
 - Prefer secure-by-default LAN designs: authenticated access, HTTPS, and a narrow public boundary.
 
 ## Skills
-- `task-execution`: Repository-local implementation workflow skill. Use it for features, bug fixes, refactors, and other code changes that should follow the structured execution flow defined in `/workspace/codex-webui/skills/task-execution/SKILL.md`.
+- `task-execution`: Repository-local implementation workflow skill. Use it for features, bug fixes, refactors, and other code changes that should follow the structured execution flow defined in `/workspace/codex-webui/.agents/skills/task-execution/SKILL.md`.
