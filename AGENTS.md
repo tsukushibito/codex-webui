@@ -25,3 +25,6 @@
 - Treat `codex app-server` as non-public unless a document explicitly says otherwise.
 - Prefer `stdio` transport over experimental network transports for the default design.
 - Prefer secure-by-default LAN designs: authenticated access, HTTPS, and a narrow public boundary.
+
+## Skills
+- `task-execution`: Repository-local implementation workflow skill. Use it for features, bug fixes, refactors, and other code changes that should follow the structured execution flow defined in `/workspace/codex-webui/skills/task-execution/SKILL.md`.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Task Execution"
+  short_description: "Structured implementation workflow"
+  default_prompt: "Use $task-execution to assess change size, review requirements, plan implementation, decide on TDD, and execute the work."
