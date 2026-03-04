@@ -1,0 +1,4 @@
+# Placeholder reverse proxy for Issue #2 bootstrap.
+:80 {
+    reverse_proxy codexbox:8080
+}

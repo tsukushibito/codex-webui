@@ -1,0 +1,48 @@
+services:
+  edge:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - codexbox
+    networks:
+      - frontend
+      - backend
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./infra/certs:/certs:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  codexbox:
+    build: ./codexbox
+    working_dir: /workspace
+    command: ["node", "/app/webui-server.js"]
+    expose:
+      - "8080"
+    environment:
+      PORT: "8080"
+      CODEX_HOME: /state/codex
+      WORKSPACE_ROOT: /workspace
+    networks:
+      - backend
+    volumes:
+      - ./:/workspace
+      - codex_state:/state/codex
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+networks:
+  frontend:
+  backend:
+    internal: true
+
+volumes:
+  codex_state:
+  caddy_data:
+  caddy_config:
