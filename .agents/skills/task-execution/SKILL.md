@@ -21,9 +21,10 @@ Follow a single repository-local execution workflow for coding tasks. Keep issue
 8. Implement.
 9. Self-evaluate against the reviewed requirements, design, and plan.
 10. Run tests or other validation and report any unverified items.
-11. Promote durable decisions back into GitHub Issues or `docs/`.
-12. Record any repeated friction, missing guidance, or repeated manual wording as a candidate improvement for this skill.
-13. Move completed task artifacts into `tasks/archived/`.
+11. Finalize delivery with a merge path and Issue closeout method.
+12. Promote durable decisions back into GitHub Issues or `docs/`.
+13. Record any repeated friction, missing guidance, or repeated manual wording as a candidate improvement for this skill.
+14. Move completed task artifacts into `tasks/archived/`.
 
 ## Task Artifacts
 
@@ -50,6 +51,12 @@ Follow a single repository-local execution workflow for coding tasks. Keep issue
 - Prefer updating the skill only when the same issue recurs or when the gap clearly affects execution quality.
 - Put workflow changes in `SKILL.md`.
 - Put detailed review criteria or decision rules in `references/`.
+
+## Delivery and Issue Closeout
+
+- Prefer PR-based delivery, including self-review cases.
+- Use `Closes #<issue-number>` in the PR description when applicable so Issue closeout is automated on merge.
+- If direct push to `main` is used, record that choice and close the Issue manually.
 
 ## References
 

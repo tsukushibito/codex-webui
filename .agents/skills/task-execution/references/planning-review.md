@@ -10,6 +10,7 @@ Review the implementation plan before starting execution.
 - Are risks, unknowns, and deferred items listed?
 - Is the task breakdown small enough to track progress?
 - Are prerequisites complete?
+- Is the merge path and Issue closeout method explicit?
 
 ## Passing Conditions
 
@@ -20,3 +21,4 @@ Do not move forward until all of these are true:
 - Risks, unknowns, and deferred items are listed.
 - The task breakdown is small enough to execute without losing track of progress.
 - No missing prerequisite remains that would stop implementation after work begins.
+- The merge path and Issue closeout method are explicit.
