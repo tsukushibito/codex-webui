@@ -12,9 +12,13 @@ const SESSION_IDLE_TIMEOUT_MS = Number(process.env.SESSION_IDLE_TIMEOUT_MS || 15
 const SESSION_SWEEP_INTERVAL_MS = Number(process.env.SESSION_SWEEP_INTERVAL_MS || 30 * 1000);
 const APPROVAL_TIMEOUT_MS = Number(process.env.APPROVAL_TIMEOUT_MS || 2 * 60 * 1000);
 const RPC_TIMEOUT_MS = Number(process.env.RPC_TIMEOUT_MS || 60 * 1000);
+const CODEX_DEFAULT_APPROVAL_POLICY = process.env.CODEX_DEFAULT_APPROVAL_POLICY || "untrusted";
+const CODEX_DEFAULT_SANDBOX = process.env.CODEX_DEFAULT_SANDBOX || "read-only";
 const STATIC_DIR = path.join(__dirname, "public");
 
 const sessions = new Map();
+const VALID_APPROVAL_POLICIES = new Set(["untrusted", "on-failure", "on-request", "never"]);
+const VALID_SANDBOX_MODES = new Set(["read-only", "workspace-write", "danger-full-access"]);
 
 function nowMs() {
   return Date.now();
@@ -48,6 +52,31 @@ function normalizeError(err) {
     return err.message;
   }
   return JSON.stringify(err);
+}
+
+function assertValidServerSafetyDefaults() {
+  if (!VALID_APPROVAL_POLICIES.has(CODEX_DEFAULT_APPROVAL_POLICY)) {
+    throw new Error(
+      `Invalid CODEX_DEFAULT_APPROVAL_POLICY: ${CODEX_DEFAULT_APPROVAL_POLICY}`,
+    );
+  }
+  if (!VALID_SANDBOX_MODES.has(CODEX_DEFAULT_SANDBOX)) {
+    throw new Error(`Invalid CODEX_DEFAULT_SANDBOX: ${CODEX_DEFAULT_SANDBOX}`);
+  }
+}
+
+function assertNoUnsafeOverrides(source, blockedKeys, endpointPath) {
+  if (!source || typeof source !== "object") {
+    return;
+  }
+
+  for (const key of blockedKeys) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+      throw new Error(
+        `${endpointPath} does not allow overriding '${key}'; server-side safety policy is enforced`,
+      );
+    }
+  }
 }
 
 function makeSession() {
@@ -573,7 +602,15 @@ async function handlePostApi(req, res, pathname) {
 
   if (pathname === "/api/thread/start") {
     const session = ensureSession(body.sessionId);
-    const params = body.params && typeof body.params === "object" ? body.params : {};
+    const rawParams = body.params && typeof body.params === "object" ? body.params : {};
+    assertNoUnsafeOverrides(rawParams, ["approvalPolicy", "sandbox", "cwd"], pathname);
+
+    const params = {
+      ...rawParams,
+      approvalPolicy: CODEX_DEFAULT_APPROVAL_POLICY,
+      sandbox: CODEX_DEFAULT_SANDBOX,
+    };
+
     const result = await rpcRequest(session, "thread/start", params);
     if (typeof result?.thread?.id === "string") {
       session.threadId = result.thread.id;
@@ -587,6 +624,7 @@ async function handlePostApi(req, res, pathname) {
     const session = ensureSession(body.sessionId);
 
     const params = body.params && typeof body.params === "object" ? { ...body.params } : {};
+    assertNoUnsafeOverrides(params, ["approvalPolicy", "sandboxPolicy", "cwd"], pathname);
 
     if (!params.threadId) {
       params.threadId = body.threadId || session.threadId;
@@ -705,6 +743,8 @@ function handleGetApi(req, res, pathname, searchParams) {
 
   sendJson(res, 404, { ok: false, error: "not found" });
 }
+
+assertValidServerSafetyDefaults();
 
 const server = http.createServer(async (req, res) => {
   const method = req.method || "GET";
