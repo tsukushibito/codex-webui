@@ -1,0 +1,258 @@
+:root {
+  --bg-0: #f2eee8;
+  --bg-1: #fff9f2;
+  --ink-0: #1c1610;
+  --ink-1: #55473b;
+  --accent: #1f6d5f;
+  --accent-soft: #d6ece7;
+  --warn: #8b2f2f;
+  --line: #d7c9bb;
+  --panel: #fffefc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif;
+  color: var(--ink-0);
+  background:
+    radial-gradient(circle at 20% 10%, #f9e8d9 0, transparent 32%),
+    radial-gradient(circle at 85% 0%, #ddeee8 0, transparent 26%),
+    linear-gradient(160deg, var(--bg-0), var(--bg-1));
+  min-height: 100vh;
+}
+
+.shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.topbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: clamp(1.4rem, 2vw, 2rem);
+  letter-spacing: 0.02em;
+}
+
+.status {
+  margin: 6px 0 0;
+  color: var(--ink-1);
+  font-size: 0.95rem;
+}
+
+.meta {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+  color: var(--ink-1);
+  font-size: 0.82rem;
+}
+
+.meta code {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  background: #f8f1e9;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 3px 7px;
+  color: var(--ink-0);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 14px;
+}
+
+.chat-panel,
+.approval-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(49, 37, 20, 0.07);
+}
+
+.chat-panel {
+  min-height: 70vh;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  overflow: hidden;
+}
+
+.messages {
+  padding: 16px;
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+}
+
+.msg {
+  border-radius: 12px;
+  padding: 10px 12px;
+  max-width: 90%;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  animation: rise 0.2s ease-out;
+}
+
+.msg.user {
+  margin-left: auto;
+  background: #f3e0cf;
+  border: 1px solid #e4c8ad;
+}
+
+.msg.assistant {
+  margin-right: auto;
+  background: #ebf4f2;
+  border: 1px solid #d1e5df;
+}
+
+.msg.system {
+  margin: 0 auto;
+  color: var(--ink-1);
+  border: 1px dashed var(--line);
+  background: #fff7ed;
+  font-size: 0.9rem;
+}
+
+.composer {
+  border-top: 1px solid var(--line);
+  padding: 12px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.composer textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 50px;
+  max-height: 180px;
+  border: 1px solid #cbb8a5;
+  border-radius: 10px;
+  padding: 10px;
+  font: inherit;
+  background: #fffdfb;
+}
+
+.composer button {
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  padding: 0 16px;
+  cursor: pointer;
+}
+
+.composer button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.approval-panel {
+  padding: 12px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 10px;
+}
+
+.approval-panel h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.approvals {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.approvals.empty {
+  color: var(--ink-1);
+  font-size: 0.92rem;
+}
+
+.approval-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px;
+  background: #fff;
+}
+
+.approval-method {
+  margin: 0 0 6px;
+  font-size: 0.86rem;
+  color: var(--ink-1);
+}
+
+.approval-body {
+  margin: 0;
+  max-height: 140px;
+  overflow: auto;
+  font-size: 0.78rem;
+  background: #f8f4ef;
+  border: 1px solid #e0d2c3;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.approval-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.approval-actions button {
+  border: 1px solid #c7b39d;
+  background: #fff;
+  border-radius: 8px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.approval-actions button[data-decision="allow"] {
+  background: var(--accent-soft);
+  border-color: #9dcabc;
+}
+
+.approval-actions button[data-decision="deny"],
+.approval-actions button[data-decision="cancel"] {
+  color: var(--warn);
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 920px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-panel {
+    min-height: 60vh;
+  }
+
+  .approval-panel {
+    min-height: 220px;
+  }
+}
