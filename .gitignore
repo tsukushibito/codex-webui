@@ -1,0 +1,12 @@
+# Local TLS materials for edge (generated per environment)
+infra/certs/*.crt
+infra/certs/*.key
+infra/certs/*.pem
+infra/certs/*.csr
+infra/certs/*.srl
+infra/certs/*.p12
+infra/certs/*.der
+
+# Keep repository placeholders/docs
+!infra/certs/.gitkeep
+!infra/certs/README.md

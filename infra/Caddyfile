@@ -1,4 +1,11 @@
-# Placeholder reverse proxy for Issue #2 bootstrap.
+# Issue #3: edge HTTPS termination and reverse proxy.
+# `edge.crt` / `edge.key` must be issued by a local CA and mounted at /certs.
+
 :80 {
-    reverse_proxy codexbox:8080
+	redir https://{host}{uri} permanent
+}
+
+:443 {
+	tls /certs/edge.crt /certs/edge.key
+	reverse_proxy codexbox:8080
 }
