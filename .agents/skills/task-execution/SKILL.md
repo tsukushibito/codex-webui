@@ -21,10 +21,11 @@ Follow a single repository-local execution workflow for coding tasks. Keep issue
 8. Implement.
 9. Self-evaluate against the reviewed requirements, design, and plan.
 10. Run tests or other validation and report any unverified items.
-11. Finalize delivery with a merge path and Issue closeout method.
-12. Promote durable decisions back into GitHub Issues or `docs/`.
-13. Record any repeated friction, missing guidance, or repeated manual wording as a candidate improvement for this skill.
-14. Move completed task artifacts into `tasks/archived/`.
+11. Confirm security boundaries and protocol compatibility with at least one negative test.
+12. Finalize delivery with a merge path and Issue closeout method.
+13. Promote durable decisions back into GitHub Issues or `docs/`.
+14. Record any repeated friction, missing guidance, or repeated manual wording as a candidate improvement for this skill.
+15. Move completed task artifacts into `tasks/archived/`.
 
 ## Task Artifacts
 
@@ -38,6 +39,7 @@ Follow a single repository-local execution workflow for coding tasks. Keep issue
 - Do not move from requirements, design, or planning to the next stage until the corresponding passing conditions are satisfied.
 - Revise and re-review if a stage still has contradictions, missing prerequisites, or unclear validation.
 - Keep the review output concise, but explicit enough that the next stage does not depend on guesswork.
+- Treat Issue acceptance criteria as necessary but not sufficient; also verify repository design expectations and security constraints.
 
 ## TDD Decision
 
@@ -64,4 +66,5 @@ Follow a single repository-local execution workflow for coding tasks. Keep issue
 - Use [references/requirements-review.md](references/requirements-review.md) for requirements review and passing conditions.
 - Use [references/design-review.md](references/design-review.md) for design review and passing conditions.
 - Use [references/planning-review.md](references/planning-review.md) for plan review and passing conditions.
+- Use [references/security-compatibility-review.md](references/security-compatibility-review.md) for boundary, negative-test, and protocol-compatibility checks.
 - Use [references/tdd-decision.md](references/tdd-decision.md) to decide whether TDD should be applied.
