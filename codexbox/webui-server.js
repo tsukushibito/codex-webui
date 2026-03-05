@@ -11,6 +11,7 @@ const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || process.cwd();
 const SESSION_IDLE_TIMEOUT_MS = Number(process.env.SESSION_IDLE_TIMEOUT_MS || 15 * 60 * 1000);
 const SESSION_SWEEP_INTERVAL_MS = Number(process.env.SESSION_SWEEP_INTERVAL_MS || 30 * 1000);
 const APPROVAL_TIMEOUT_MS = Number(process.env.APPROVAL_TIMEOUT_MS || 2 * 60 * 1000);
+const USER_INPUT_TIMEOUT_MS = Number(process.env.USER_INPUT_TIMEOUT_MS || 2 * 60 * 1000);
 const RPC_TIMEOUT_MS = Number(process.env.RPC_TIMEOUT_MS || 60 * 1000);
 const CODEX_DEFAULT_APPROVAL_POLICY = process.env.CODEX_DEFAULT_APPROVAL_POLICY || "untrusted";
 const CODEX_DEFAULT_SANDBOX = process.env.CODEX_DEFAULT_SANDBOX || "read-only";
@@ -92,6 +93,7 @@ function makeSession() {
     closed: false,
     pendingRequests: new Map(),
     pendingApprovals: new Map(),
+    pendingUserInputs: new Map(),
     sseClients: new Set(),
     threadId: null,
   };
@@ -260,6 +262,105 @@ function listPendingApprovals(session) {
     .map(serializeApproval);
 }
 
+function userInputDefaultResponse(params) {
+  const answers = {};
+  const questions = Array.isArray(params?.questions) ? params.questions : [];
+  for (const question of questions) {
+    const id = question && typeof question.id === "string" ? question.id : null;
+    if (!id) {
+      continue;
+    }
+    answers[id] = { answers: [] };
+  }
+  return { answers };
+}
+
+function serializeUserInputRequest(request) {
+  return {
+    requestId: request.requestId,
+    method: request.method,
+    params: request.params,
+    createdAt: request.createdAt,
+    expiresAt: request.expiresAt,
+  };
+}
+
+function listPendingUserInputs(session) {
+  return Array.from(session.pendingUserInputs.values())
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .map(serializeUserInputRequest);
+}
+
+function normalizeUserInputResult(request, body) {
+  if (body.result && typeof body.result === "object") {
+    return body.result;
+  }
+
+  const result = userInputDefaultResponse(request.params);
+  const rawAnswers = body.answers;
+  if (!rawAnswers || typeof rawAnswers !== "object") {
+    return result;
+  }
+
+  for (const [questionId, rawAnswer] of Object.entries(rawAnswers)) {
+    if (Array.isArray(rawAnswer)) {
+      result.answers[questionId] = { answers: rawAnswer.map((value) => String(value)) };
+      continue;
+    }
+    if (rawAnswer && typeof rawAnswer === "object" && Array.isArray(rawAnswer.answers)) {
+      result.answers[questionId] = {
+        answers: rawAnswer.answers.map((value) => String(value)),
+      };
+    }
+  }
+
+  return result;
+}
+
+function resolveUserInputRequest(session, requestId, result, resolutionType) {
+  const key = String(requestId);
+  const request = session.pendingUserInputs.get(key);
+  if (!request) {
+    throw new Error(`user input request ${requestId} not found`);
+  }
+
+  clearTimeout(request.timeoutHandle);
+  session.pendingUserInputs.delete(key);
+
+  rpcRespond(session, request.rpcId, result);
+  emitSessionEvent(session, "user_input/resolved", {
+    resolutionType,
+    request: serializeUserInputRequest(request),
+    result,
+  });
+  touchSession(session);
+
+  return {
+    requestId: request.requestId,
+    resolutionType,
+    result,
+  };
+}
+
+function handleUserInputTimeout(session, requestId) {
+  const key = String(requestId);
+  const request = session.pendingUserInputs.get(key);
+  if (!request) {
+    return;
+  }
+
+  const timeoutResult = userInputDefaultResponse(request.params);
+  try {
+    resolveUserInputRequest(session, requestId, timeoutResult, "timeout");
+  } catch (err) {
+    session.pendingUserInputs.delete(key);
+    emitSessionEvent(session, "user_input/timed_out", {
+      request: serializeUserInputRequest(request),
+      reason: normalizeError(err),
+    });
+  }
+}
+
 function resolveApproval(session, requestId, result, resolutionType) {
   const key = String(requestId);
   const approval = session.pendingApprovals.get(key);
@@ -348,10 +449,59 @@ function handleRpcRequestFromServer(session, message) {
     return;
   }
 
+  if (method === "item/tool/requestUserInput") {
+    const requestId = String(message.id);
+    const createdAt = nowMs();
+    const request = {
+      requestId,
+      rpcId: message.id,
+      method,
+      params: message.params || {},
+      createdAt,
+      expiresAt: createdAt + USER_INPUT_TIMEOUT_MS,
+      timeoutHandle: null,
+    };
+
+    request.timeoutHandle = setTimeout(() => {
+      handleUserInputTimeout(session, requestId);
+    }, USER_INPUT_TIMEOUT_MS);
+
+    session.pendingUserInputs.set(requestId, request);
+    emitSessionEvent(session, "user_input/pending", {
+      request: serializeUserInputRequest(request),
+    });
+    touchSession(session);
+    return;
+  }
+
+  if (method === "item/tool/call") {
+    const result = {
+      success: false,
+      contentItems: [
+        {
+          type: "inputText",
+          text: "Dynamic tool execution is not supported in this bridge.",
+        },
+      ],
+    };
+    rpcRespond(session, message.id, result);
+    emitSessionEvent(session, "tool_call/unsupported", {
+      requestId: String(message.id),
+      method,
+      params: message.params || {},
+      result,
+    });
+    touchSession(session);
+    return;
+  }
+
   rpcError(session, message.id, `Unsupported server request method: ${method}`);
   emitSessionEvent(session, "rpc/server_request_unsupported", {
-    message,
+    requestId: String(message.id),
+    method: typeof method === "string" ? method : null,
+    reason: "unsupported-server-request-method",
   });
+  touchSession(session);
 }
 
 function handleRpcNotification(session, message) {
@@ -433,6 +583,11 @@ function shutdownSession(session, reason) {
     clearTimeout(approval.timeoutHandle);
   }
   session.pendingApprovals.clear();
+
+  for (const request of session.pendingUserInputs.values()) {
+    clearTimeout(request.timeoutHandle);
+  }
+  session.pendingUserInputs.clear();
 
   if (session.child && !session.child.killed) {
     session.child.kill("SIGTERM");
@@ -581,6 +736,7 @@ async function handlePostApi(req, res, pathname) {
         initResult,
         idleTimeoutMs: SESSION_IDLE_TIMEOUT_MS,
         approvalTimeoutMs: APPROVAL_TIMEOUT_MS,
+        userInputTimeoutMs: USER_INPUT_TIMEOUT_MS,
       });
       return;
     } catch (err) {
@@ -679,6 +835,27 @@ async function handlePostApi(req, res, pathname) {
     return;
   }
 
+  if (pathname === "/api/user-input/respond") {
+    const session = ensureSession(body.sessionId);
+    const requestId = body.requestId;
+    if (requestId === undefined || requestId === null) {
+      throw new Error("requestId is required");
+    }
+
+    const request = session.pendingUserInputs.get(String(requestId));
+    if (!request) {
+      throw new Error(`pending user input request not found: ${requestId}`);
+    }
+
+    const result = normalizeUserInputResult(request, body);
+    const resolved = resolveUserInputRequest(session, requestId, result, "manual");
+    sendJson(res, 200, {
+      ok: true,
+      resolved,
+    });
+    return;
+  }
+
   sendJson(res, 404, { ok: false, error: "not found" });
 }
 
@@ -714,6 +891,7 @@ function handleGetApi(req, res, pathname, searchParams) {
         sessionId: session.id,
         threadId: session.threadId,
         pendingApprovals: listPendingApprovals(session),
+        pendingUserInputs: listPendingUserInputs(session),
       },
       session.nextSseId++,
     );
@@ -737,6 +915,15 @@ function handleGetApi(req, res, pathname, searchParams) {
     sendJson(res, 200, {
       ok: true,
       pendingApprovals: listPendingApprovals(session),
+    });
+    return;
+  }
+
+  if (pathname === "/api/user-input") {
+    const session = ensureSession(searchParams.get("sessionId"));
+    sendJson(res, 200, {
+      ok: true,
+      pendingUserInputs: listPendingUserInputs(session),
     });
     return;
   }
