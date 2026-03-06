@@ -19,17 +19,36 @@ function createApp(env = {}) {
     messageById: new Map(),
     pendingApprovals: new Map(),
     pendingUserInputs: new Map(),
+    workspaceTree: [],
+    selectedPath: null,
+    selectedFile: null,
+    selectedDiff: null,
+    selectedEntry: null,
+    filePreviewError: "",
+    diffError: "",
+    loadingWorkspaceTree: false,
+    loadingSelection: false,
+    activePane: "chat",
+    selectionRequestToken: 0,
   };
 
   const els = {
+    shell: doc.getElementById("shell"),
     status: doc.getElementById("status"),
     sessionId: doc.getElementById("session-id"),
     messages: doc.getElementById("messages"),
+    workspaceTree: doc.getElementById("workspace-tree"),
+    selectedPath: doc.getElementById("selected-path"),
+    filePreview: doc.getElementById("file-preview"),
+    diffView: doc.getElementById("diff-view"),
     approvals: doc.getElementById("approvals"),
     userInputs: doc.getElementById("user-inputs"),
     composer: doc.getElementById("composer"),
     prompt: doc.getElementById("prompt"),
     send: doc.getElementById("send"),
+    tabChat: doc.getElementById("tab-chat"),
+    tabFiles: doc.getElementById("tab-files"),
+    tabDiff: doc.getElementById("tab-diff"),
   };
 
   function setStatus(text) {
@@ -90,6 +109,306 @@ function createApp(env = {}) {
     } catch {
       return null;
     }
+  }
+
+  function findFirstFileNode(nodes) {
+    for (const node of nodes || []) {
+      if (node.type === "file") {
+        return node;
+      }
+      if (node.type === "directory") {
+        const nested = findFirstFileNode(node.children || []);
+        if (nested) {
+          return nested;
+        }
+      }
+    }
+    return null;
+  }
+
+  function findEntryByPath(nodes, targetPath) {
+    for (const node of nodes || []) {
+      if (node.path === targetPath) {
+        return node;
+      }
+      if (node.type === "directory") {
+        const nested = findEntryByPath(node.children || [], targetPath);
+        if (nested) {
+          return nested;
+        }
+      }
+    }
+    return null;
+  }
+
+  function describeGitStatus(code) {
+    const trimmed = String(code || "").trim();
+    return trimmed || "clean";
+  }
+
+  function setActivePane(pane) {
+    state.activePane = pane;
+    if (els.shell) {
+      els.shell.dataset.activePane = pane;
+    }
+
+    const tabMap = [
+      [els.tabChat, "chat"],
+      [els.tabFiles, "files"],
+      [els.tabDiff, "diff"],
+    ];
+    for (const [button, buttonPane] of tabMap) {
+      if (!button) {
+        continue;
+      }
+      button.classList.toggle("is-active", buttonPane === pane);
+    }
+  }
+
+  function renderWorkspaceTreeNodes(nodes, container, depth) {
+    for (const node of nodes || []) {
+      if (node.type === "directory") {
+        const directory = createElement("section", "tree-directory");
+        const label = createElement("div", "tree-directory-label", node.name);
+        label.dataset.depth = String(depth);
+
+        const children = createElement("div", "tree-children");
+        children.dataset.depth = String(depth + 1);
+
+        directory.appendChild(label);
+        renderWorkspaceTreeNodes(node.children || [], children, depth + 1);
+        directory.appendChild(children);
+        container.appendChild(directory);
+        continue;
+      }
+
+      const button = createElement("button", "tree-file");
+      const name = createElement("span", "tree-file-name", node.name);
+      const status = createElement("span", "tree-file-status", describeGitStatus(node.gitStatus));
+
+      button.type = "button";
+      button.dataset.path = node.path;
+      button.dataset.depth = String(depth);
+      button.classList.toggle("is-selected", node.path === state.selectedPath);
+      button.addEventListener("click", async () => {
+        await selectPath(node.path);
+        setActivePane("diff");
+      });
+
+      button.appendChild(name);
+      button.appendChild(status);
+      container.appendChild(button);
+    }
+  }
+
+  function renderWorkspaceTree() {
+    const nodes = state.workspaceTree || [];
+    els.workspaceTree.classList.toggle("empty", nodes.length === 0);
+
+    if (state.loadingWorkspaceTree) {
+      els.workspaceTree.textContent = "Loading files...";
+      return;
+    }
+
+    if (nodes.length === 0) {
+      els.workspaceTree.textContent = "No files available.";
+      return;
+    }
+
+    els.workspaceTree.replaceChildren();
+    renderWorkspaceTreeNodes(nodes, els.workspaceTree, 0);
+  }
+
+  function renderFilePreview() {
+    els.filePreview.classList.toggle("empty", !state.selectedPath || state.loadingSelection);
+
+    if (!state.selectedPath) {
+      els.selectedPath.textContent = "Select a file to inspect.";
+      els.filePreview.textContent = "Select a file from the tree to inspect its workspace contents.";
+      return;
+    }
+
+    els.selectedPath.textContent = state.selectedPath;
+
+    if (state.loadingSelection) {
+      els.filePreview.textContent = `Loading workspace file for ${state.selectedPath}...`;
+      return;
+    }
+
+    if (state.filePreviewError) {
+      els.filePreview.textContent = state.filePreviewError;
+      return;
+    }
+
+    if (!state.selectedFile) {
+      els.filePreview.textContent = "No workspace file content available.";
+      return;
+    }
+
+    const card = createElement("article", "inspector-card");
+    const meta = createElement(
+      "p",
+      "inspector-meta",
+      `${state.selectedFile.path} · ${state.selectedFile.size} bytes`,
+    );
+    const body = createElement("pre", "code-block", state.selectedFile.content);
+
+    card.appendChild(meta);
+    card.appendChild(body);
+    els.filePreview.replaceChildren(card);
+  }
+
+  function createDiffSide(title, payload) {
+    const side = createElement("article", "diff-side");
+    const heading = createElement("div", "diff-side-heading");
+    const titleNode = createElement("h3", "diff-side-title", title);
+    const refNode = createElement("p", "diff-side-ref", payload.ref || "");
+    const body = createElement("pre", "code-block", payload.exists ? payload.content : "");
+
+    heading.appendChild(titleNode);
+    heading.appendChild(refNode);
+    side.appendChild(heading);
+
+    if (!payload.exists) {
+      side.appendChild(createElement("p", "diff-empty", "File does not exist on this side."));
+      return side;
+    }
+
+    side.appendChild(body);
+    return side;
+  }
+
+  function renderDiffView() {
+    els.diffView.classList.toggle("empty", !state.selectedPath || state.loadingSelection);
+
+    if (!state.selectedPath) {
+      els.diffView.textContent = "Select a file to render its Git-backed diff.";
+      return;
+    }
+
+    if (state.loadingSelection) {
+      els.diffView.textContent = `Loading Git diff for ${state.selectedPath}...`;
+      return;
+    }
+
+    if (state.diffError) {
+      els.diffView.textContent = state.diffError;
+      return;
+    }
+
+    if (!state.selectedDiff) {
+      els.diffView.textContent = "No Git diff available.";
+      return;
+    }
+
+    const wrapper = createElement("article", "diff-card");
+    const meta = createElement(
+      "p",
+      "inspector-meta",
+      `${state.selectedDiff.path} · status ${describeGitStatus(state.selectedDiff.gitStatus)}`,
+    );
+    const columns = createElement("div", "diff-columns");
+
+    columns.appendChild(createDiffSide("HEAD", state.selectedDiff.left));
+    columns.appendChild(createDiffSide("WORKTREE", state.selectedDiff.right));
+    wrapper.appendChild(meta);
+    wrapper.appendChild(columns);
+    els.diffView.replaceChildren(wrapper);
+  }
+
+  async function loadWorkspaceTree() {
+    state.loadingWorkspaceTree = true;
+    renderWorkspaceTree();
+
+    try {
+      const response = await api("/api/fs/tree", null, "GET");
+      state.workspaceTree = Array.isArray(response.tree) ? response.tree : [];
+      renderWorkspaceTree();
+
+      const currentEntry = state.selectedPath
+        ? findEntryByPath(state.workspaceTree, state.selectedPath)
+        : null;
+      if (currentEntry) {
+        await selectPath(currentEntry.path);
+        return;
+      }
+
+      const firstFile = findFirstFileNode(state.workspaceTree);
+      if (firstFile) {
+        await selectPath(firstFile.path);
+      } else {
+        state.selectedPath = null;
+        state.selectedEntry = null;
+        state.selectedFile = null;
+        state.selectedDiff = null;
+        state.filePreviewError = "";
+        state.diffError = "";
+        renderFilePreview();
+        renderDiffView();
+      }
+    } catch (err) {
+      state.workspaceTree = [];
+      els.workspaceTree.classList.add("empty");
+      els.workspaceTree.textContent = `Failed to load workspace tree: ${err.message}`;
+      setStatus(`Workspace error: ${err.message}`);
+    } finally {
+      state.loadingWorkspaceTree = false;
+      renderWorkspaceTree();
+    }
+  }
+
+  async function selectPath(pathname) {
+    const path = String(pathname || "");
+    if (!path) {
+      return;
+    }
+
+    state.selectedPath = path;
+    state.selectedEntry = findEntryByPath(state.workspaceTree, path);
+    state.selectedFile = null;
+    state.selectedDiff = null;
+    state.filePreviewError = "";
+    state.diffError = "";
+    state.loadingSelection = true;
+    const token = ++state.selectionRequestToken;
+
+    renderWorkspaceTree();
+    renderFilePreview();
+    renderDiffView();
+
+    const encodedPath = encodeURIComponent(path);
+    const [fileResult, diffResult] = await Promise.allSettled([
+      api(`/api/fs/file?path=${encodedPath}`, null, "GET"),
+      api(`/api/git/diff?path=${encodedPath}`, null, "GET"),
+    ]);
+
+    if (token !== state.selectionRequestToken) {
+      return;
+    }
+
+    state.loadingSelection = false;
+
+    if (fileResult.status === "fulfilled") {
+      state.selectedFile = fileResult.value.file || null;
+    } else {
+      state.filePreviewError = `Failed to load file: ${fileResult.reason.message}`;
+    }
+
+    if (diffResult.status === "fulfilled") {
+      state.selectedDiff = diffResult.value.diff || null;
+    } else {
+      state.diffError = `Failed to load diff: ${diffResult.reason.message}`;
+    }
+
+    renderWorkspaceTree();
+    renderFilePreview();
+    renderDiffView();
+
+    if (state.filePreviewError || state.diffError) {
+      setStatus(`Inspect error: ${state.filePreviewError || state.diffError}`);
+      return;
+    }
+    setStatus(`Loaded ${path}`);
   }
 
   function renderApprovals() {
@@ -530,11 +849,35 @@ function createApp(env = {}) {
     });
   }
 
+  function bindPaneTabs() {
+    const tabs = [
+      [els.tabChat, "chat"],
+      [els.tabFiles, "files"],
+      [els.tabDiff, "diff"],
+    ];
+
+    for (const [button, pane] of tabs) {
+      if (!button) {
+        continue;
+      }
+      button.addEventListener("click", () => {
+        setActivePane(pane);
+      });
+    }
+  }
+
   async function init() {
+    setActivePane(state.activePane);
     updateComposerState();
+    renderWorkspaceTree();
+    renderFilePreview();
+    renderDiffView();
     renderApprovals();
     renderUserInputs();
     bindComposer();
+    bindPaneTabs();
+
+    await loadWorkspaceTree();
 
     if (autoStart) {
       await startSession();
@@ -546,6 +889,8 @@ function createApp(env = {}) {
     els,
     init,
     api,
+    loadWorkspaceTree,
+    selectPath,
     applySessionSnapshot,
     handleUserInputPending,
     handleUserInputResolved,

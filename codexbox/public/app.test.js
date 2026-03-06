@@ -118,14 +118,22 @@ class FakeDocument {
   constructor() {
     this.nodes = new Map();
     for (const id of [
+      "shell",
       "status",
       "session-id",
       "messages",
+      "workspace-tree",
+      "selected-path",
+      "file-preview",
+      "diff-view",
       "approvals",
       "user-inputs",
       "composer",
       "prompt",
       "send",
+      "tab-chat",
+      "tab-files",
+      "tab-diff",
     ]) {
       this.nodes.set(id, new FakeElement("div", id));
     }
@@ -227,9 +235,9 @@ test("bundled UI renders and submits pending user-input requests", async () => {
     preventDefault() {},
   });
 
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].requestPath, "/api/user-input/respond");
-  assert.deepEqual(calls[0].body, {
+  const respondCall = calls.find((call) => call.requestPath === "/api/user-input/respond");
+  assert.ok(respondCall);
+  assert.deepEqual(respondCall.body, {
     sessionId: "session-1",
     requestId: "42",
     answers: {
@@ -243,4 +251,173 @@ test("bundled UI renders and submits pending user-input requests", async () => {
     },
   });
   assert.match(userInputRoot.textContent, /No pending user input requests/);
+});
+
+test("bundled UI renders workspace tree and Git-backed file inspection", async () => {
+  const document = new FakeDocument();
+  const calls = [];
+  const app = createApp({
+    document,
+    autoStart: false,
+    EventSource: class {},
+    fetch: async (requestPath, options) => {
+      calls.push({
+        requestPath,
+        method: options.method,
+      });
+
+      if (requestPath === "/api/fs/tree") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            tree: [
+              {
+                type: "file",
+                name: "README.md",
+                path: "README.md",
+                tracked: true,
+                gitStatus: " M",
+                indexStatus: " ",
+                worktreeStatus: "M",
+              },
+              {
+                type: "directory",
+                name: "docs",
+                path: "docs",
+                children: [
+                  {
+                    type: "file",
+                    name: "notes.md",
+                    path: "docs/notes.md",
+                    tracked: true,
+                    gitStatus: "??",
+                    indexStatus: "?",
+                    worktreeStatus: "?",
+                  },
+                ],
+              },
+            ],
+          }),
+        };
+      }
+
+      if (requestPath === "/api/fs/file?path=README.md") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            file: {
+              path: "README.md",
+              size: 12,
+              content: "hello world\n",
+            },
+          }),
+        };
+      }
+
+      if (requestPath === "/api/git/diff?path=README.md") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            diff: {
+              path: "README.md",
+              gitStatus: " M",
+              left: {
+                path: "README.md",
+                ref: "HEAD",
+                exists: true,
+                size: 5,
+                content: "hello",
+              },
+              right: {
+                path: "README.md",
+                ref: "WORKTREE",
+                exists: true,
+                size: 12,
+                content: "hello world\n",
+              },
+            },
+          }),
+        };
+      }
+
+      if (requestPath === "/api/fs/file?path=docs%2Fnotes.md") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            file: {
+              path: "docs/notes.md",
+              size: 11,
+              content: "notes here\n",
+            },
+          }),
+        };
+      }
+
+      if (requestPath === "/api/git/diff?path=docs%2Fnotes.md") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            diff: {
+              path: "docs/notes.md",
+              gitStatus: "??",
+              left: {
+                path: "docs/notes.md",
+                ref: "HEAD",
+                exists: false,
+                size: 0,
+                content: "",
+              },
+              right: {
+                path: "docs/notes.md",
+                ref: "WORKTREE",
+                exists: true,
+                size: 11,
+                content: "notes here\n",
+              },
+            },
+          }),
+        };
+      }
+
+      throw new Error(`Unexpected request: ${requestPath}`);
+    },
+  });
+
+  await app.init();
+
+  const workspaceTree = document.getElementById("workspace-tree");
+  const filePreview = document.getElementById("file-preview");
+  const diffView = document.getElementById("diff-view");
+
+  assert.match(workspaceTree.textContent, /README\.md/);
+  assert.match(workspaceTree.textContent, /notes\.md/);
+  assert.match(filePreview.textContent, /hello world/);
+  assert.match(diffView.textContent, /HEAD/);
+  assert.match(diffView.textContent, /WORKTREE/);
+  await document.getElementById("tab-files").dispatchEvent({ type: "click" });
+  assert.equal(document.getElementById("shell").dataset.activePane, "files");
+
+  const notesButton = findFirst(
+    workspaceTree,
+    (node) => node.tagName === "BUTTON" && node.dataset.path === "docs/notes.md",
+  );
+  assert.ok(notesButton);
+  await notesButton.dispatchEvent({ type: "click" });
+
+  assert.equal(app.state.selectedPath, "docs/notes.md");
+  assert.equal(document.getElementById("shell").dataset.activePane, "diff");
+  assert.match(filePreview.textContent, /notes here/);
+  assert.match(diffView.textContent, /File does not exist on this side/);
+  assert.ok(calls.some((call) => call.requestPath === "/api/fs/tree"));
+  assert.ok(calls.some((call) => call.requestPath === "/api/git/diff?path=docs%2Fnotes.md"));
 });
