@@ -29,23 +29,18 @@
         </section>
 
         <aside class="approval-panel">
-          <h2>Approvals</h2>
-          <div id="approvals" class="approvals empty">No pending approvals.</div>
+          <section class="panel-section">
+            <h2>Approvals</h2>
+            <div id="approvals" class="approvals empty">No pending approvals.</div>
+          </section>
+
+          <section class="panel-section">
+            <h2>User Input</h2>
+            <div id="user-inputs" class="user-inputs empty">No pending user input requests.</div>
+          </section>
         </aside>
       </main>
     </div>
-
-    <template id="approval-template">
-      <article class="approval-card">
-        <p class="approval-method"></p>
-        <pre class="approval-body"></pre>
-        <div class="approval-actions">
-          <button data-decision="allow" type="button">Allow</button>
-          <button data-decision="deny" type="button">Deny</button>
-          <button data-decision="cancel" type="button">Cancel</button>
-        </div>
-      </article>
-    </template>
 
     <script src="/static/app.js" defer></script>
   </body>

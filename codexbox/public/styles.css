@@ -164,7 +164,13 @@ body {
 .approval-panel {
   padding: 12px;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto;
+  gap: 10px;
+  align-content: start;
+}
+
+.panel-section {
+  display: grid;
   gap: 10px;
 }
 
@@ -173,13 +179,15 @@ body {
   font-size: 1rem;
 }
 
-.approvals {
+.approvals,
+.user-inputs {
   display: grid;
   gap: 10px;
   align-content: start;
 }
 
-.approvals.empty {
+.approvals.empty,
+.user-inputs.empty {
   color: var(--ink-1);
   font-size: 0.92rem;
 }
@@ -229,6 +237,87 @@ body {
 
 .approval-actions button[data-decision="deny"],
 .approval-actions button[data-decision="cancel"] {
+  color: var(--warn);
+}
+
+.user-input-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+}
+
+.user-input-method {
+  margin: 0 0 8px;
+  font-size: 0.86rem;
+  color: var(--ink-1);
+}
+
+.user-input-form {
+  display: grid;
+  gap: 10px;
+}
+
+.user-input-question {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #e6d8ca;
+  border-radius: 10px;
+  background: #fdf8f2;
+}
+
+.user-input-question-title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.user-input-question-body,
+.user-input-empty {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--ink-1);
+}
+
+.user-input-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.user-input-option,
+.user-input-actions button {
+  border: 1px solid #c7b39d;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 9px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.user-input-answer {
+  width: 100%;
+  resize: vertical;
+  min-height: 72px;
+  border: 1px solid #cbb8a5;
+  border-radius: 10px;
+  padding: 10px;
+  font: inherit;
+  background: #fffdfb;
+}
+
+.user-input-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.user-input-submit {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.user-input-skip {
   color: var(--warn);
 }
 
