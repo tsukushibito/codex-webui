@@ -38,6 +38,9 @@ Follow a single repository-local execution workflow for coding tasks. Keep issue
 - Do not move from requirements, design, or planning to the next stage until the corresponding passing conditions are satisfied.
 - Revise and re-review if a stage still has contradictions, missing prerequisites, or unclear validation.
 - Keep the review output concise, but explicit enough that the next stage does not depend on guesswork.
+- If a task adds or changes an API, event, schema, protocol message, or other consumed interface, identify the shipped consumers before implementation.
+- Do not treat backend-only or contract-only validation as sufficient when a bundled or first-party client consumes the changed interface.
+- For consumed interface changes, either validate at least one end-to-end consumer path in the same task or create an explicit follow-up Issue and record why it is separate.
 
 ## TDD Decision
 
