@@ -117,9 +117,40 @@ function resolveWorkspacePath(requestedPath) {
   };
 }
 
+function normalizeRepoRelativePath(requestedPath) {
+  const rawPath = String(requestedPath || "").trim();
+  if (!rawPath) {
+    throw new Error("path is required");
+  }
+
+  const candidatePath = path.resolve(WORKSPACE_ROOT_REALPATH, rawPath);
+  if (!isPathInside(WORKSPACE_ROOT_REALPATH, candidatePath)) {
+    throw new Error(`path escapes workspace: ${rawPath}`);
+  }
+
+  const relativePath = path.relative(WORKSPACE_ROOT_REALPATH, candidatePath).split(path.sep).join("/");
+  if (!relativePath || relativePath === ".") {
+    throw new Error("path must point to a file");
+  }
+
+  return {
+    rawPath,
+    absolutePath: candidatePath,
+    relativePath,
+  };
+}
+
 async function runGit(args) {
   const { stdout } = await execFileAsync("git", ["-C", WORKSPACE_ROOT_REALPATH, ...args], {
     encoding: "utf8",
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  return stdout;
+}
+
+async function runGitBuffer(args) {
+  const { stdout } = await execFileAsync("git", ["-C", WORKSPACE_ROOT_REALPATH, ...args], {
+    encoding: "buffer",
     maxBuffer: 8 * 1024 * 1024,
   });
   return stdout;
@@ -233,6 +264,31 @@ function ensureTextFile(buffer, requestedPath) {
   }
 }
 
+function toTextPayload(pathname, ref, exists, buffer) {
+  if (!exists) {
+    return {
+      path: pathname,
+      ref,
+      exists: false,
+      size: 0,
+      content: "",
+    };
+  }
+
+  if (buffer.length > MAX_FILE_BYTES) {
+    throw new Error(`file is too large: ${pathname}`);
+  }
+  ensureTextFile(buffer, pathname);
+
+  return {
+    path: pathname,
+    ref,
+    exists: true,
+    size: buffer.length,
+    content: buffer.toString("utf8"),
+  };
+}
+
 async function listWorkspaceFiles() {
   const [trackedOutput, statusOutput] = await Promise.all([
     runGit(["ls-files", "-z", "--cached"]),
@@ -317,6 +373,96 @@ async function readWorkspaceFile(requestedPath) {
     path: resolved.relativePath,
     size: buffer.length,
     content: buffer.toString("utf8"),
+  };
+}
+
+async function gitObjectExists(ref, relativePath) {
+  try {
+    await runGit(["cat-file", "-e", `${ref}:${relativePath}`]);
+    return true;
+  } catch (err) {
+    if (typeof err?.code === "number") {
+      return false;
+    }
+    throw err;
+  }
+}
+
+async function gitObjectType(ref, relativePath) {
+  const output = await runGit(["cat-file", "-t", `${ref}:${relativePath}`]);
+  return output.trim();
+}
+
+async function readGitFile(requestedPath, ref = "HEAD") {
+  const normalized = normalizeRepoRelativePath(requestedPath);
+  const exists = await gitObjectExists(ref, normalized.relativePath);
+  if (!exists) {
+    return toTextPayload(normalized.relativePath, ref, false, Buffer.alloc(0));
+  }
+
+  const objectType = await gitObjectType(ref, normalized.relativePath);
+  if (objectType !== "blob") {
+    throw new Error(`path is not a file: ${requestedPath}`);
+  }
+
+  const buffer = await runGitBuffer(["show", `${ref}:${normalized.relativePath}`]);
+  return toTextPayload(normalized.relativePath, ref, true, buffer);
+}
+
+async function readWorkspaceFileVersion(requestedPath) {
+  const normalized = normalizeRepoRelativePath(requestedPath);
+  if (!fs.existsSync(normalized.absolutePath)) {
+    return toTextPayload(normalized.relativePath, "WORKTREE", false, Buffer.alloc(0));
+  }
+
+  const resolved = resolveWorkspacePath(normalized.relativePath);
+  const stat = await fs.promises.stat(resolved.absolutePath);
+  if (!stat.isFile()) {
+    throw new Error(`path is not a file: ${requestedPath}`);
+  }
+
+  const buffer = await fs.promises.readFile(resolved.absolutePath);
+  return toTextPayload(normalized.relativePath, "WORKTREE", true, buffer);
+}
+
+async function readGitStatus(requestedPath) {
+  const normalized = normalizeRepoRelativePath(requestedPath);
+  const output = await runGit([
+    "status",
+    "--porcelain=v1",
+    "-z",
+    "--untracked-files=all",
+    "--",
+    normalized.relativePath,
+  ]);
+  const status = parseGitStatusPorcelain(output).get(normalized.relativePath);
+
+  return {
+    path: normalized.relativePath,
+    gitStatus: status?.code || "  ",
+    indexStatus: status?.indexStatus || " ",
+    worktreeStatus: status?.worktreeStatus || " ",
+  };
+}
+
+async function readGitDiff(requestedPath) {
+  const status = await readGitStatus(requestedPath);
+  const [left, right] = await Promise.all([
+    readGitFile(status.path, "HEAD"),
+    readWorkspaceFileVersion(status.path),
+  ]);
+
+  if (!left.exists && !right.exists) {
+    throw new Error(`path not found: ${status.path}`);
+  }
+
+  return {
+    path: status.path,
+    gitStatus: status.gitStatus,
+    indexStatus: status.indexStatus,
+    worktreeStatus: status.worktreeStatus,
+    left,
+    right,
   };
 }
 
@@ -1184,6 +1330,25 @@ async function handleGetApi(req, res, pathname, searchParams) {
     sendJson(res, 200, {
       ok: true,
       file,
+    });
+    return;
+  }
+
+  if (pathname === "/api/git/show") {
+    const ref = String(searchParams.get("ref") || "HEAD").trim() || "HEAD";
+    const file = await readGitFile(searchParams.get("path"), ref);
+    sendJson(res, 200, {
+      ok: true,
+      file,
+    });
+    return;
+  }
+
+  if (pathname === "/api/git/diff") {
+    const diff = await readGitDiff(searchParams.get("path"));
+    sendJson(res, 200, {
+      ok: true,
+      diff,
     });
     return;
   }

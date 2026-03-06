@@ -4,11 +4,14 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const net = require("node:net");
+const os = require("node:os");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
+const { spawn, execFile } = require("node:child_process");
+const { promisify } = require("node:util");
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 const SERVER_PATH = path.join(__dirname, "webui-server.js");
+const execFileAsync = promisify(execFile);
 
 async function findFreePort() {
   return new Promise((resolve, reject) => {
@@ -46,7 +49,33 @@ async function waitForServer(port) {
   throw new Error("server did not become ready in time");
 }
 
-async function startServer(t) {
+async function git(repoDir, args) {
+  const result = await execFileAsync("git", ["-C", repoDir, ...args], {
+    encoding: "utf8",
+  });
+  return result.stdout;
+}
+
+async function createTempGitRepo(t) {
+  const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), "codex-webui-git-"));
+  t.after(async () => {
+    await fs.rm(repoDir, { recursive: true, force: true });
+  });
+
+  await git(repoDir, ["init", "-q"]);
+  await git(repoDir, ["config", "user.email", "test@example.com"]);
+  await git(repoDir, ["config", "user.name", "Test User"]);
+
+  await fs.writeFile(path.join(repoDir, "tracked.txt"), "tracked-v1\n");
+  await fs.mkdir(path.join(repoDir, "nested"), { recursive: true });
+  await fs.writeFile(path.join(repoDir, "nested", "keep.txt"), "nested-v1\n");
+  await git(repoDir, ["add", "."]);
+  await git(repoDir, ["commit", "-qm", "init"]);
+
+  return repoDir;
+}
+
+async function startServer(t, options = {}) {
   const port = await findFreePort();
   const child = spawn(process.execPath, [SERVER_PATH], {
     cwd: REPO_ROOT,
@@ -54,7 +83,8 @@ async function startServer(t) {
       ...process.env,
       HOST: "127.0.0.1",
       PORT: String(port),
-      MAX_FILE_BYTES: "128",
+      MAX_FILE_BYTES: options.maxFileBytes || "128",
+      WORKSPACE_ROOT: options.workspaceRoot || REPO_ROOT,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -151,4 +181,109 @@ test("GET /api/fs/file rejects oversized files", async (t) => {
   const body = await response.json();
   assert.equal(body.ok, false);
   assert.match(body.error, /file is too large/);
+});
+
+test("GET /api/git/show returns HEAD content for a tracked file", async (t) => {
+  const repoDir = await createTempGitRepo(t);
+  await fs.writeFile(path.join(repoDir, "tracked.txt"), "tracked-v2\n");
+
+  const { port } = await startServer(t, { workspaceRoot: repoDir });
+  const response = await fetch(
+    `http://127.0.0.1:${port}/api/git/show?path=${encodeURIComponent("tracked.txt")}`,
+  );
+  assert.equal(response.status, 200);
+
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.file.path, "tracked.txt");
+  assert.equal(body.file.ref, "HEAD");
+  assert.equal(body.file.exists, true);
+  assert.equal(body.file.content, "tracked-v1\n");
+});
+
+test("GET /api/git/show rejects directories", async (t) => {
+  const repoDir = await createTempGitRepo(t);
+
+  const { port } = await startServer(t, { workspaceRoot: repoDir });
+  const response = await fetch(
+    `http://127.0.0.1:${port}/api/git/show?path=${encodeURIComponent("nested")}`,
+  );
+  assert.equal(response.status, 400);
+
+  const body = await response.json();
+  assert.equal(body.ok, false);
+  assert.match(body.error, /path is not a file/);
+});
+
+test("GET /api/git/diff returns HEAD and worktree content for modified files", async (t) => {
+  const repoDir = await createTempGitRepo(t);
+  await fs.writeFile(path.join(repoDir, "tracked.txt"), "tracked-v2\n");
+
+  const { port } = await startServer(t, { workspaceRoot: repoDir });
+  const response = await fetch(
+    `http://127.0.0.1:${port}/api/git/diff?path=${encodeURIComponent("tracked.txt")}`,
+  );
+  assert.equal(response.status, 200);
+
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.diff.path, "tracked.txt");
+  assert.equal(body.diff.left.content, "tracked-v1\n");
+  assert.equal(body.diff.right.content, "tracked-v2\n");
+  assert.equal(body.diff.left.exists, true);
+  assert.equal(body.diff.right.exists, true);
+  assert.match(body.diff.gitStatus, /M/);
+});
+
+test("GET /api/git/diff uses an empty left side for new files", async (t) => {
+  const repoDir = await createTempGitRepo(t);
+  await fs.writeFile(path.join(repoDir, "new-file.txt"), "brand-new\n");
+
+  const { port } = await startServer(t, { workspaceRoot: repoDir });
+  const response = await fetch(
+    `http://127.0.0.1:${port}/api/git/diff?path=${encodeURIComponent("new-file.txt")}`,
+  );
+  assert.equal(response.status, 200);
+
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.diff.left.exists, false);
+  assert.equal(body.diff.left.content, "");
+  assert.equal(body.diff.right.exists, true);
+  assert.equal(body.diff.right.content, "brand-new\n");
+  assert.equal(body.diff.right.ref, "WORKTREE");
+  assert.equal(body.diff.gitStatus, "??");
+});
+
+test("GET /api/git/diff uses an empty right side for deleted files", async (t) => {
+  const repoDir = await createTempGitRepo(t);
+  await fs.rm(path.join(repoDir, "tracked.txt"));
+
+  const { port } = await startServer(t, { workspaceRoot: repoDir });
+  const response = await fetch(
+    `http://127.0.0.1:${port}/api/git/diff?path=${encodeURIComponent("tracked.txt")}`,
+  );
+  assert.equal(response.status, 200);
+
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.diff.left.exists, true);
+  assert.equal(body.diff.left.content, "tracked-v1\n");
+  assert.equal(body.diff.right.exists, false);
+  assert.equal(body.diff.right.content, "");
+  assert.match(body.diff.gitStatus, /D/);
+});
+
+test("GET /api/git/diff blocks path traversal", async (t) => {
+  const repoDir = await createTempGitRepo(t);
+
+  const { port } = await startServer(t, { workspaceRoot: repoDir });
+  const response = await fetch(
+    `http://127.0.0.1:${port}/api/git/diff?path=${encodeURIComponent("../etc/passwd")}`,
+  );
+  assert.equal(response.status, 400);
+
+  const body = await response.json();
+  assert.equal(body.ok, false);
+  assert.match(body.error, /path escapes workspace/);
 });
