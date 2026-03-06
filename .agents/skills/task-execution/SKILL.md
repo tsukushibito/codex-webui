@@ -41,6 +41,14 @@ Follow a single repository-local execution workflow for coding tasks. Keep issue
 - If a task adds or changes an API, event, schema, protocol message, or other consumed interface, identify the shipped consumers before implementation.
 - Do not treat backend-only or contract-only validation as sufficient when a bundled or first-party client consumes the changed interface.
 - For consumed interface changes, either validate at least one end-to-end consumer path in the same task or create an explicit follow-up Issue and record why it is separate.
+- For API and contract changes, explicitly review invalid inputs, missing-versus-invalid distinctions, and boundary cases such as directories, symlinks, binaries, and size limits when relevant.
+
+## Self-Evaluation
+
+- Before closeout, compare the shipped behavior against the reviewed requirements, design, and plan.
+- For API or contract changes, confirm the success path and failure semantics are both explicit and tested.
+- Check whether the implementation leaves any caller-visible ambiguity, especially around invalid parameters, missing resources, or type mismatches.
+- If a boundary case is intentionally deferred, record the follow-up Issue instead of leaving the behavior implicit.
 
 ## TDD Decision
 

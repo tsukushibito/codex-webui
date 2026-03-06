@@ -26,6 +26,9 @@
 - State whether the Issue covers only a backend or contract change, or also includes bundled or first-party consumer work.
 - Add an `Out of scope` section when splitting backend and consumer work across separate Issues.
 - For API, event, schema, protocol, or other consumed interface changes, list the affected consumers or workflows explicitly.
+- For API, event, schema, protocol, or other behavior changes, include an `Edge cases and error handling` section.
+- In that section, make invalid-input behavior explicit, including missing-versus-invalid distinctions when they matter to callers.
+- Call out file or path constraints explicitly when relevant, such as directory handling, symlinks, binary rejection, and size limits.
 - Make the validation boundary explicit in the acceptance criteria.
 - If end-to-end consumer validation is deferred, link the follow-up Issue in the body instead of leaving the consumer work implicit.
 
