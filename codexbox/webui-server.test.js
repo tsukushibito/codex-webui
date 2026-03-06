@@ -215,6 +215,20 @@ test("GET /api/git/show rejects directories", async (t) => {
   assert.match(body.error, /path is not a file/);
 });
 
+test("GET /api/git/show rejects invalid refs", async (t) => {
+  const repoDir = await createTempGitRepo(t);
+
+  const { port } = await startServer(t, { workspaceRoot: repoDir });
+  const response = await fetch(
+    `http://127.0.0.1:${port}/api/git/show?path=${encodeURIComponent("tracked.txt")}&ref=${encodeURIComponent("does-not-exist")}`,
+  );
+  assert.equal(response.status, 400);
+
+  const body = await response.json();
+  assert.equal(body.ok, false);
+  assert.match(body.error, /invalid ref/);
+});
+
 test("GET /api/git/diff returns HEAD and worktree content for modified files", async (t) => {
   const repoDir = await createTempGitRepo(t);
   await fs.writeFile(path.join(repoDir, "tracked.txt"), "tracked-v2\n");
@@ -253,6 +267,29 @@ test("GET /api/git/diff uses an empty left side for new files", async (t) => {
   assert.equal(body.diff.right.content, "brand-new\n");
   assert.equal(body.diff.right.ref, "WORKTREE");
   assert.equal(body.diff.gitStatus, "??");
+});
+
+test("GET /api/git/diff compares symlink paths as symlink entries", async (t) => {
+  const repoDir = await createTempGitRepo(t);
+  await fs.writeFile(path.join(repoDir, "target.txt"), "target-v1\n");
+  await fs.symlink("target.txt", path.join(repoDir, "link.txt"));
+  await git(repoDir, ["add", "target.txt", "link.txt"]);
+  await git(repoDir, ["commit", "-qm", "add symlink"]);
+  await fs.writeFile(path.join(repoDir, "target.txt"), "target-v2\n");
+
+  const { port } = await startServer(t, { workspaceRoot: repoDir });
+  const response = await fetch(
+    `http://127.0.0.1:${port}/api/git/diff?path=${encodeURIComponent("link.txt")}`,
+  );
+  assert.equal(response.status, 200);
+
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.diff.left.exists, true);
+  assert.equal(body.diff.right.exists, true);
+  assert.equal(body.diff.left.content, "target.txt");
+  assert.equal(body.diff.right.content, "target.txt");
+  assert.equal(body.diff.gitStatus, "  ");
 });
 
 test("GET /api/git/diff uses an empty right side for deleted files", async (t) => {

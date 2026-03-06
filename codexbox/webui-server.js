@@ -156,6 +156,19 @@ async function runGitBuffer(args) {
   return stdout;
 }
 
+function isGitMissingObjectError(err) {
+  if (typeof err?.stderr !== "string") {
+    return false;
+  }
+  return (
+    err.stderr.includes("exists on disk, but not in") ||
+    err.stderr.includes("pathspec") ||
+    err.stderr.includes("Not a valid object name") ||
+    err.stderr.includes("invalid object name") ||
+    err.stderr.includes("does not exist in")
+  );
+}
+
 function parseGitStatusPorcelain(output) {
   const statuses = new Map();
   const records = output.split("\0");
@@ -381,8 +394,19 @@ async function gitObjectExists(ref, relativePath) {
     await runGit(["cat-file", "-e", `${ref}:${relativePath}`]);
     return true;
   } catch (err) {
-    if (typeof err?.code === "number") {
+    if (typeof err?.code === "number" && isGitMissingObjectError(err)) {
       return false;
+    }
+    throw err;
+  }
+}
+
+async function assertGitRefExists(ref) {
+  try {
+    await runGit(["rev-parse", "--verify", "--quiet", `${ref}^{object}`]);
+  } catch (err) {
+    if (typeof err?.code === "number") {
+      throw new Error(`invalid ref: ${ref}`);
     }
     throw err;
   }
@@ -395,6 +419,7 @@ async function gitObjectType(ref, relativePath) {
 
 async function readGitFile(requestedPath, ref = "HEAD") {
   const normalized = normalizeRepoRelativePath(requestedPath);
+  await assertGitRefExists(ref);
   const exists = await gitObjectExists(ref, normalized.relativePath);
   if (!exists) {
     return toTextPayload(normalized.relativePath, ref, false, Buffer.alloc(0));
@@ -413,6 +438,16 @@ async function readWorkspaceFileVersion(requestedPath) {
   const normalized = normalizeRepoRelativePath(requestedPath);
   if (!fs.existsSync(normalized.absolutePath)) {
     return toTextPayload(normalized.relativePath, "WORKTREE", false, Buffer.alloc(0));
+  }
+
+  const entryStat = await fs.promises.lstat(normalized.absolutePath);
+  if (entryStat.isSymbolicLink()) {
+    const resolvedPath = fs.realpathSync.native(normalized.absolutePath);
+    if (!isPathInside(WORKSPACE_ROOT_REALPATH, resolvedPath)) {
+      throw new Error(`path escapes workspace: ${requestedPath}`);
+    }
+    const linkTarget = await fs.promises.readlink(normalized.absolutePath, "utf8");
+    return toTextPayload(normalized.relativePath, "WORKTREE", true, Buffer.from(linkTarget, "utf8"));
   }
 
   const resolved = resolveWorkspacePath(normalized.relativePath);
