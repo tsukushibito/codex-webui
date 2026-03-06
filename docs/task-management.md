@@ -21,6 +21,14 @@
 - Use an Issue when the work should be prioritized, scheduled, reviewed independently, or referenced later.
 - Keep related review fixes inside the same Issue when they are still part of the original acceptance criteria.
 
+## 4.1 Issue Definition Guidance
+- Write Issue bodies so the implementation boundary is explicit, not implied.
+- State whether the Issue covers only a backend or contract change, or also includes bundled or first-party consumer work.
+- Add an `Out of scope` section when splitting backend and consumer work across separate Issues.
+- For API, event, schema, protocol, or other consumed interface changes, list the affected consumers or workflows explicitly.
+- Make the validation boundary explicit in the acceptance criteria.
+- If end-to-end consumer validation is deferred, link the follow-up Issue in the body instead of leaving the consumer work implicit.
+
 ## 5. What Stays Out of Issues
 - Do not create a separate Issue for every temporary implementation step.
 - Do not use Issues for scratch notes, short-lived TODO lists, or local sequencing details.
