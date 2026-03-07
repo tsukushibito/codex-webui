@@ -690,12 +690,7 @@ const server = http.createServer(async (req, res) => {
   const pathname = requestUrl.pathname;
 
   try {
-    if (method === "GET" && pathname === "/") {
-      servePublicAsset(res, "/static/index.html");
-      return;
-    }
-
-    if (method === "GET" && (pathname === "/app" || pathname === "/app/")) {
+    if (method === "GET" && (pathname === "/" || pathname === "/app" || pathname === "/app/")) {
       serveBuiltFrontend(res);
       return;
     }
