@@ -120,6 +120,21 @@ async function createFakeCodexBin(t, scriptSource) {
   return binPath;
 }
 
+function parseSseTranscript(text) {
+  return String(text || "")
+    .split("\n\n")
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+    .map((chunk) => {
+      const eventMatch = chunk.match(/^event: (.+)$/m);
+      const dataMatch = chunk.match(/^data: (.+)$/m);
+      return {
+        event: eventMatch ? eventMatch[1] : null,
+        data: dataMatch ? JSON.parse(dataMatch[1]) : null,
+      };
+    });
+}
+
 test("GET /api/fs/tree returns tracked files", async (t) => {
   const { port } = await startServer(t);
   const response = await fetch(`http://127.0.0.1:${port}/api/fs/tree`);
@@ -655,4 +670,77 @@ rl.on("line", (line) => {
   const missingBody = await missingResponse.json();
   assert.equal(missingBody.ok, false);
   assert.match(missingBody.error, /turn changes not found/);
+});
+
+test("POST /api/exec streams one-shot codex exec output without creating a session", async (t) => {
+  const fakeCodex = await createFakeCodexBin(
+    t,
+    `#!/usr/bin/env node
+if (process.argv[2] === "exec") {
+  process.stdout.write(JSON.stringify({ type: "thread.started", thread_id: "thread-1" }) + "\\n");
+  process.stdout.write(JSON.stringify({ type: "turn.started" }) + "\\n");
+  process.stderr.write("exec stderr line\\n");
+  process.stdout.write(JSON.stringify({
+    type: "item.completed",
+    item: { id: "item_0", type: "agent_message", text: "ok" },
+  }) + "\\n");
+  process.stdout.write(JSON.stringify({
+    type: "turn.completed",
+    usage: { input_tokens: 1, cached_input_tokens: 0, output_tokens: 1 },
+  }) + "\\n");
+  process.exit(0);
+}
+
+process.stderr.write("unsupported fake codex mode\\n");
+process.exit(1);
+`,
+  );
+
+  const { port } = await startServer(t, { codexBin: fakeCodex });
+
+  const response = await fetch(`http://127.0.0.1:${port}/api/exec`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      prompt: "reply with ok",
+    }),
+  });
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") || "", /text\/event-stream/);
+
+  const transcript = await response.text();
+  const sseEvents = parseSseTranscript(transcript).filter((entry) => entry.event);
+  const eventNames = sseEvents.map((entry) => entry.event);
+
+  assert.equal(eventNames[0], "exec/started");
+  assert.equal(eventNames[eventNames.length - 1], "exec/completed");
+  assert.equal(eventNames.filter((name) => name === "exec/event").length, 4);
+  assert.ok(eventNames.includes("exec/stderr"));
+
+  const jobId = sseEvents[0].data.jobId;
+  assert.ok(jobId);
+  const execEvents = sseEvents.filter((entry) => entry.event === "exec/event");
+  const stderrEvent = sseEvents.find((entry) => entry.event === "exec/stderr");
+  const completedEvent = sseEvents.find((entry) => entry.event === "exec/completed");
+
+  assert.ok(execEvents.every((entry) => entry.data.jobId === jobId));
+  assert.equal(execEvents[0].data.event.type, "thread.started");
+  assert.equal(execEvents[3].data.event.type, "turn.completed");
+  assert.match(stderrEvent.data.chunk, /exec stderr line/);
+  assert.equal(completedEvent.data.exitCode, 0);
+  assert.equal(completedEvent.data.signal, null);
+
+  const healthzResponse = await fetch(`http://127.0.0.1:${port}/api/healthz`);
+  const healthzBody = await healthzResponse.json();
+  assert.equal(healthzBody.sessions, 0);
+
+  const missingPromptResponse = await fetch(`http://127.0.0.1:${port}/api/exec`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  assert.equal(missingPromptResponse.status, 400);
+  const missingPromptBody = await missingPromptResponse.json();
+  assert.equal(missingPromptBody.ok, false);
+  assert.match(missingPromptBody.error, /prompt is required/);
 });

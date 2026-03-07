@@ -223,6 +223,8 @@ Notes:
 ### 11.4 One-shot Execution
 - If needed later, add a separate `codex exec --json` path.
 - Keep one-shot jobs separate from the stateful conversation UI.
+- Use `POST /api/exec` as a stateless streaming route for one-shot jobs.
+- Stream the raw `codex exec --json` JSONL payloads as SSE `exec/event` frames, with separate `exec/stderr`, `exec/error`, and `exec/completed` frames.
 
 ## 12. FS and Git API Design
 

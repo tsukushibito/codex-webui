@@ -933,6 +933,16 @@ function serializeSessionSnapshot(session) {
   };
 }
 
+function readExecPrompt(body) {
+  if (typeof body?.prompt === "string" && body.prompt.trim()) {
+    return body.prompt;
+  }
+  if (typeof body?.text === "string" && body.text.trim()) {
+    return body.text;
+  }
+  throw new Error("prompt is required");
+}
+
 function normalizeUserInputResult(request, body) {
   if (body.result && typeof body.result === "object") {
     return body.result;
@@ -1545,6 +1555,123 @@ async function handlePostApi(req, res, pathname) {
       ok: true,
       resolved,
     });
+    return;
+  }
+
+  if (pathname === "/api/exec") {
+    const prompt = readExecPrompt(body);
+    const jobId = randomUUID();
+    let nextEventId = 1;
+    let stdoutBuffer = "";
+    let finished = false;
+
+    const writeExecEvent = (eventName, payload) => {
+      if (res.writableEnded) {
+        return;
+      }
+      writeSse(res, eventName, { jobId, ...payload }, nextEventId++);
+    };
+
+    const flushStdoutLine = (line) => {
+      const text = String(line || "").trim();
+      if (!text) {
+        return;
+      }
+
+      try {
+        writeExecEvent("exec/event", {
+          event: JSON.parse(text),
+        });
+      } catch (err) {
+        writeExecEvent("exec/error", {
+          error: `failed to parse exec json: ${normalizeError(err)}`,
+          line: text,
+        });
+      }
+    };
+
+    const child = spawn(
+      CODEX_BIN,
+      [
+        "exec",
+        "--json",
+        "--skip-git-repo-check",
+        "--sandbox",
+        CODEX_DEFAULT_SANDBOX,
+        "-C",
+        WORKSPACE_ROOT,
+        prompt,
+      ],
+      {
+        cwd: WORKSPACE_ROOT,
+        env: process.env,
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+
+    res.writeHead(200, {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache, no-transform",
+      connection: "keep-alive",
+      "x-accel-buffering": "no",
+    });
+    res.write("retry: 1500\n\n");
+    writeExecEvent("exec/started", {
+      command: "codex exec --json",
+      sandbox: CODEX_DEFAULT_SANDBOX,
+    });
+
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdoutBuffer += chunk;
+      const parts = stdoutBuffer.split(/\r?\n/);
+      stdoutBuffer = parts.pop() || "";
+      for (const part of parts) {
+        flushStdoutLine(part);
+      }
+    });
+
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk) => {
+      writeExecEvent("exec/stderr", {
+        chunk: String(chunk),
+      });
+    });
+
+    child.on("error", (err) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      writeExecEvent("exec/error", {
+        error: `failed to start exec: ${normalizeError(err)}`,
+      });
+      writeExecEvent("exec/completed", {
+        exitCode: null,
+        signal: null,
+      });
+      res.end();
+    });
+
+    child.on("exit", (code, signal) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      flushStdoutLine(stdoutBuffer);
+      writeExecEvent("exec/completed", {
+        exitCode: code === null ? null : code,
+        signal: signal || null,
+      });
+      res.end();
+    });
+
+    res.on("close", () => {
+      if (!finished && child && !child.killed) {
+        child.kill("SIGTERM");
+      }
+    });
+
     return;
   }
 
