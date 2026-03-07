@@ -1,4 +1,6 @@
-const migrationSteps = [
+import type { BridgeIssueStep } from './types';
+
+const migrationSteps: BridgeIssueStep[] = [
   { issue: '#43', title: 'Define typed frontend contracts and shared state models' },
   { issue: '#44', title: 'Port current WebUI shell and layout to Preact components' },
   { issue: '#45', title: 'Port interactive session, approval, and file-inspection flows' },
