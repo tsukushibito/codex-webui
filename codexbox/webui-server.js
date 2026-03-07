@@ -5,6 +5,15 @@ const { spawn, execFile } = require("node:child_process");
 const { randomUUID, createHash } = require("node:crypto");
 const { promisify } = require("node:util");
 const { openSseStream, writeSse } = require("./server/sse");
+const {
+  approvalDefaultResult,
+  createSessionStore,
+  listPendingApprovals,
+  listPendingUserInputs,
+  normalizeUserInputResult,
+  serializeSessionSnapshot,
+} = require("./server/session-store");
+const { createSessionRuntime } = require("./server/session-runtime");
 
 const PORT = Number(process.env.PORT || 8080);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -21,7 +30,6 @@ const STATIC_DIR = path.join(__dirname, "public");
 const MAX_FILE_BYTES = Number(process.env.MAX_FILE_BYTES || 256 * 1024);
 const execFileAsync = promisify(execFile);
 
-const sessions = new Map();
 const VALID_APPROVAL_POLICIES = new Set(["untrusted", "on-failure", "on-request", "never"]);
 const VALID_SANDBOX_MODES = new Set(["read-only", "workspace-write", "danger-full-access"]);
 const WORKSPACE_ROOT_REALPATH = fs.realpathSync.native(WORKSPACE_ROOT);
@@ -712,221 +720,38 @@ async function finalizeTurnChanges(session, params) {
   }
 }
 
-function makeSession() {
-  const sessionId = randomUUID();
-  const session = {
-    id: sessionId,
-    createdAt: nowMs(),
-    lastActivityAt: nowMs(),
-    nextRpcId: 1,
-    nextSseId: 1,
-    stdoutBuffer: "",
-    child: null,
-    closed: false,
-    pendingRequests: new Map(),
-    pendingApprovals: new Map(),
-    pendingUserInputs: new Map(),
-    activeTurnSnapshots: new Map(),
-    completedTurnChanges: new Map(),
-    sseClients: new Set(),
-    threadId: null,
-  };
-  sessions.set(sessionId, session);
-  return session;
-}
+const sessionStore = createSessionStore({
+  randomUUID,
+  nowMs,
+});
 
-function touchSession(session) {
-  session.lastActivityAt = nowMs();
-}
+const {
+  sessions,
+  createSession: makeSession,
+  emitSessionEvent,
+  ensureSession,
+  shutdownSession,
+  touchSession,
+} = sessionStore;
 
-function emitSessionEvent(session, eventName, payload) {
-  const eventId = session.nextSseId++;
-  const data = {
-    sessionId: session.id,
-    emittedAt: nowMs(),
-    ...payload,
-  };
-
-  for (const client of session.sseClients) {
-    if (client.writableEnded || client.destroyed) {
-      session.sseClients.delete(client);
-      continue;
-    }
-    try {
-      writeSse(client, eventName, data, eventId);
-    } catch {
-      session.sseClients.delete(client);
-    }
-  }
-}
-
-function rpcWrite(session, message) {
-  if (!session.child || session.closed) {
-    throw new Error("session is not running");
-  }
-  const line = JSON.stringify(message);
-  session.child.stdin.write(`${line}\n`);
-  touchSession(session);
-}
-
-function rpcNotify(session, method, params) {
-  const message = {
-    jsonrpc: "2.0",
-    method,
-  };
-  if (params !== undefined) {
-    message.params = params;
-  }
-  rpcWrite(session, message);
-}
-
-function rpcRespond(session, requestId, result) {
-  rpcWrite(session, {
-    jsonrpc: "2.0",
-    id: requestId,
-    result,
-  });
-}
-
-function rpcError(session, requestId, message, code = -32601, data = null) {
-  rpcWrite(session, {
-    jsonrpc: "2.0",
-    id: requestId,
-    error: {
-      code,
-      message,
-      data,
-    },
-  });
-}
-
-function rpcRequest(session, method, params) {
-  const requestId = session.nextRpcId++;
-  const key = String(requestId);
-
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      session.pendingRequests.delete(key);
-      reject(new Error(`RPC timeout for method ${method}`));
-    }, RPC_TIMEOUT_MS);
-
-    session.pendingRequests.set(key, {
-      method,
-      resolve,
-      reject,
-      timeout,
-    });
-
-    try {
-      rpcWrite(session, {
-        jsonrpc: "2.0",
-        id: requestId,
-        method,
-        params,
-      });
-    } catch (err) {
-      clearTimeout(timeout);
-      session.pendingRequests.delete(key);
-      reject(err);
-    }
-  });
-}
-
-function handleRpcResponse(session, message) {
-  const key = String(message.id);
-  const pending = session.pendingRequests.get(key);
-  if (!pending) {
-    return;
-  }
-
-  clearTimeout(pending.timeout);
-  session.pendingRequests.delete(key);
-
-  if (message.error) {
-    pending.reject(new Error(normalizeError(message.error)));
-    return;
-  }
-
-  pending.resolve(message.result);
-}
-
-function approvalDefaultResult(method, decision) {
-  const normalized = String(decision || "deny").toLowerCase();
-
-  if (method === "item/commandExecution/requestApproval") {
-    if (normalized === "allow") return { decision: "accept" };
-    if (normalized === "cancel") return { decision: "cancel" };
-    return { decision: "decline" };
-  }
-
-  if (method === "item/fileChange/requestApproval") {
-    if (normalized === "allow") return { decision: "accept" };
-    if (normalized === "cancel") return { decision: "cancel" };
-    return { decision: "decline" };
-  }
-
-  if (method === "execCommandApproval" || method === "applyPatchApproval") {
-    if (normalized === "allow") return { decision: "approved" };
-    if (normalized === "cancel") return { decision: "abort" };
-    return { decision: "denied" };
-  }
-
-  return null;
-}
-
-function serializeApproval(approval) {
-  return {
-    requestId: approval.requestId,
-    method: approval.method,
-    params: approval.params,
-    createdAt: approval.createdAt,
-    expiresAt: approval.expiresAt,
-  };
-}
-
-function listPendingApprovals(session) {
-  return Array.from(session.pendingApprovals.values())
-    .sort((a, b) => a.createdAt - b.createdAt)
-    .map(serializeApproval);
-}
-
-function userInputDefaultResponse(params) {
-  const answers = {};
-  const questions = Array.isArray(params?.questions) ? params.questions : [];
-  for (const question of questions) {
-    const id = question && typeof question.id === "string" ? question.id : null;
-    if (!id) {
-      continue;
-    }
-    answers[id] = { answers: [] };
-  }
-  return { answers };
-}
-
-function serializeUserInputRequest(request) {
-  return {
-    requestId: request.requestId,
-    method: request.method,
-    params: request.params,
-    createdAt: request.createdAt,
-    expiresAt: request.expiresAt,
-  };
-}
-
-function listPendingUserInputs(session) {
-  return Array.from(session.pendingUserInputs.values())
-    .sort((a, b) => a.createdAt - b.createdAt)
-    .map(serializeUserInputRequest);
-}
-
-function serializeSessionSnapshot(session) {
-  return {
-    sessionId: session.id,
-    threadId: session.threadId,
-    pendingApprovals: listPendingApprovals(session),
-    pendingUserInputs: listPendingUserInputs(session),
-  };
-}
+const {
+  resolveApproval,
+  resolveUserInputRequest,
+  rpcRequest,
+  startSessionRuntime,
+} = createSessionRuntime({
+  codexBin: CODEX_BIN,
+  workspaceRoot: WORKSPACE_ROOT,
+  approvalTimeoutMs: APPROVAL_TIMEOUT_MS,
+  userInputTimeoutMs: USER_INPUT_TIMEOUT_MS,
+  rpcTimeoutMs: RPC_TIMEOUT_MS,
+  emitSessionEvent,
+  normalizeError,
+  nowMs,
+  onTurnCompleted: finalizeTurnChanges,
+  shutdownSession,
+  touchSession,
+});
 
 function readExecPrompt(body) {
   if (typeof body?.prompt === "string" && body.prompt.trim()) {
@@ -936,386 +761,6 @@ function readExecPrompt(body) {
     return body.text;
   }
   throw new Error("prompt is required");
-}
-
-function normalizeUserInputResult(request, body) {
-  if (body.result && typeof body.result === "object") {
-    return body.result;
-  }
-
-  const result = userInputDefaultResponse(request.params);
-  const rawAnswers = body.answers;
-  if (!rawAnswers || typeof rawAnswers !== "object") {
-    return result;
-  }
-
-  for (const [questionId, rawAnswer] of Object.entries(rawAnswers)) {
-    if (Array.isArray(rawAnswer)) {
-      result.answers[questionId] = { answers: rawAnswer.map((value) => String(value)) };
-      continue;
-    }
-    if (rawAnswer && typeof rawAnswer === "object" && Array.isArray(rawAnswer.answers)) {
-      result.answers[questionId] = {
-        answers: rawAnswer.answers.map((value) => String(value)),
-      };
-    }
-  }
-
-  return result;
-}
-
-function resolveUserInputRequest(session, requestId, result, resolutionType) {
-  const key = String(requestId);
-  const request = session.pendingUserInputs.get(key);
-  if (!request) {
-    throw new Error(`user input request ${requestId} not found`);
-  }
-
-  clearTimeout(request.timeoutHandle);
-  session.pendingUserInputs.delete(key);
-
-  rpcRespond(session, request.rpcId, result);
-  emitSessionEvent(session, "user_input/resolved", {
-    resolutionType,
-    request: serializeUserInputRequest(request),
-    result,
-  });
-  touchSession(session);
-
-  return {
-    requestId: request.requestId,
-    resolutionType,
-    result,
-  };
-}
-
-function handleUserInputTimeout(session, requestId) {
-  const key = String(requestId);
-  const request = session.pendingUserInputs.get(key);
-  if (!request) {
-    return;
-  }
-
-  const timeoutResult = userInputDefaultResponse(request.params);
-  try {
-    resolveUserInputRequest(session, requestId, timeoutResult, "timeout");
-  } catch (err) {
-    session.pendingUserInputs.delete(key);
-    emitSessionEvent(session, "user_input/timed_out", {
-      request: serializeUserInputRequest(request),
-      reason: normalizeError(err),
-    });
-  }
-}
-
-function resolveApproval(session, requestId, result, resolutionType) {
-  const key = String(requestId);
-  const approval = session.pendingApprovals.get(key);
-  if (!approval) {
-    throw new Error(`approval ${requestId} not found`);
-  }
-
-  clearTimeout(approval.timeoutHandle);
-  session.pendingApprovals.delete(key);
-
-  rpcRespond(session, approval.requestId, result);
-  emitSessionEvent(session, "approval/resolved", {
-    resolutionType,
-    approval: serializeApproval(approval),
-    result,
-  });
-  touchSession(session);
-
-  return {
-    requestId: approval.requestId,
-    resolutionType,
-    result,
-  };
-}
-
-function handleApprovalTimeout(session, requestId) {
-  const key = String(requestId);
-  const approval = session.pendingApprovals.get(key);
-  if (!approval) {
-    return;
-  }
-
-  const timeoutResult = approvalDefaultResult(approval.method, "cancel");
-  if (!timeoutResult) {
-    session.pendingApprovals.delete(key);
-    emitSessionEvent(session, "approval/timed_out", {
-      approval: serializeApproval(approval),
-      reason: "unsupported-approval-type",
-    });
-    return;
-  }
-
-  try {
-    resolveApproval(session, requestId, timeoutResult, "timeout");
-  } catch (err) {
-    emitSessionEvent(session, "approval/timed_out", {
-      approval: serializeApproval(approval),
-      reason: normalizeError(err),
-    });
-  }
-}
-
-function isApprovalRequestMethod(method) {
-  return (
-    method === "item/commandExecution/requestApproval" ||
-    method === "item/fileChange/requestApproval" ||
-    method === "execCommandApproval" ||
-    method === "applyPatchApproval"
-  );
-}
-
-function handleRpcRequestFromServer(session, message) {
-  const method = message.method;
-
-  if (isApprovalRequestMethod(method)) {
-    const requestId = String(message.id);
-    const createdAt = nowMs();
-    const approval = {
-      requestId,
-      method,
-      params: message.params || {},
-      createdAt,
-      expiresAt: createdAt + APPROVAL_TIMEOUT_MS,
-      timeoutHandle: null,
-    };
-
-    approval.timeoutHandle = setTimeout(() => {
-      handleApprovalTimeout(session, requestId);
-    }, APPROVAL_TIMEOUT_MS);
-
-    session.pendingApprovals.set(requestId, approval);
-    emitSessionEvent(session, "approval/pending", {
-      approval: serializeApproval(approval),
-    });
-    touchSession(session);
-    return;
-  }
-
-  if (method === "item/tool/requestUserInput") {
-    const requestId = String(message.id);
-    const createdAt = nowMs();
-    const request = {
-      requestId,
-      rpcId: message.id,
-      method,
-      params: message.params || {},
-      createdAt,
-      expiresAt: createdAt + USER_INPUT_TIMEOUT_MS,
-      timeoutHandle: null,
-    };
-
-    request.timeoutHandle = setTimeout(() => {
-      handleUserInputTimeout(session, requestId);
-    }, USER_INPUT_TIMEOUT_MS);
-
-    session.pendingUserInputs.set(requestId, request);
-    emitSessionEvent(session, "user_input/pending", {
-      request: serializeUserInputRequest(request),
-    });
-    touchSession(session);
-    return;
-  }
-
-  if (method === "item/tool/call") {
-    const result = {
-      success: false,
-      contentItems: [
-        {
-          type: "inputText",
-          text: "Dynamic tool execution is not supported in this bridge.",
-        },
-      ],
-    };
-    rpcRespond(session, message.id, result);
-    emitSessionEvent(session, "tool_call/unsupported", {
-      requestId: String(message.id),
-      method,
-      params: message.params || {},
-      result,
-    });
-    touchSession(session);
-    return;
-  }
-
-  rpcError(session, message.id, `Unsupported server request method: ${method}`);
-  emitSessionEvent(session, "rpc/server_request_unsupported", {
-    requestId: String(message.id),
-    method: typeof method === "string" ? method : null,
-    reason: "unsupported-server-request-method",
-  });
-  touchSession(session);
-}
-
-function handleRpcNotification(session, message) {
-  emitSessionEvent(session, "rpc/notification", { message });
-
-  if (message.method === "thread/started") {
-    const threadId = message.params?.thread?.id;
-    if (typeof threadId === "string") {
-      session.threadId = threadId;
-    }
-  }
-
-  if (message.method === "item/agentMessage/delta") {
-    emitSessionEvent(session, "chat/delta", {
-      params: message.params || {},
-    });
-  }
-
-  if (message.method === "turn/completed") {
-    finalizeTurnChanges(session, message.params || {});
-  }
-
-  touchSession(session);
-}
-
-function handleRpcMessage(session, message) {
-  if (!message || typeof message !== "object") {
-    return;
-  }
-
-  if (Object.prototype.hasOwnProperty.call(message, "id") && Object.prototype.hasOwnProperty.call(message, "method")) {
-    handleRpcRequestFromServer(session, message);
-    return;
-  }
-
-  if (Object.prototype.hasOwnProperty.call(message, "id")) {
-    handleRpcResponse(session, message);
-    return;
-  }
-
-  if (Object.prototype.hasOwnProperty.call(message, "method")) {
-    handleRpcNotification(session, message);
-  }
-}
-
-function handleChildStdout(session, chunk) {
-  session.stdoutBuffer += chunk;
-  const parts = session.stdoutBuffer.split(/\r?\n/);
-  session.stdoutBuffer = parts.pop() || "";
-
-  for (const part of parts) {
-    const line = part.trim();
-    if (!line) {
-      continue;
-    }
-
-    try {
-      const parsed = JSON.parse(line);
-      handleRpcMessage(session, parsed);
-    } catch (err) {
-      emitSessionEvent(session, "rpc/parse_error", {
-        line,
-        error: normalizeError(err),
-      });
-    }
-  }
-}
-
-function shutdownSession(session, reason) {
-  if (!session || session.closed) {
-    return;
-  }
-
-  session.closed = true;
-
-  for (const pending of session.pendingRequests.values()) {
-    clearTimeout(pending.timeout);
-    pending.reject(new Error(`session closed: ${reason}`));
-  }
-  session.pendingRequests.clear();
-
-  for (const approval of session.pendingApprovals.values()) {
-    clearTimeout(approval.timeoutHandle);
-  }
-  session.pendingApprovals.clear();
-
-  for (const request of session.pendingUserInputs.values()) {
-    clearTimeout(request.timeoutHandle);
-  }
-  session.pendingUserInputs.clear();
-  session.activeTurnSnapshots.clear();
-  session.completedTurnChanges.clear();
-
-  if (session.child && !session.child.killed) {
-    session.child.kill("SIGTERM");
-    setTimeout(() => {
-      if (session.child && !session.child.killed) {
-        session.child.kill("SIGKILL");
-      }
-    }, 1000).unref();
-  }
-
-  emitSessionEvent(session, "session/closed", { reason });
-
-  for (const client of session.sseClients) {
-    try {
-      client.end();
-    } catch {
-      // no-op
-    }
-  }
-  session.sseClients.clear();
-
-  sessions.delete(session.id);
-}
-
-async function startSessionRuntime(session) {
-  const child = spawn(CODEX_BIN, ["app-server", "--listen", "stdio://"], {
-    cwd: WORKSPACE_ROOT,
-    env: process.env,
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-
-  session.child = child;
-
-  child.stdout.setEncoding("utf8");
-  child.stdout.on("data", (chunk) => {
-    handleChildStdout(session, chunk);
-  });
-
-  child.stderr.setEncoding("utf8");
-  child.stderr.on("data", (chunk) => {
-    emitSessionEvent(session, "rpc/stderr", { chunk: String(chunk) });
-  });
-
-  child.on("error", (err) => {
-    if (session.closed) {
-      return;
-    }
-    emitSessionEvent(session, "session/error", {
-      error: `app-server process error: ${normalizeError(err)}`,
-    });
-    shutdownSession(session, `app-server process error: ${normalizeError(err)}`);
-  });
-
-  child.on("exit", (code, signal) => {
-    if (session.closed) {
-      return;
-    }
-    shutdownSession(session, `app-server exited (code=${code}, signal=${signal})`);
-  });
-
-  const initResult = await rpcRequest(session, "initialize", {
-    clientInfo: {
-      name: "codex-webui",
-      version: "0.1.0",
-    },
-    capabilities: {
-      experimentalApi: true,
-    },
-  });
-
-  rpcNotify(session, "initialized");
-  emitSessionEvent(session, "session/started", { initResult });
-  touchSession(session);
-
-  return initResult;
 }
 
 async function readRequestBody(req) {
@@ -1340,24 +785,6 @@ async function readRequestBody(req) {
   }
 
   return JSON.parse(text);
-}
-
-function ensureSession(sessionId) {
-  const id = String(sessionId || "").trim();
-  if (!id) {
-    throw new Error("sessionId is required");
-  }
-
-  const session = sessions.get(id);
-  if (!session) {
-    throw new Error(`session not found: ${id}`);
-  }
-
-  if (session.closed) {
-    throw new Error(`session is closed: ${id}`);
-  }
-
-  return session;
 }
 
 function serveStaticFile(res, filePath, contentType) {

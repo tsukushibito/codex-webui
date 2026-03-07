@@ -49,6 +49,20 @@ async function waitForServer(port) {
   throw new Error("server did not become ready in time");
 }
 
+async function waitForCondition(check, description) {
+  const deadline = Date.now() + 5000;
+
+  while (Date.now() < deadline) {
+    const result = await check();
+    if (result) {
+      return result;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+
+  throw new Error(description);
+}
+
 async function git(repoDir, args) {
   const result = await execFileAsync("git", ["-C", repoDir, ...args], {
     encoding: "utf8",
@@ -502,6 +516,191 @@ rl.on("line", (line) => {
   assert.equal(readBody.result.thread.turns.length, 1);
   assert.equal(readBody.result.thread.turns[0].items[0].type, "userMessage");
   assert.equal(readBody.result.thread.turns[0].items[1].text, "Hi there");
+});
+
+test("approval, user input, and session closeout keep runtime state transitions intact", async (t) => {
+  const logDir = await fs.mkdtemp(path.join(os.tmpdir(), "codex-webui-runtime-"));
+  const logPath = path.join(logDir, "runtime.log");
+  t.after(async () => {
+    await fs.rm(logDir, { recursive: true, force: true });
+  });
+
+  const fakeCodex = await createFakeCodexBin(
+    t,
+    `#!/usr/bin/env node
+const fs = require("node:fs");
+const readline = require("node:readline");
+
+const logPath = ${JSON.stringify(logPath)};
+const rl = readline.createInterface({ input: process.stdin });
+
+function send(message) {
+  process.stdout.write(JSON.stringify(message) + "\\n");
+}
+
+function log(line) {
+  fs.appendFileSync(logPath, line + "\\n");
+}
+
+rl.on("line", (line) => {
+  if (!line.trim()) {
+    return;
+  }
+
+  const message = JSON.parse(line);
+
+  if (message.method === "initialize") {
+    send({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: "2026-03-01" } });
+    return;
+  }
+
+  if (message.method === "thread/start") {
+    send({
+      jsonrpc: "2.0",
+      id: message.id,
+      result: {
+        thread: {
+          id: "thread-runtime",
+        },
+      },
+    });
+    send({
+      jsonrpc: "2.0",
+      id: "approval-1",
+      method: "execCommandApproval",
+      params: {
+        command: ["pwd"],
+      },
+    });
+    return;
+  }
+
+  if (message.id === "approval-1") {
+    log("approval:" + JSON.stringify(message.result));
+    send({
+      jsonrpc: "2.0",
+      id: "user-input-1",
+      method: "item/tool/requestUserInput",
+      params: {
+        questions: [
+          {
+            id: "choice",
+            prompt: "Pick one",
+          },
+        ],
+      },
+    });
+    return;
+  }
+
+  if (message.id === "user-input-1") {
+    log("user-input:" + JSON.stringify(message.result));
+  }
+});
+`,
+  );
+
+  const { port } = await startServer(t, { codexBin: fakeCodex });
+  const startResponse = await fetch(`http://127.0.0.1:${port}/api/session/start`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  assert.equal(startResponse.status, 200);
+  const startBody = await startResponse.json();
+  assert.equal(startBody.ok, true);
+
+  const threadResponse = await fetch(`http://127.0.0.1:${port}/api/thread/start`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      sessionId: startBody.sessionId,
+      params: {},
+    }),
+  });
+  assert.equal(threadResponse.status, 200);
+
+  const approvalsBody = await waitForCondition(async () => {
+    const response = await fetch(
+      `http://127.0.0.1:${port}/api/approvals?sessionId=${encodeURIComponent(startBody.sessionId)}`,
+    );
+    const body = await response.json();
+    return body.pendingApprovals.length === 1 ? body : null;
+  }, "approval did not become pending");
+  assert.equal(approvalsBody.pendingApprovals[0].requestId, "approval-1");
+
+  const approvalResponse = await fetch(`http://127.0.0.1:${port}/api/approvals/respond`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      sessionId: startBody.sessionId,
+      requestId: "approval-1",
+      decision: "allow",
+    }),
+  });
+  assert.equal(approvalResponse.status, 200);
+  const approvalBody = await approvalResponse.json();
+  assert.equal(approvalBody.ok, true);
+  assert.equal(approvalBody.resolved.result.decision, "approved");
+
+  const userInputBody = await waitForCondition(async () => {
+    const response = await fetch(
+      `http://127.0.0.1:${port}/api/user-input?sessionId=${encodeURIComponent(startBody.sessionId)}`,
+    );
+    const body = await response.json();
+    return body.pendingUserInputs.length === 1 ? body : null;
+  }, "user input did not become pending");
+  assert.equal(userInputBody.pendingUserInputs[0].requestId, "user-input-1");
+
+  const userInputResponse = await fetch(`http://127.0.0.1:${port}/api/user-input/respond`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      sessionId: startBody.sessionId,
+      requestId: "user-input-1",
+      answers: {
+        choice: ["alpha"],
+      },
+    }),
+  });
+  assert.equal(userInputResponse.status, 200);
+  const userInputResolved = await userInputResponse.json();
+  assert.equal(userInputResolved.ok, true);
+  assert.deepEqual(userInputResolved.resolved.result.answers.choice.answers, ["alpha"]);
+
+  const logText = await waitForCondition(async () => {
+    try {
+      const text = await fs.readFile(logPath, "utf8");
+      return text.includes("approval:") && text.includes("user-input:") ? text : null;
+    } catch {
+      return null;
+    }
+  }, "runtime did not record approval and user-input responses");
+  assert.match(logText, /approval:\{"decision":"approved"\}/);
+  assert.match(logText, /user-input:\{"answers":\{"choice":\{"answers":\["alpha"\]\}\}\}/);
+
+  const endResponse = await fetch(`http://127.0.0.1:${port}/api/session/end`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      sessionId: startBody.sessionId,
+    }),
+  });
+  assert.equal(endResponse.status, 200);
+  const endBody = await endResponse.json();
+  assert.equal(endBody.ok, true);
+
+  const reconnectResponse = await fetch(`http://127.0.0.1:${port}/api/session/reconnect`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      sessionId: startBody.sessionId,
+    }),
+  });
+  assert.equal(reconnectResponse.status, 400);
+  const reconnectBody = await reconnectResponse.json();
+  assert.equal(reconnectBody.ok, false);
+  assert.match(reconnectBody.error, /session not found/);
 });
 
 test("GET /api/turn/changes returns snapshot-based turn-local changed files", async (t) => {
