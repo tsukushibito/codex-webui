@@ -203,10 +203,9 @@ Notes:
 - Start with read-only and approval-required defaults.
 
 ### 10.4 Frontend Build Bridge
-- The legacy server-delivered frontend may remain at `/` during migration.
-- A separately built frontend may be exposed at `/app` while parity work is in progress.
+- The shipped frontend should be the built Preact frontend served at `/`.
+- A compatibility alias such as `/app` is optional, but `/` is the default user-facing route.
 - Built frontend assets should be served by `codexbox` from a static path under `/static/`.
-- Prefer a bridge that allows incremental migration instead of requiring an all-at-once frontend cutover.
 
 ## 11. WebUI Feature Scope
 
