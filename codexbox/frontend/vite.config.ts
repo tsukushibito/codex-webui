@@ -17,4 +17,8 @@ export default defineConfig({
       '/static': backendOrigin,
     },
   },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+  },
 });

@@ -4,14 +4,21 @@
   "scripts": {
     "dev": "vite --config frontend/vite.config.ts --host 0.0.0.0 --port 5173",
     "build": "vite build --config frontend/vite.config.ts",
-    "check": "tsc --project frontend/tsconfig.json --noEmit"
+    "check": "tsc --project frontend/tsconfig.json --noEmit",
+    "test:frontend": "vitest run --config frontend/vite.config.ts",
+    "test:backend": "node --test webui-server.test.js",
+    "test:legacy": "node --test public/app.test.js",
+    "test:all": "npm run test:frontend && npm run test:backend && npm run test:legacy"
   },
   "dependencies": {
     "preact": "^10.28.4"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.3",
+    "@testing-library/preact": "^3.2.4",
+    "jsdom": "^28.1.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
   }
 }
