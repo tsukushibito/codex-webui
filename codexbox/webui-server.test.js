@@ -62,7 +62,8 @@ test("GET /app serves the built Preact frontend and hashed assets", async (t) =>
   const appResponse = await fetch(`http://127.0.0.1:${port}/app`);
   assert.equal(appResponse.status, 200);
   const appHtml = await appResponse.text();
-  assert.match(appHtml, /Preact \+ TypeScript/);
+  assert.match(appHtml, /Codex WebUI/);
+  assert.match(appHtml, /<div id="app"><\/div>/);
 
   const assetPathMatch = appHtml.match(/\/static\/preact\/assets\/[^"]+\.js/);
   assert.ok(assetPathMatch);
