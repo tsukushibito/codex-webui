@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'preact/hooks';
 import type {
   ApprovalDecision,
   ApprovalRequest,
@@ -15,6 +16,38 @@ import { PaneTabs } from './PaneTabs';
 import { TranscriptPane } from './TranscriptPane';
 import { UserInputsSection } from './UserInputsSection';
 import { WorkspaceTree } from './WorkspaceTree';
+
+const THEME_STORAGE_KEY = 'codex-webui-theme';
+
+type UiTheme = 'light' | 'dark';
+type UiThemeMode = UiTheme | 'system';
+
+function getInitialThemeMode(): UiThemeMode {
+  if (typeof window === 'undefined') {
+    return 'system';
+  }
+
+  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (stored === 'light' || stored === 'dark' || stored === 'system') {
+    return stored;
+  }
+
+  return 'system';
+}
+
+function readSystemTheme(): UiTheme {
+  if (typeof window === 'undefined') {
+    return 'light';
+  }
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function resolveTheme(mode: UiThemeMode, systemTheme: UiTheme): UiTheme {
+  if (mode === 'system') {
+    return systemTheme;
+  }
+  return mode;
+}
 
 interface ShellProps {
   activePane: PaneId;
@@ -66,6 +99,34 @@ export function Shell(props: ShellProps) {
     userInputs,
     workspaceTree,
   } = props;
+  const [themeMode, setThemeMode] = useState<UiThemeMode>(() => getInitialThemeMode());
+  const [systemTheme, setSystemTheme] = useState<UiTheme>(() => readSystemTheme());
+  const theme = resolveTheme(themeMode, systemTheme);
+
+  useEffect(() => {
+    document.body.dataset.theme = theme;
+  }, [theme]);
+
+  useEffect(() => {
+    window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
+  }, [themeMode]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!mediaQuery) {
+      return;
+    }
+
+    const updateTheme = (event: MediaQueryListEvent) => {
+      setSystemTheme(event.matches ? 'dark' : 'light');
+    };
+
+    setSystemTheme(mediaQuery.matches ? 'dark' : 'light');
+    mediaQuery.addEventListener('change', updateTheme);
+    return () => {
+      mediaQuery.removeEventListener('change', updateTheme);
+    };
+  }, []);
 
   return (
     <div className="shell" data-active-pane={activePane}>
@@ -75,6 +136,19 @@ export function Shell(props: ShellProps) {
           <p className="status">{statusText}</p>
         </div>
         <div className="meta">
+          <label className="theme-label" htmlFor="theme-mode">
+            Theme
+          </label>
+          <select
+            className="theme-select"
+            id="theme-mode"
+            onChange={(event) => setThemeMode((event.currentTarget as HTMLSelectElement).value as UiThemeMode)}
+            value={themeMode}
+          >
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
           <span>Session</span>
           <code>{sessionId || '-'}</code>
         </div>

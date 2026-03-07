@@ -16,6 +16,20 @@
   box-sizing: border-box;
 }
 
+body[data-theme="dark"] {
+  --bg-0: #14171d;
+  --bg-1: #1a1f26;
+  --ink-0: #ebe8e1;
+  --ink-1: #bbb3a9;
+  --accent: #4ca794;
+  --accent-soft: #1f3f38;
+  --warn: #ff8f8f;
+  --line: #3a3f49;
+  --line-soft: #313641;
+  --panel: #1f232b;
+  --panel-soft: #242933;
+}
+
 body {
   margin: 0;
   font-family: "IBM Plex Sans", "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif;
@@ -69,6 +83,26 @@ body {
   border-radius: 8px;
   padding: 3px 7px;
   color: var(--ink-0);
+}
+
+.theme-label {
+  font-size: 0.78rem;
+  color: var(--ink-1);
+}
+
+.theme-select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: var(--panel-soft);
+  color: var(--ink-0);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.theme-select:hover {
+  border-color: var(--accent);
 }
 
 .workspace-nav {
