@@ -12,3 +12,5 @@ infra/certs/*.der
 !infra/certs/README.md
 
 codexbox/node_modules/
+
+codexbox/frontend/node_modules/
