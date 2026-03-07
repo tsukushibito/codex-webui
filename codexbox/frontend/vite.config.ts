@@ -3,9 +3,9 @@ import preact from '@preact/preset-vite';
 
 const backendOrigin = process.env.VITE_BACKEND_ORIGIN || 'http://127.0.0.1:8080';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   root: __dirname,
-  base: '/static/preact/',
+  base: command === 'serve' ? '/' : '/static/preact/',
   plugins: [preact()],
   build: {
     outDir: '../public/preact',
@@ -21,4 +21,4 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
   },
-});
+}));
