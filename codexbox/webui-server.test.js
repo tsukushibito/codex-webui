@@ -39,6 +39,23 @@ test("GET /api/fs/tree returns tracked files", async (t) => {
   assert.ok(body.entries.some((entry) => entry.path === "README.md"));
 });
 
+test("GET /static serves split frontend assets", async (t) => {
+  const { port } = await startServer(t);
+
+  const indexResponse = await fetch(`http://127.0.0.1:${port}/`);
+  assert.equal(indexResponse.status, 200);
+  const indexHtml = await indexResponse.text();
+  assert.match(indexHtml, /\/static\/app-transport\.js/);
+  assert.match(indexHtml, /\/static\/app-session\.js/);
+  assert.match(indexHtml, /\/static\/app-render\.js/);
+
+  const scriptResponse = await fetch(`http://127.0.0.1:${port}/static/app-transport.js`);
+  assert.equal(scriptResponse.status, 200);
+  assert.match(scriptResponse.headers.get("content-type") || "", /text\/javascript/);
+  const scriptBody = await scriptResponse.text();
+  assert.match(scriptBody, /createApiClient/);
+});
+
 test("GET /api/fs/file returns text content for a workspace file", async (t) => {
   const { port } = await startServer(t);
   const response = await fetch(
