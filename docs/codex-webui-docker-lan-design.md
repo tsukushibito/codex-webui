@@ -159,7 +159,7 @@ services:
     networks:
       - backend
     volumes:
-      - ./repo:/workspace
+      - ./:/workspace
       - codex_state:/state/codex
     tmpfs:
       - /tmp
@@ -207,17 +207,21 @@ Notes:
 - A compatibility alias such as `/app` is optional, but `/` is the default user-facing route.
 - Built frontend assets should be served by `codexbox` from a static path under `/static/`.
 
+### 10.5 Local Development Routing
+- `npm run dev` starts the Vite frontend on `:5173` for local frontend development.
+- `npm run dev:backend` starts only the WebUI backend on `:8080`.
+- `npm run dev:all` starts both backend (`:8080`) and frontend (`:5173`).
+- During Vite serve mode, use base path `/`; during production build, use `/static/preact/`.
+- For integrated app behavior equivalent to production serving, use `:8080`.
+
 ## 11. WebUI Feature Scope
 
 ### 11.1 Threads
 - `thread/start`
-- `thread/resume`
-- `thread/list`
 - `thread/read`
 
 ### 11.2 Turns
 - `turn/start`
-- `turn/steer`
 
 ### 11.3 Events
 - `item/started`
@@ -226,9 +230,8 @@ Notes:
 - Approval request events
 
 ### 11.4 One-shot Execution
-- If needed later, add a separate `codex exec --json` path.
+- `POST /api/exec` is implemented as a stateless streaming route for one-shot jobs.
 - Keep one-shot jobs separate from the stateful conversation UI.
-- Use `POST /api/exec` as a stateless streaming route for one-shot jobs.
 - Stream the raw `codex exec --json` JSONL payloads as SSE `exec/event` frames, with separate `exec/stderr`, `exec/error`, and `exec/completed` frames.
 
 ## 12. FS and Git API Design
@@ -266,11 +269,11 @@ Notes:
 ## 13. UI Design
 
 ### 13.1 Layout
-- Left: thread list and file tree
+- Left: file tree (read-only)
 - Center: chat
-- Right: diff view
-- Bottom: tool execution log
-- Modal: approval dialog
+- Right: file preview, diff view, approvals, and user-input sections
+- Approvals and user-input requests are shown inline in the right panel (no modal in current implementation)
+- File tree directories are collapsible (`expand/collapse`) and nested by depth
 
 ### 13.2 Mobile Behavior
 - Avoid a permanent three-pane layout on iPhone.
