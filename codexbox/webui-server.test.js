@@ -83,6 +83,7 @@ async function startServer(t, options = {}) {
       ...process.env,
       HOST: "127.0.0.1",
       PORT: String(port),
+      CODEX_BIN: options.codexBin || process.env.CODEX_BIN || "codex",
       MAX_FILE_BYTES: options.maxFileBytes || "128",
       WORKSPACE_ROOT: options.workspaceRoot || REPO_ROOT,
     },
@@ -107,6 +108,16 @@ async function startServer(t, options = {}) {
 
   await waitForServer(port);
   return { port };
+}
+
+async function createFakeCodexBin(t, scriptSource) {
+  const binDir = await fs.mkdtemp(path.join(os.tmpdir(), "codex-webui-fake-codex-"));
+  const binPath = path.join(binDir, "codex");
+  await fs.writeFile(binPath, scriptSource, { mode: 0o755 });
+  t.after(async () => {
+    await fs.rm(binDir, { recursive: true, force: true });
+  });
+  return binPath;
 }
 
 test("GET /api/fs/tree returns tracked files", async (t) => {
@@ -323,4 +334,157 @@ test("GET /api/git/diff blocks path traversal", async (t) => {
   const body = await response.json();
   assert.equal(body.ok, false);
   assert.match(body.error, /path escapes workspace/);
+});
+
+test("session reconnect returns snapshot and thread/read resyncs transcript", async (t) => {
+  const fakeCodex = await createFakeCodexBin(
+    t,
+    `#!/usr/bin/env node
+const readline = require("node:readline");
+
+const rl = readline.createInterface({ input: process.stdin });
+let approvalSent = false;
+
+function send(message) {
+  process.stdout.write(JSON.stringify(message) + "\\n");
+}
+
+rl.on("line", (line) => {
+  const message = JSON.parse(line);
+
+  if (message.method === "initialize") {
+    send({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: "2026-03-01" } });
+    return;
+  }
+
+  if (message.method === "thread/start") {
+    send({
+      jsonrpc: "2.0",
+      id: message.id,
+      result: {
+        thread: {
+          id: "thread-1",
+        },
+      },
+    });
+    if (!approvalSent) {
+      approvalSent = true;
+      send({
+        jsonrpc: "2.0",
+        id: "approval-1",
+        method: "item/commandExecution/requestApproval",
+        params: {
+          command: ["pwd"],
+          cwd: "/workspace",
+        },
+      });
+    }
+    return;
+  }
+
+  if (message.method === "thread/read") {
+    send({
+      jsonrpc: "2.0",
+      id: message.id,
+      result: {
+        thread: {
+          id: "thread-1",
+          cliVersion: "0.111.0",
+          createdAt: 1,
+          cwd: "/workspace",
+          ephemeral: false,
+          modelProvider: "openai",
+          preview: "Hello",
+          source: "appServer",
+          status: "idle",
+          updatedAt: 2,
+          turns: [
+            {
+              id: "turn-1",
+              status: "completed",
+              items: [
+                {
+                  id: "user-1",
+                  type: "userMessage",
+                  content: [{ type: "text", text: "Hello" }],
+                },
+                {
+                  id: "assistant-1",
+                  type: "agentMessage",
+                  text: "Hi there",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+    return;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(message, "id")) {
+    send({ jsonrpc: "2.0", id: message.id, result: {} });
+  }
+});
+`,
+  );
+
+  const { port } = await startServer(t, { codexBin: fakeCodex });
+
+  const startResponse = await fetch(`http://127.0.0.1:${port}/api/session/start`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  assert.equal(startResponse.status, 200);
+  const startBody = await startResponse.json();
+  assert.equal(startBody.ok, true);
+
+  const threadResponse = await fetch(`http://127.0.0.1:${port}/api/thread/start`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      sessionId: startBody.sessionId,
+      params: {},
+    }),
+  });
+  assert.equal(threadResponse.status, 200);
+  const threadBody = await threadResponse.json();
+  assert.equal(threadBody.ok, true);
+  assert.equal(threadBody.result.thread.id, "thread-1");
+
+  await new Promise((resolve) => setTimeout(resolve, 25));
+
+  const reconnectResponse = await fetch(`http://127.0.0.1:${port}/api/session/reconnect`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      sessionId: startBody.sessionId,
+    }),
+  });
+  assert.equal(reconnectResponse.status, 200);
+
+  const reconnectBody = await reconnectResponse.json();
+  assert.equal(reconnectBody.ok, true);
+  assert.equal(reconnectBody.sessionId, startBody.sessionId);
+  assert.equal(reconnectBody.threadId, "thread-1");
+  assert.equal(reconnectBody.pendingApprovals.length, 1);
+  assert.equal(reconnectBody.pendingApprovals[0].requestId, "approval-1");
+
+  const readResponse = await fetch(`http://127.0.0.1:${port}/api/thread/read`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      sessionId: startBody.sessionId,
+      threadId: "thread-1",
+    }),
+  });
+  assert.equal(readResponse.status, 200);
+
+  const readBody = await readResponse.json();
+  assert.equal(readBody.ok, true);
+  assert.equal(readBody.result.thread.id, "thread-1");
+  assert.equal(readBody.result.thread.turns.length, 1);
+  assert.equal(readBody.result.thread.turns[0].items[0].type, "userMessage");
+  assert.equal(readBody.result.thread.turns[0].items[1].text, "Hi there");
 });

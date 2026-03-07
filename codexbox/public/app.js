@@ -5,10 +5,23 @@ function splitAnswerText(text) {
     .filter(Boolean);
 }
 
+const SESSION_STORAGE_KEY = "codex-webui.sessionId";
+
 function createApp(env = {}) {
   const doc = env.document || document;
   const fetchImpl = env.fetch || fetch;
   const EventSourceImpl = env.EventSource || EventSource;
+  const storage = env.storage || (
+    typeof window !== "undefined" && window.localStorage
+      ? window.localStorage
+      : {
+        getItem() {
+          return null;
+        },
+        setItem() {},
+        removeItem() {},
+      }
+  );
   const autoStart = env.autoStart !== false;
 
   const state = {
@@ -55,6 +68,40 @@ function createApp(env = {}) {
     els.status.textContent = text;
   }
 
+  function loadPersistedSessionId() {
+    try {
+      return String(storage.getItem(SESSION_STORAGE_KEY) || "").trim() || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function persistSessionId(sessionId) {
+    try {
+      storage.setItem(SESSION_STORAGE_KEY, String(sessionId || ""));
+    } catch {
+      // Ignore storage failures; reconnect is best-effort.
+    }
+  }
+
+  function clearPersistedSessionId() {
+    try {
+      storage.removeItem(SESSION_STORAGE_KEY);
+    } catch {
+      // Ignore storage failures; reconnect is best-effort.
+    }
+  }
+
+  function setSessionId(sessionId) {
+    state.sessionId = sessionId ? String(sessionId) : null;
+    els.sessionId.textContent = state.sessionId || "-";
+    if (state.sessionId) {
+      persistSessionId(state.sessionId);
+    } else {
+      clearPersistedSessionId();
+    }
+  }
+
   function createElement(tagName, className, text) {
     const node = doc.createElement(tagName);
     if (className) {
@@ -77,6 +124,11 @@ function createApp(env = {}) {
     els.messages.appendChild(node);
     els.messages.scrollTop = els.messages.scrollHeight;
     return node;
+  }
+
+  function clearMessages() {
+    state.messageById.clear();
+    els.messages.replaceChildren();
   }
 
   function updateComposerState() {
@@ -144,6 +196,41 @@ function createApp(env = {}) {
   function describeGitStatus(code) {
     const trimmed = String(code || "").trim();
     return trimmed || "clean";
+  }
+
+  function extractUserMessageText(item) {
+    const parts = [];
+    for (const contentItem of item?.content || []) {
+      if (contentItem?.type === "text" && typeof contentItem.text === "string") {
+        parts.push(contentItem.text);
+      }
+    }
+    return parts.join("\n").trim();
+  }
+
+  function rebuildTranscriptFromThread(thread) {
+    clearMessages();
+
+    const turns = Array.isArray(thread?.turns) ? thread.turns : [];
+    for (const turn of turns) {
+      for (const item of turn?.items || []) {
+        if (!item || typeof item !== "object") {
+          continue;
+        }
+
+        if (item.type === "userMessage") {
+          const text = extractUserMessageText(item);
+          if (text) {
+            appendMessage("user", text, { itemId: item.id });
+          }
+          continue;
+        }
+
+        if (item.type === "agentMessage" && typeof item.text === "string") {
+          appendMessage("assistant", item.text, { itemId: item.id });
+        }
+      }
+    }
   }
 
   function setActivePane(pane) {
@@ -732,6 +819,7 @@ function createApp(env = {}) {
     setStatus(`Session closed: ${payload?.reason || "unknown"}`);
     state.sending = false;
     state.threadId = null;
+    setSessionId(null);
     state.pendingApprovals.clear();
     state.pendingUserInputs.clear();
     renderApprovals();
@@ -740,6 +828,10 @@ function createApp(env = {}) {
   }
 
   function connectSse() {
+    if (state.eventSource && typeof state.eventSource.close === "function") {
+      state.eventSource.close();
+    }
+
     const url = `/api/session/events?sessionId=${encodeURIComponent(state.sessionId)}`;
     const eventSource = new EventSourceImpl(url);
     state.eventSource = eventSource;
@@ -789,15 +881,51 @@ function createApp(env = {}) {
     });
 
     eventSource.onerror = () => {
-      setStatus("SSE disconnected. Refresh to reconnect.");
+      setStatus("SSE disconnected. Reconnecting if the session is still alive.");
     };
+  }
+
+  async function resyncThreadTranscript() {
+    if (!state.sessionId || !state.threadId) {
+      return;
+    }
+
+    const response = await api("/api/thread/read", {
+      sessionId: state.sessionId,
+      threadId: state.threadId,
+      includeTurns: true,
+    });
+    rebuildTranscriptFromThread(response.result?.thread || null);
+  }
+
+  async function reconnectSession(sessionId) {
+    const reconnect = await api("/api/session/reconnect", {
+      sessionId,
+    });
+
+    setSessionId(reconnect.sessionId);
+    applySessionSnapshot(reconnect);
+    connectSse();
+
+    if (!state.threadId) {
+      setStatus("Reconnected. Waiting for a thread to start.");
+      return true;
+    }
+
+    try {
+      await resyncThreadTranscript();
+      setStatus(`Reconnected. Thread: ${state.threadId}`);
+    } catch (err) {
+      setStatus(`Reconnected, but transcript sync failed: ${err.message}`);
+    }
+
+    return true;
   }
 
   async function startSession() {
     setStatus("Starting session...");
     const session = await api("/api/session/start", {});
-    state.sessionId = session.sessionId;
-    els.sessionId.textContent = state.sessionId;
+    setSessionId(session.sessionId);
 
     connectSse();
 
@@ -816,6 +944,21 @@ function createApp(env = {}) {
     } else {
       setStatus("Ready, but thread ID is missing.");
     }
+  }
+
+  async function bootstrapSession() {
+    const storedSessionId = loadPersistedSessionId();
+    if (storedSessionId) {
+      try {
+        await reconnectSession(storedSessionId);
+        return;
+      } catch (err) {
+        clearPersistedSessionId();
+        setStatus(`Reconnect failed: ${err.message}. Starting a new session...`);
+      }
+    }
+
+    await startSession();
   }
 
   async function sendTurn(text) {
@@ -880,7 +1023,7 @@ function createApp(env = {}) {
     await loadWorkspaceTree();
 
     if (autoStart) {
-      await startSession();
+      await bootstrapSession();
     }
   }
 
@@ -897,6 +1040,8 @@ function createApp(env = {}) {
     handleUserInputTimedOut,
     renderUserInputs,
     splitAnswerText,
+    rebuildTranscriptFromThread,
+    reconnectSession,
   };
 }
 

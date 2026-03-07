@@ -712,6 +712,15 @@ function listPendingUserInputs(session) {
     .map(serializeUserInputRequest);
 }
 
+function serializeSessionSnapshot(session) {
+  return {
+    sessionId: session.id,
+    threadId: session.threadId,
+    pendingApprovals: listPendingApprovals(session),
+    pendingUserInputs: listPendingUserInputs(session),
+  };
+}
+
 function normalizeUserInputResult(request, body) {
   if (body.result && typeof body.result === "object") {
     return body.result;
@@ -1177,6 +1186,19 @@ async function handlePostApi(req, res, pathname) {
     return;
   }
 
+  if (pathname === "/api/session/reconnect") {
+    const session = ensureSession(body.sessionId);
+    touchSession(session);
+    sendJson(res, 200, {
+      ok: true,
+      ...serializeSessionSnapshot(session),
+      idleTimeoutMs: SESSION_IDLE_TIMEOUT_MS,
+      approvalTimeoutMs: APPROVAL_TIMEOUT_MS,
+      userInputTimeoutMs: USER_INPUT_TIMEOUT_MS,
+    });
+    return;
+  }
+
   if (pathname === "/api/thread/start") {
     const session = ensureSession(body.sessionId);
     const rawParams = body.params && typeof body.params === "object" ? body.params : {};
@@ -1223,6 +1245,26 @@ async function handlePostApi(req, res, pathname) {
     }
 
     const result = await rpcRequest(session, "turn/start", params);
+    touchSession(session);
+    sendJson(res, 200, { ok: true, result });
+    return;
+  }
+
+  if (pathname === "/api/thread/read") {
+    const session = ensureSession(body.sessionId);
+    const threadId = String(body.threadId || session.threadId || "").trim();
+    if (!threadId) {
+      throw new Error("threadId is required");
+    }
+
+    const includeTurns = body.includeTurns !== false;
+    const result = await rpcRequest(session, "thread/read", {
+      threadId,
+      includeTurns,
+    });
+    if (typeof result?.thread?.id === "string") {
+      session.threadId = result.thread.id;
+    }
     touchSession(session);
     sendJson(res, 200, { ok: true, result });
     return;
@@ -1308,12 +1350,7 @@ async function handleGetApi(req, res, pathname, searchParams) {
     writeSse(
       res,
       "session/snapshot",
-      {
-        sessionId: session.id,
-        threadId: session.threadId,
-        pendingApprovals: listPendingApprovals(session),
-        pendingUserInputs: listPendingUserInputs(session),
-      },
+      serializeSessionSnapshot(session),
       session.nextSseId++,
     );
 
