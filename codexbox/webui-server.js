@@ -28,6 +28,8 @@ const RPC_TIMEOUT_MS = Number(process.env.RPC_TIMEOUT_MS || 60 * 1000);
 const CODEX_DEFAULT_APPROVAL_POLICY = process.env.CODEX_DEFAULT_APPROVAL_POLICY || "untrusted";
 const CODEX_DEFAULT_SANDBOX = process.env.CODEX_DEFAULT_SANDBOX || "read-only";
 const STATIC_DIR = path.join(__dirname, "public");
+const PREACT_STATIC_DIR = process.env.PREACT_STATIC_DIR || path.join(STATIC_DIR, "preact");
+const PREACT_INDEX_PATH = path.join(PREACT_STATIC_DIR, "index.html");
 const MAX_FILE_BYTES = Number(process.env.MAX_FILE_BYTES || 256 * 1024);
 
 const VALID_APPROVAL_POLICIES = new Set(["untrusted", "on-failure", "on-request", "never"]);
@@ -195,6 +197,22 @@ function serveStaticFile(res, filePath, contentType) {
 
     res.writeHead(200, {
       "content-type": contentType,
+      "content-length": buf.length,
+      "cache-control": "no-store",
+    });
+    res.end(buf);
+  });
+}
+
+function serveBuiltFrontend(res) {
+  fs.readFile(PREACT_INDEX_PATH, (err, buf) => {
+    if (err) {
+      sendText(res, 503, "Frontend build not found");
+      return;
+    }
+
+    res.writeHead(200, {
+      "content-type": "text/html; charset=utf-8",
       "content-length": buf.length,
       "cache-control": "no-store",
     });
@@ -674,6 +692,11 @@ const server = http.createServer(async (req, res) => {
   try {
     if (method === "GET" && pathname === "/") {
       servePublicAsset(res, "/static/index.html");
+      return;
+    }
+
+    if (method === "GET" && (pathname === "/app" || pathname === "/app/")) {
+      serveBuiltFrontend(res);
       return;
     }
 

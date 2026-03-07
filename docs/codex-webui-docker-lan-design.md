@@ -202,6 +202,12 @@ Notes:
 - Fix defaults in `~/.codex/config.toml` and repo-local `.codex/config.toml`.
 - Start with read-only and approval-required defaults.
 
+### 10.4 Frontend Build Bridge
+- The legacy server-delivered frontend may remain at `/` during migration.
+- A separately built frontend may be exposed at `/app` while parity work is in progress.
+- Built frontend assets should be served by `codexbox` from a static path under `/static/`.
+- Prefer a bridge that allows incremental migration instead of requiring an all-at-once frontend cutover.
+
 ## 11. WebUI Feature Scope
 
 ### 11.1 Threads

@@ -56,6 +56,34 @@ test("GET /static serves split frontend assets", async (t) => {
   assert.match(scriptBody, /createApiClient/);
 });
 
+test("GET /app serves the built Preact frontend and hashed assets", async (t) => {
+  const { port } = await startServer(t);
+
+  const appResponse = await fetch(`http://127.0.0.1:${port}/app`);
+  assert.equal(appResponse.status, 200);
+  const appHtml = await appResponse.text();
+  assert.match(appHtml, /Preact \+ TypeScript/);
+
+  const assetPathMatch = appHtml.match(/\/static\/preact\/assets\/[^"]+\.js/);
+  assert.ok(assetPathMatch);
+
+  const assetResponse = await fetch(`http://127.0.0.1:${port}${assetPathMatch[0]}`);
+  assert.equal(assetResponse.status, 200);
+  assert.match(assetResponse.headers.get("content-type") || "", /text\/javascript/);
+});
+
+test("GET /app returns 503 when the built frontend is missing", async (t) => {
+  const missingBuildDir = await fs.mkdtemp(path.join(os.tmpdir(), "codex-webui-missing-preact-"));
+  t.after(async () => {
+    await fs.rm(missingBuildDir, { recursive: true, force: true });
+  });
+
+  const { port } = await startServer(t, { preactStaticDir: missingBuildDir });
+  const response = await fetch(`http://127.0.0.1:${port}/app`);
+  assert.equal(response.status, 503);
+  assert.equal(await response.text(), "Frontend build not found");
+});
+
 test("GET /api/fs/file returns text content for a workspace file", async (t) => {
   const { port } = await startServer(t);
   const response = await fetch(
