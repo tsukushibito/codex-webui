@@ -10,3 +10,5 @@ infra/certs/*.der
 # Keep repository placeholders/docs
 !infra/certs/.gitkeep
 !infra/certs/README.md
+
+codexbox/node_modules/

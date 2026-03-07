@@ -83,6 +83,7 @@ async function startServer(t, options = {}) {
       PORT: String(port),
       CODEX_BIN: options.codexBin || process.env.CODEX_BIN || "codex",
       MAX_FILE_BYTES: options.maxFileBytes || "128",
+      PREACT_STATIC_DIR: options.preactStaticDir || process.env.PREACT_STATIC_DIR,
       WORKSPACE_ROOT: options.workspaceRoot || REPO_ROOT,
     },
     stdio: ["ignore", "pipe", "pipe"],
