@@ -7,7 +7,9 @@
     "check": "tsc --project frontend/tsconfig.json --noEmit",
     "test:frontend": "vitest run --config frontend/vite.config.ts",
     "test:backend": "node --test webui-server.test.js",
-    "test:all": "npm run test:frontend && npm run test:backend"
+    "test:all": "npm run test:frontend && npm run test:backend",
+    "dev:backend": "node webui-server.js",
+    "dev:all": "node scripts/dev-all.mjs"
   },
   "dependencies": {
     "preact": "^10.28.4"

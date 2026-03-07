@@ -247,15 +247,42 @@ body {
 
 .tree-directory {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
-.tree-directory-label {
+.tree-directory-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-1);
+  font: inherit;
   font-size: 0.82rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--ink-1);
-  padding-left: calc(var(--depth, 0) * 12px);
+  cursor: pointer;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  text-align: left;
+}
+
+.tree-directory-toggle:hover {
+  background: #f8f1e9;
+}
+
+.tree-directory-chevron {
+  width: 14px;
+  text-align: center;
+  color: var(--accent);
+}
+
+.tree-directory-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tree-children {

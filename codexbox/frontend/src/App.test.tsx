@@ -232,6 +232,9 @@ describe('Preact App', () => {
     expect(readmeBlocks.length).toBeGreaterThan(0);
     expect(screen.getByText('# Old')).toBeTruthy();
     expect(screen.getAllByText('README.md').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'notes.md??' })).toBeNull();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Expand docs directory' }));
 
     await fireEvent.click(screen.getByRole('button', { name: 'notes.md??' }));
 
