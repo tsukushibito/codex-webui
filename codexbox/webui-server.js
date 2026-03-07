@@ -202,6 +202,46 @@ function serveStaticFile(res, filePath, contentType) {
   });
 }
 
+function staticContentTypeFor(filePath) {
+  const extension = path.extname(filePath).toLowerCase();
+  if (extension === ".html") {
+    return "text/html; charset=utf-8";
+  }
+  if (extension === ".js") {
+    return "text/javascript; charset=utf-8";
+  }
+  if (extension === ".css") {
+    return "text/css; charset=utf-8";
+  }
+  return null;
+}
+
+function servePublicAsset(res, requestPath) {
+  const relativePath = String(requestPath || "").replace(/^\/static\//, "");
+  if (!relativePath) {
+    sendText(res, 404, "Not found");
+    return;
+  }
+
+  const assetPath = path.resolve(STATIC_DIR, relativePath);
+  const relativeAssetPath = path.relative(STATIC_DIR, assetPath);
+  if (
+    relativeAssetPath.startsWith("..") ||
+    path.isAbsolute(relativeAssetPath)
+  ) {
+    sendText(res, 404, "Not found");
+    return;
+  }
+
+  const contentType = staticContentTypeFor(assetPath);
+  if (!contentType) {
+    sendText(res, 404, "Not found");
+    return;
+  }
+
+  serveStaticFile(res, assetPath, contentType);
+}
+
 async function handleSessionStartRoute(req, res) {
   const session = makeSession();
   try {
@@ -633,17 +673,12 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (method === "GET" && pathname === "/") {
-      serveStaticFile(res, path.join(STATIC_DIR, "index.html"), "text/html; charset=utf-8");
+      servePublicAsset(res, "/static/index.html");
       return;
     }
 
-    if (method === "GET" && pathname === "/static/app.js") {
-      serveStaticFile(res, path.join(STATIC_DIR, "app.js"), "text/javascript; charset=utf-8");
-      return;
-    }
-
-    if (method === "GET" && pathname === "/static/styles.css") {
-      serveStaticFile(res, path.join(STATIC_DIR, "styles.css"), "text/css; charset=utf-8");
+    if (method === "GET" && pathname.startsWith("/static/")) {
+      servePublicAsset(res, pathname);
       return;
     }
 
