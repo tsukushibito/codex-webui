@@ -1,29 +1,70 @@
-import type { PaneId, TranscriptMessage } from '../types';
+import type {
+  ApprovalDecision,
+  ApprovalRequest,
+  GitDiffRecord,
+  PaneId,
+  TranscriptMessage,
+  UserInputRequest,
+  WorkspaceEntry,
+  WorkspaceFile,
+} from '../types';
+import { ApprovalsSection } from './ApprovalsSection';
+import { DiffPreviewSection } from './DiffPreviewSection';
+import { FilePreviewSection } from './FilePreviewSection';
 import { PaneTabs } from './PaneTabs';
-import { PlaceholderPanel } from './PlaceholderPanel';
 import { TranscriptPane } from './TranscriptPane';
+import { UserInputsSection } from './UserInputsSection';
+import { WorkspaceTree } from './WorkspaceTree';
 
 interface ShellProps {
   activePane: PaneId;
+  approvals: ApprovalRequest[];
+  diffError: string;
+  filePreviewError: string;
+  loadingSelection: boolean;
+  loadingWorkspaceTree: boolean;
   messages: TranscriptMessage[];
+  onResolveApproval: (approval: ApprovalRequest, decision: ApprovalDecision) => Promise<void>;
   onSelectPane: (pane: PaneId) => void;
+  onSelectPath: (path: string) => Promise<void>;
   onSend: (text: string) => Promise<void>;
+  onSkipUserInput: (request: UserInputRequest) => Promise<void>;
+  onSubmitUserInput: (request: UserInputRequest, answers: Record<string, string[]>) => Promise<void>;
+  selectedDiff: GitDiffRecord | null;
+  selectedFile: WorkspaceFile | null;
+  selectedPath: string | null;
   sending: boolean;
   sessionId: string | null;
   sessionReady: boolean;
   statusText: string;
+  userInputs: UserInputRequest[];
+  workspaceTree: WorkspaceEntry[];
 }
 
 export function Shell(props: ShellProps) {
   const {
     activePane,
+    approvals,
+    diffError,
+    filePreviewError,
+    loadingSelection,
+    loadingWorkspaceTree,
     messages,
+    onResolveApproval,
     onSelectPane,
+    onSelectPath,
     onSend,
+    onSkipUserInput,
+    onSubmitUserInput,
+    selectedDiff,
+    selectedFile,
+    selectedPath,
     sending,
     sessionId,
     sessionReady,
     statusText,
+    userInputs,
+    workspaceTree,
   } = props;
 
   return (
@@ -48,9 +89,15 @@ export function Shell(props: ShellProps) {
               <h2>Files</h2>
               <p>Read-only workspace tree</p>
             </div>
-            <div className="workspace-tree empty">
-              <PlaceholderPanel body="File tree migration continues in #45." title="Deferred" />
-            </div>
+            <WorkspaceTree
+              entries={workspaceTree}
+              loading={loadingWorkspaceTree}
+              onSelectPath={async (path) => {
+                await onSelectPath(path);
+                onSelectPane('diff');
+              }}
+              selectedPath={selectedPath}
+            />
           </section>
         </aside>
 
@@ -65,11 +112,14 @@ export function Shell(props: ShellProps) {
           <section className="panel-section">
             <div className="panel-heading">
               <h2>File</h2>
-              <p className="selected-path">Select a file to inspect.</p>
+              <p className="selected-path">{selectedPath || 'Select a file to inspect.'}</p>
             </div>
-            <div className="file-preview empty">
-              <PlaceholderPanel body="File preview migration continues in #45." title="Deferred" />
-            </div>
+            <FilePreviewSection
+              error={filePreviewError}
+              file={selectedFile}
+              loading={loadingSelection}
+              selectedPath={selectedPath}
+            />
           </section>
 
           <section className="panel-section">
@@ -77,9 +127,12 @@ export function Shell(props: ShellProps) {
               <h2>Diff</h2>
               <p>HEAD vs worktree</p>
             </div>
-            <div className="diff-view empty">
-              <PlaceholderPanel body="Diff preview migration continues in #45." title="Deferred" />
-            </div>
+            <DiffPreviewSection
+              diff={selectedDiff}
+              error={diffError}
+              loading={loadingSelection}
+              selectedPath={selectedPath}
+            />
           </section>
 
           <section className="panel-section">
@@ -87,9 +140,7 @@ export function Shell(props: ShellProps) {
               <h2>Approvals</h2>
               <p>Pending tool or file-change requests</p>
             </div>
-            <div className="approvals empty">
-              <PlaceholderPanel body="Approval actions migrate in #45." title="Deferred" />
-            </div>
+            <ApprovalsSection approvals={approvals} onResolveApproval={onResolveApproval} />
           </section>
 
           <section className="panel-section">
@@ -97,9 +148,11 @@ export function Shell(props: ShellProps) {
               <h2>User Input</h2>
               <p>Questions waiting on browser input</p>
             </div>
-            <div className="user-inputs empty">
-              <PlaceholderPanel body="User-input forms migrate in #45." title="Deferred" />
-            </div>
+            <UserInputsSection
+              onSkipUserInput={onSkipUserInput}
+              onSubmitUserInput={onSubmitUserInput}
+              requests={userInputs}
+            />
           </section>
         </aside>
       </main>
