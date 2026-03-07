@@ -148,6 +148,46 @@ class FakeDocument {
   }
 }
 
+class FakeStorage {
+  constructor(initial = {}) {
+    this.values = new Map(Object.entries(initial));
+  }
+
+  getItem(key) {
+    return this.values.has(key) ? this.values.get(key) : null;
+  }
+
+  setItem(key, value) {
+    this.values.set(String(key), String(value));
+  }
+
+  removeItem(key) {
+    this.values.delete(String(key));
+  }
+}
+
+class FakeEventSource {
+  constructor(url) {
+    this.url = url;
+    this.listeners = new Map();
+    this.closed = false;
+    FakeEventSource.instances.push(this);
+  }
+
+  addEventListener(type, listener) {
+    if (!this.listeners.has(type)) {
+      this.listeners.set(type, []);
+    }
+    this.listeners.get(type).push(listener);
+  }
+
+  close() {
+    this.closed = true;
+  }
+}
+
+FakeEventSource.instances = [];
+
 function findFirst(node, predicate) {
   if (predicate(node)) {
     return node;
@@ -251,6 +291,109 @@ test("bundled UI renders and submits pending user-input requests", async () => {
     },
   });
   assert.match(userInputRoot.textContent, /No pending user input requests/);
+});
+
+test("bundled UI reconnects a stored session and rebuilds transcript from thread/read", async () => {
+  const document = new FakeDocument();
+  const storage = new FakeStorage({
+    "codex-webui.sessionId": "session-restore",
+  });
+  const calls = [];
+  FakeEventSource.instances = [];
+
+  const app = createApp({
+    document,
+    storage,
+    EventSource: FakeEventSource,
+    fetch: async (requestPath, options) => {
+      calls.push({
+        requestPath,
+        method: options.method,
+        body: options.body ? JSON.parse(options.body) : null,
+      });
+
+      if (requestPath === "/api/fs/tree") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ ok: true, tree: [] }),
+        };
+      }
+
+      if (requestPath === "/api/session/reconnect") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            sessionId: "session-restore",
+            threadId: "thread-restore",
+            pendingApprovals: [
+              {
+                requestId: "approval-1",
+                method: "item/commandExecution/requestApproval",
+                params: { command: ["pwd"] },
+              },
+            ],
+            pendingUserInputs: [],
+          }),
+        };
+      }
+
+      if (requestPath === "/api/thread/read") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            result: {
+              thread: {
+                id: "thread-restore",
+                turns: [
+                  {
+                    id: "turn-1",
+                    items: [
+                      {
+                        id: "user-1",
+                        type: "userMessage",
+                        content: [{ type: "text", text: "Reconnect me" }],
+                      },
+                      {
+                        id: "assistant-1",
+                        type: "agentMessage",
+                        text: "Transcript restored",
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          }),
+        };
+      }
+
+      throw new Error(`Unexpected request: ${requestPath}`);
+    },
+  });
+
+  await app.init();
+
+  const messages = document.getElementById("messages");
+  const approvals = document.getElementById("approvals");
+
+  assert.equal(app.state.sessionId, "session-restore");
+  assert.equal(app.state.threadId, "thread-restore");
+  assert.match(messages.textContent, /Reconnect me/);
+  assert.match(messages.textContent, /Transcript restored/);
+  assert.match(approvals.textContent, /item\/commandExecution\/requestApproval/);
+  assert.equal(document.getElementById("session-id").textContent, "session-restore");
+  assert.equal(FakeEventSource.instances.length, 1);
+  assert.equal(FakeEventSource.instances[0].url, "/api/session/events?sessionId=session-restore");
+
+  assert.ok(calls.some((call) => call.requestPath === "/api/session/reconnect"));
+  assert.ok(calls.some((call) => call.requestPath === "/api/thread/read"));
+  assert.equal(calls.some((call) => call.requestPath === "/api/session/start"), false);
+  assert.equal(storage.getItem("codex-webui.sessionId"), "session-restore");
 });
 
 test("bundled UI renders workspace tree and Git-backed file inspection", async () => {
