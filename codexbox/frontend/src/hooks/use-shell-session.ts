@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { apiRequest, parseEventData, SESSION_STORAGE_KEY } from '../lib/api';
+import { findEntryByPath, findFirstFileNode } from '../lib/workspace';
 import type {
+  ApprovalDecision,
+  ApprovalEvent,
+  ApprovalRequest,
   ChatDeltaEvent,
+  GitDiffRecord,
+  GitDiffResponse,
+  PaneId,
   RpcNotificationEvent,
   SessionClosedEvent,
   SessionReconnectResponse,
@@ -11,11 +18,15 @@ import type {
   ThreadReadResponse,
   ThreadRecord,
   ThreadStartResponse,
+  TranscriptMessage,
+  UserInputEvent,
+  UserInputRequest,
+  WorkspaceEntry,
+  WorkspaceFile,
+  WorkspaceFileResponse,
+  WorkspaceTreeResponse,
 } from '../types';
-import type { MessageRole, PaneId, TranscriptMessage } from '../types';
-
-type ApprovalEventPayload = { approval?: { requestId?: string; method?: string } };
-type UserInputEventPayload = { request?: { requestId?: string; method?: string } };
+import type { MessageRole } from '../types';
 
 function loadStoredSessionId(): string | null {
   try {
@@ -73,12 +84,7 @@ function transcriptFromThread(thread: ThreadRecord | null | undefined): Transcri
   return messages;
 }
 
-function appendMessage(
-  previous: TranscriptMessage[],
-  role: MessageRole,
-  text: string,
-  id?: string,
-): TranscriptMessage[] {
+function appendMessage(previous: TranscriptMessage[], role: MessageRole, text: string, id?: string): TranscriptMessage[] {
   return [...previous, { id, role, text }];
 }
 
@@ -103,10 +109,22 @@ export function useShellSession() {
   const [sending, setSending] = useState(false);
   const [statusText, setStatusText] = useState('Booting session...');
   const [messages, setMessages] = useState<TranscriptMessage[]>([]);
+  const [pendingApprovals, setPendingApprovals] = useState<Map<string, ApprovalRequest>>(() => new Map());
+  const [pendingUserInputs, setPendingUserInputs] = useState<Map<string, UserInputRequest>>(() => new Map());
+  const [workspaceTree, setWorkspaceTree] = useState<WorkspaceEntry[]>([]);
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<WorkspaceEntry | null>(null);
+  const [selectedFile, setSelectedFile] = useState<WorkspaceFile | null>(null);
+  const [selectedDiff, setSelectedDiff] = useState<GitDiffRecord | null>(null);
+  const [filePreviewError, setFilePreviewError] = useState('');
+  const [diffError, setDiffError] = useState('');
+  const [loadingWorkspaceTree, setLoadingWorkspaceTree] = useState(false);
+  const [loadingSelection, setLoadingSelection] = useState(false);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const threadIdRef = useRef<string | null>(null);
+  const selectionRequestTokenRef = useRef(0);
 
   useEffect(() => {
     sessionIdRef.current = sessionId;
@@ -119,6 +137,113 @@ export function useShellSession() {
   function updateSessionId(nextSessionId: string | null) {
     setSessionId(nextSessionId);
     persistSessionId(nextSessionId);
+  }
+
+  function syncPendingApprovals(approvals?: ApprovalRequest[]) {
+    const next = new Map<string, ApprovalRequest>();
+    for (const approval of approvals || []) {
+      next.set(String(approval.requestId), approval);
+    }
+    setPendingApprovals(next);
+  }
+
+  function syncPendingUserInputs(requests?: UserInputRequest[]) {
+    const next = new Map<string, UserInputRequest>();
+    for (const request of requests || []) {
+      next.set(String(request.requestId), request);
+    }
+    setPendingUserInputs(next);
+  }
+
+  async function selectPath(pathname: string) {
+    const path = String(pathname || '');
+    if (!path) {
+      return;
+    }
+
+    setSelectedPath(path);
+    setSelectedEntry(findEntryByPath(workspaceTree, path));
+    setSelectedFile(null);
+    setSelectedDiff(null);
+    setFilePreviewError('');
+    setDiffError('');
+    setLoadingSelection(true);
+    const token = ++selectionRequestTokenRef.current;
+    const encodedPath = encodeURIComponent(path);
+
+    const [fileResult, diffResult] = await Promise.allSettled([
+      apiRequest<WorkspaceFileResponse>(`/api/fs/file?path=${encodedPath}`, undefined, 'GET'),
+      apiRequest<GitDiffResponse>(`/api/git/diff?path=${encodedPath}`, undefined, 'GET'),
+    ]);
+
+    if (token !== selectionRequestTokenRef.current) {
+      return;
+    }
+
+    setLoadingSelection(false);
+
+    if (fileResult.status === 'fulfilled') {
+      setSelectedFile(fileResult.value.file || null);
+    } else {
+      setFilePreviewError(`Failed to load file: ${fileResult.reason instanceof Error ? fileResult.reason.message : String(fileResult.reason)}`);
+    }
+
+    if (diffResult.status === 'fulfilled') {
+      setSelectedDiff(diffResult.value.diff || null);
+    } else {
+      setDiffError(`Failed to load diff: ${diffResult.reason instanceof Error ? diffResult.reason.message : String(diffResult.reason)}`);
+    }
+
+    if (fileResult.status === 'rejected' || diffResult.status === 'rejected') {
+      let rejectionReason: unknown;
+      if (fileResult.status === 'rejected') {
+        rejectionReason = fileResult.reason;
+      } else if (diffResult.status === 'rejected') {
+        rejectionReason = diffResult.reason;
+      } else {
+        rejectionReason = 'unknown error';
+      }
+      const message = rejectionReason instanceof Error ? rejectionReason.message : String(rejectionReason);
+      setStatusText(`Inspect error: ${message}`);
+      return;
+    }
+
+    setStatusText(`Loaded ${path}`);
+  }
+
+  async function loadWorkspaceTree() {
+    setLoadingWorkspaceTree(true);
+
+    try {
+      const response = await apiRequest<WorkspaceTreeResponse>('/api/fs/tree', undefined, 'GET');
+      const tree = Array.isArray(response.tree) ? response.tree : [];
+      setWorkspaceTree(tree);
+
+      const currentEntry = selectedPath ? findEntryByPath(tree, selectedPath) : null;
+      if (currentEntry) {
+        await selectPath(currentEntry.path);
+        return;
+      }
+
+      const firstFile = findFirstFileNode(tree);
+      if (firstFile) {
+        await selectPath(firstFile.path);
+        return;
+      }
+
+      setSelectedPath(null);
+      setSelectedEntry(null);
+      setSelectedFile(null);
+      setSelectedDiff(null);
+      setFilePreviewError('');
+      setDiffError('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setWorkspaceTree([]);
+      setStatusText(`Workspace error: ${message}`);
+    } finally {
+      setLoadingWorkspaceTree(false);
+    }
   }
 
   async function resyncTranscript(currentSessionId: string, currentThreadId: string) {
@@ -140,6 +265,8 @@ export function useShellSession() {
     if (payload.threadId === null) {
       setThreadId(null);
     }
+    syncPendingApprovals(payload.pendingApprovals);
+    syncPendingUserInputs(payload.pendingUserInputs);
   }
 
   function connectSse(currentSessionId: string) {
@@ -211,17 +338,75 @@ export function useShellSession() {
     });
 
     source.addEventListener('approval/pending', (event) => {
-      const payload = parseEventData<ApprovalEventPayload>(event as MessageEvent<string>);
-      if (payload?.approval?.method) {
-        setStatusText(`Approval requested: ${payload.approval.method}`);
+      const payload = parseEventData<ApprovalEvent>(event as MessageEvent<string>);
+      const approval = payload?.approval;
+      if (!approval) {
+        return;
       }
+      setPendingApprovals((previous) => new Map(previous).set(String(approval.requestId), approval));
+      setStatusText(`Approval requested: ${approval.method}`);
+    });
+
+    source.addEventListener('approval/resolved', (event) => {
+      const payload = parseEventData<ApprovalEvent>(event as MessageEvent<string>);
+      const requestId = String(payload?.approval?.requestId || '');
+      if (!requestId) {
+        return;
+      }
+      setPendingApprovals((previous) => {
+        const next = new Map(previous);
+        next.delete(requestId);
+        return next;
+      });
+    });
+
+    source.addEventListener('approval/timed_out', (event) => {
+      const payload = parseEventData<ApprovalEvent>(event as MessageEvent<string>);
+      const requestId = String(payload?.approval?.requestId || '');
+      if (requestId) {
+        setPendingApprovals((previous) => {
+          const next = new Map(previous);
+          next.delete(requestId);
+          return next;
+        });
+      }
+      setStatusText('An approval request timed out.');
     });
 
     source.addEventListener('user_input/pending', (event) => {
-      const payload = parseEventData<UserInputEventPayload>(event as MessageEvent<string>);
-      if (payload?.request?.method) {
-        setStatusText(`User input requested: ${payload.request.method}`);
+      const payload = parseEventData<UserInputEvent>(event as MessageEvent<string>);
+      const request = payload?.request;
+      if (!request) {
+        return;
       }
+      setPendingUserInputs((previous) => new Map(previous).set(String(request.requestId), request));
+      setStatusText(`User input requested: ${request.method}`);
+    });
+
+    source.addEventListener('user_input/resolved', (event) => {
+      const payload = parseEventData<UserInputEvent>(event as MessageEvent<string>);
+      const requestId = String(payload?.request?.requestId || '');
+      if (!requestId) {
+        return;
+      }
+      setPendingUserInputs((previous) => {
+        const next = new Map(previous);
+        next.delete(requestId);
+        return next;
+      });
+    });
+
+    source.addEventListener('user_input/timed_out', (event) => {
+      const payload = parseEventData<UserInputEvent>(event as MessageEvent<string>);
+      const requestId = String(payload?.request?.requestId || '');
+      if (requestId) {
+        setPendingUserInputs((previous) => {
+          const next = new Map(previous);
+          next.delete(requestId);
+          return next;
+        });
+      }
+      setStatusText('A user input request timed out.');
     });
 
     source.addEventListener('session/closed', (event) => {
@@ -230,6 +415,8 @@ export function useShellSession() {
       setSending(false);
       setThreadId(null);
       updateSessionId(null);
+      setPendingApprovals(new Map());
+      setPendingUserInputs(new Map());
     });
 
     source.onerror = () => {
@@ -245,7 +432,7 @@ export function useShellSession() {
     });
 
     updateSessionId(reconnect.sessionId);
-    setThreadId(reconnect.threadId || null);
+    applySnapshot(reconnect);
     connectSse(reconnect.sessionId);
 
     if (!reconnect.threadId) {
@@ -327,7 +514,54 @@ export function useShellSession() {
     }
   }
 
+  async function resolveApproval(approval: ApprovalRequest, decision: ApprovalDecision) {
+    try {
+      await apiRequest('/api/approvals/respond', {
+        sessionId: sessionIdRef.current,
+        requestId: approval.requestId,
+        decision,
+      });
+      setStatusText(`Approval resolved: ${approval.requestId}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatusText(`Approval error: ${message}`);
+    }
+  }
+
+  async function submitUserInput(request: UserInputRequest, answers: Record<string, string[]>) {
+    try {
+      await apiRequest('/api/user-input/respond', {
+        sessionId: sessionIdRef.current,
+        requestId: request.requestId,
+        answers,
+      });
+      setStatusText(`User input resolved: ${request.requestId}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatusText(`User input error: ${message}`);
+    }
+  }
+
+  async function skipUserInput(request: UserInputRequest) {
+    try {
+      await apiRequest('/api/user-input/respond', {
+        sessionId: sessionIdRef.current,
+        requestId: request.requestId,
+        answers: {},
+      });
+      setStatusText(`User input skipped: ${request.requestId}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatusText(`User input error: ${message}`);
+    }
+  }
+
   useEffect(() => {
+    loadWorkspaceTree().catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatusText(`Workspace error: ${message}`);
+    });
+
     bootstrapSession().catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
       setStatusText(`Startup failed: ${message}`);
@@ -341,12 +575,45 @@ export function useShellSession() {
 
   return useMemo(() => ({
     activePane,
+    approvals: Array.from(pendingApprovals.values()),
+    diffError,
+    filePreviewError,
+    loadingSelection,
+    loadingWorkspaceTree,
     messages,
+    onResolveApproval: resolveApproval,
+    onSelectPath: selectPath,
+    onSkipUserInput: skipUserInput,
+    onSubmitUserInput: submitUserInput,
+    selectedDiff,
+    selectedEntry,
+    selectedFile,
+    selectedPath,
     sending,
     sessionId,
     setActivePane,
     sendTurn,
     sessionReady: Boolean(threadId),
     statusText,
-  }), [activePane, messages, sending, sessionId, statusText, threadId]);
+    userInputs: Array.from(pendingUserInputs.values()),
+    workspaceTree,
+  }), [
+    activePane,
+    diffError,
+    filePreviewError,
+    loadingSelection,
+    loadingWorkspaceTree,
+    messages,
+    pendingApprovals,
+    pendingUserInputs,
+    selectedDiff,
+    selectedEntry,
+    selectedFile,
+    selectedPath,
+    sending,
+    sessionId,
+    statusText,
+    threadId,
+    workspaceTree,
+  ]);
 }
