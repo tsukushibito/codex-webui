@@ -253,6 +253,8 @@ Notes:
 - Do not use plain `git diff --name-only` at `turn/completed` as the turn diff.
 - Compute turn-local changes against a snapshot captured at turn start.
 - At minimum store starting status and file hashes.
+- Expose completed turn-local changes through `GET /api/turn/changes?sessionId=...&turnId=...`.
+- Return per-path `changeType` plus before/after snapshot summaries so later UI work can render turn-local change state without re-deriving it from the current workspace.
 
 ## 13. UI Design
 

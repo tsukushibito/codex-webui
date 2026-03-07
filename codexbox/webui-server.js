@@ -2,7 +2,7 @@ const http = require("node:http");
 const path = require("node:path");
 const fs = require("node:fs");
 const { spawn, execFile } = require("node:child_process");
-const { randomUUID } = require("node:crypto");
+const { randomUUID, createHash } = require("node:crypto");
 const { promisify } = require("node:util");
 
 const PORT = Number(process.env.PORT || 8080);
@@ -501,6 +501,216 @@ async function readGitDiff(requestedPath) {
   };
 }
 
+function hashBuffer(buffer) {
+  return createHash("sha256").update(buffer).digest("hex");
+}
+
+function defaultGitStatus(status = {}) {
+  return {
+    gitStatus: status.gitStatus || status.code || "  ",
+    indexStatus: status.indexStatus || " ",
+    worktreeStatus: status.worktreeStatus || " ",
+  };
+}
+
+async function captureWorkspaceSnapshotEntry(relativePath, tracked, status) {
+  const absolutePath = path.resolve(WORKSPACE_ROOT_REALPATH, relativePath);
+  const statusFields = defaultGitStatus(status);
+
+  let entryStat = null;
+  try {
+    entryStat = await fs.promises.lstat(absolutePath);
+  } catch (err) {
+    if (err && err.code !== "ENOENT") {
+      throw err;
+    }
+  }
+
+  if (!entryStat) {
+    return {
+      path: relativePath,
+      tracked,
+      exists: false,
+      kind: "missing",
+      digest: null,
+      ...statusFields,
+    };
+  }
+
+  if (entryStat.isSymbolicLink()) {
+    const resolvedPath = fs.realpathSync.native(absolutePath);
+    if (!isPathInside(WORKSPACE_ROOT_REALPATH, resolvedPath)) {
+      throw new Error(`path escapes workspace: ${relativePath}`);
+    }
+    const linkTarget = await fs.promises.readlink(absolutePath, "utf8");
+    return {
+      path: relativePath,
+      tracked,
+      exists: true,
+      kind: "symlink",
+      digest: hashBuffer(Buffer.from(linkTarget, "utf8")),
+      ...statusFields,
+    };
+  }
+
+  const resolvedPath = fs.realpathSync.native(absolutePath);
+  if (!isPathInside(WORKSPACE_ROOT_REALPATH, resolvedPath)) {
+    throw new Error(`path escapes workspace: ${relativePath}`);
+  }
+
+  const resolvedStat = await fs.promises.stat(resolvedPath);
+  if (resolvedStat.isFile()) {
+    const buffer = await fs.promises.readFile(resolvedPath);
+    return {
+      path: relativePath,
+      tracked,
+      exists: true,
+      kind: "file",
+      digest: hashBuffer(buffer),
+      ...statusFields,
+    };
+  }
+
+  return {
+    path: relativePath,
+    tracked,
+    exists: true,
+    kind: "other",
+    digest: hashBuffer(Buffer.from(`${entryStat.mode}:${resolvedStat.size}`)),
+    ...statusFields,
+  };
+}
+
+async function captureWorkspaceSnapshot() {
+  const [trackedOutput, statusOutput] = await Promise.all([
+    runGit(["ls-files", "-z", "--cached"]),
+    runGit(["status", "--porcelain=v1", "-z", "--untracked-files=all"]),
+  ]);
+
+  const statuses = parseGitStatusPorcelain(statusOutput);
+  const trackedPaths = new Set(trackedOutput.split("\0").filter(Boolean));
+  const snapshotPaths = new Set([...trackedPaths, ...statuses.keys()]);
+  const sortedPaths = Array.from(snapshotPaths).sort((left, right) => left.localeCompare(right));
+
+  const entries = await Promise.all(
+    sortedPaths.map((relativePath) => captureWorkspaceSnapshotEntry(
+      relativePath,
+      trackedPaths.has(relativePath),
+      statuses.get(relativePath),
+    )),
+  );
+
+  return new Map(entries.map((entry) => [entry.path, entry]));
+}
+
+function virtualSnapshotEntry(pathname) {
+  return {
+    path: pathname,
+    tracked: false,
+    exists: false,
+    kind: "missing",
+    digest: null,
+    gitStatus: "  ",
+    indexStatus: " ",
+    worktreeStatus: " ",
+  };
+}
+
+function snapshotEntriesEqual(left, right) {
+  return (
+    left.tracked === right.tracked &&
+    left.exists === right.exists &&
+    left.kind === right.kind &&
+    left.digest === right.digest &&
+    left.gitStatus === right.gitStatus &&
+    left.indexStatus === right.indexStatus &&
+    left.worktreeStatus === right.worktreeStatus
+  );
+}
+
+function serializeSnapshotEntry(entry) {
+  return {
+    exists: entry.exists,
+    kind: entry.kind,
+    tracked: entry.tracked,
+    gitStatus: entry.gitStatus,
+    indexStatus: entry.indexStatus,
+    worktreeStatus: entry.worktreeStatus,
+  };
+}
+
+function determineTurnFileChangeType(beforeEntry, afterEntry) {
+  if (!beforeEntry.exists && afterEntry.exists) {
+    return "created";
+  }
+  if (beforeEntry.exists && !afterEntry.exists) {
+    return "deleted";
+  }
+  return "updated";
+}
+
+function diffWorkspaceSnapshots(beforeSnapshot, afterSnapshot) {
+  const changedFiles = [];
+  const paths = new Set([...beforeSnapshot.keys(), ...afterSnapshot.keys()]);
+
+  for (const pathname of Array.from(paths).sort((left, right) => left.localeCompare(right))) {
+    const beforeEntry = beforeSnapshot.get(pathname) || virtualSnapshotEntry(pathname);
+    const afterEntry = afterSnapshot.get(pathname) || virtualSnapshotEntry(pathname);
+
+    if (snapshotEntriesEqual(beforeEntry, afterEntry)) {
+      continue;
+    }
+
+    changedFiles.push({
+      path: pathname,
+      changeType: determineTurnFileChangeType(beforeEntry, afterEntry),
+      before: serializeSnapshotEntry(beforeEntry),
+      after: serializeSnapshotEntry(afterEntry),
+    });
+  }
+
+  return changedFiles;
+}
+
+function rememberCompletedTurnChanges(session, turnChanges) {
+  session.completedTurnChanges.set(turnChanges.turnId, turnChanges);
+  while (session.completedTurnChanges.size > 20) {
+    const oldestTurnId = session.completedTurnChanges.keys().next().value;
+    session.completedTurnChanges.delete(oldestTurnId);
+  }
+}
+
+async function finalizeTurnChanges(session, params) {
+  const turnId = String(params?.turn?.id || "").trim();
+  if (!turnId) {
+    return;
+  }
+
+  const activeTurn = session.activeTurnSnapshots.get(turnId);
+  if (!activeTurn) {
+    return;
+  }
+
+  try {
+    const completedSnapshot = await captureWorkspaceSnapshot();
+    const turnChanges = {
+      turnId,
+      threadId: String(params?.threadId || activeTurn.threadId || session.threadId || "").trim() || null,
+      startedAt: activeTurn.startedAt,
+      completedAt: nowMs(),
+      changedFiles: diffWorkspaceSnapshots(activeTurn.snapshot, completedSnapshot),
+    };
+    session.activeTurnSnapshots.delete(turnId);
+    rememberCompletedTurnChanges(session, turnChanges);
+  } catch (err) {
+    session.activeTurnSnapshots.delete(turnId);
+    emitSessionEvent(session, "turn/changes_error", {
+      turnId,
+      error: normalizeError(err),
+    });
+  }
+}
+
 function makeSession() {
   const sessionId = randomUUID();
   const session = {
@@ -515,6 +725,8 @@ function makeSession() {
     pendingRequests: new Map(),
     pendingApprovals: new Map(),
     pendingUserInputs: new Map(),
+    activeTurnSnapshots: new Map(),
+    completedTurnChanges: new Map(),
     sseClients: new Set(),
     threadId: null,
   };
@@ -950,6 +1162,10 @@ function handleRpcNotification(session, message) {
     });
   }
 
+  if (message.method === "turn/completed") {
+    finalizeTurnChanges(session, message.params || {});
+  }
+
   touchSession(session);
 }
 
@@ -1018,6 +1234,8 @@ function shutdownSession(session, reason) {
     clearTimeout(request.timeoutHandle);
   }
   session.pendingUserInputs.clear();
+  session.activeTurnSnapshots.clear();
+  session.completedTurnChanges.clear();
 
   if (session.child && !session.child.killed) {
     session.child.kill("SIGTERM");
@@ -1244,7 +1462,18 @@ async function handlePostApi(req, res, pathname) {
       }
     }
 
+    const turnStartedAt = nowMs();
+    const turnSnapshot = await captureWorkspaceSnapshot();
     const result = await rpcRequest(session, "turn/start", params);
+    const turnId = String(result?.turn?.id || "").trim();
+    if (turnId) {
+      session.activeTurnSnapshots.set(turnId, {
+        turnId,
+        threadId: String(params.threadId || session.threadId || "").trim() || null,
+        startedAt: turnStartedAt,
+        snapshot: turnSnapshot,
+      });
+    }
     touchSession(session);
     sendJson(res, 200, { ok: true, result });
     return;
@@ -1382,6 +1611,25 @@ async function handleGetApi(req, res, pathname, searchParams) {
     sendJson(res, 200, {
       ok: true,
       pendingUserInputs: listPendingUserInputs(session),
+    });
+    return;
+  }
+
+  if (pathname === "/api/turn/changes") {
+    const session = ensureSession(searchParams.get("sessionId"));
+    const turnId = String(searchParams.get("turnId") || "").trim();
+    if (!turnId) {
+      throw new Error("turnId is required");
+    }
+
+    const turnChanges = session.completedTurnChanges.get(turnId);
+    if (!turnChanges) {
+      throw new Error(`turn changes not found: ${turnId}`);
+    }
+
+    sendJson(res, 200, {
+      ok: true,
+      turnChanges,
     });
     return;
   }

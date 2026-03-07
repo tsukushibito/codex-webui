@@ -488,3 +488,171 @@ rl.on("line", (line) => {
   assert.equal(readBody.result.thread.turns[0].items[0].type, "userMessage");
   assert.equal(readBody.result.thread.turns[0].items[1].text, "Hi there");
 });
+
+test("GET /api/turn/changes returns snapshot-based turn-local changed files", async (t) => {
+  const repoDir = await createTempGitRepo(t);
+  await fs.writeFile(path.join(repoDir, "preexisting.txt"), "base-before\n");
+  await fs.writeFile(path.join(repoDir, "remove-me.txt"), "remove-me\n");
+  await fs.writeFile(path.join(repoDir, "deleted-before.txt"), "deleted-before\n");
+  await git(repoDir, ["add", "preexisting.txt", "remove-me.txt", "deleted-before.txt"]);
+  await git(repoDir, ["commit", "-qm", "add more tracked files"]);
+
+  await fs.writeFile(path.join(repoDir, "preexisting.txt"), "dirty-before\n");
+  await fs.writeFile(path.join(repoDir, "existing-untracked.txt"), "untracked-before\n");
+  await fs.rm(path.join(repoDir, "deleted-before.txt"));
+
+  const fakeCodex = await createFakeCodexBin(
+    t,
+    `#!/usr/bin/env node
+const fs = require("node:fs");
+const path = require("node:path");
+const readline = require("node:readline");
+
+const rl = readline.createInterface({ input: process.stdin });
+
+function send(message) {
+  process.stdout.write(JSON.stringify(message) + "\\n");
+}
+
+rl.on("line", (line) => {
+  const message = JSON.parse(line);
+
+  if (message.method === "initialize") {
+    send({ jsonrpc: "2.0", id: message.id, result: { protocolVersion: "2026-03-01" } });
+    return;
+  }
+
+  if (message.method === "thread/start") {
+    send({
+      jsonrpc: "2.0",
+      id: message.id,
+      result: { thread: { id: "thread-1" } },
+    });
+    return;
+  }
+
+  if (message.method === "turn/start") {
+    const cwd = process.cwd();
+    fs.writeFileSync(path.join(cwd, "tracked.txt"), "changed-during-turn\\n");
+    fs.writeFileSync(path.join(cwd, "preexisting.txt"), "dirty-after\\n");
+    fs.writeFileSync(path.join(cwd, "new-turn-file.txt"), "created-in-turn\\n");
+    fs.rmSync(path.join(cwd, "remove-me.txt"));
+
+    send({
+      jsonrpc: "2.0",
+      id: message.id,
+      result: {
+        turn: {
+          id: "turn-1",
+          status: "inProgress",
+          items: [],
+        },
+      },
+    });
+
+    setTimeout(() => {
+      send({
+        jsonrpc: "2.0",
+        method: "turn/completed",
+        params: {
+          threadId: "thread-1",
+          turn: {
+            id: "turn-1",
+            status: "completed",
+            items: [],
+          },
+        },
+      });
+    }, 20);
+    return;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(message, "id")) {
+    send({ jsonrpc: "2.0", id: message.id, result: {} });
+  }
+});
+`,
+  );
+
+  const { port } = await startServer(t, {
+    workspaceRoot: repoDir,
+    codexBin: fakeCodex,
+  });
+
+  const startResponse = await fetch(`http://127.0.0.1:${port}/api/session/start`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  const startBody = await startResponse.json();
+
+  const threadResponse = await fetch(`http://127.0.0.1:${port}/api/thread/start`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      sessionId: startBody.sessionId,
+      params: {},
+    }),
+  });
+  const threadBody = await threadResponse.json();
+  assert.equal(threadBody.result.thread.id, "thread-1");
+
+  const turnResponse = await fetch(`http://127.0.0.1:${port}/api/turn/start`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      sessionId: startBody.sessionId,
+      threadId: "thread-1",
+      prompt: "Change files",
+    }),
+  });
+  assert.equal(turnResponse.status, 200);
+  const turnBody = await turnResponse.json();
+  assert.equal(turnBody.ok, true);
+  assert.equal(turnBody.result.turn.id, "turn-1");
+
+  await new Promise((resolve) => setTimeout(resolve, 80));
+
+  const changesResponse = await fetch(
+    `http://127.0.0.1:${port}/api/turn/changes?sessionId=${encodeURIComponent(startBody.sessionId)}&turnId=turn-1`,
+  );
+  assert.equal(changesResponse.status, 200);
+  const changesBody = await changesResponse.json();
+  assert.equal(changesBody.ok, true);
+  assert.equal(changesBody.turnChanges.turnId, "turn-1");
+  assert.equal(changesBody.turnChanges.threadId, "thread-1");
+
+  const changedPaths = changesBody.turnChanges.changedFiles.map((entry) => entry.path).sort();
+  assert.deepEqual(changedPaths, [
+    "new-turn-file.txt",
+    "preexisting.txt",
+    "remove-me.txt",
+    "tracked.txt",
+  ]);
+
+  const preexisting = changesBody.turnChanges.changedFiles.find((entry) => entry.path === "preexisting.txt");
+  assert.equal(preexisting.changeType, "updated");
+  assert.equal(preexisting.before.gitStatus, " M");
+  assert.equal(preexisting.after.gitStatus, " M");
+
+  const created = changesBody.turnChanges.changedFiles.find((entry) => entry.path === "new-turn-file.txt");
+  assert.equal(created.changeType, "created");
+  assert.equal(created.before.exists, false);
+  assert.equal(created.after.exists, true);
+
+  const deleted = changesBody.turnChanges.changedFiles.find((entry) => entry.path === "remove-me.txt");
+  assert.equal(deleted.changeType, "deleted");
+  assert.equal(deleted.before.exists, true);
+  assert.equal(deleted.after.exists, false);
+
+  assert.equal(changedPaths.includes("existing-untracked.txt"), false);
+  assert.equal(changedPaths.includes("deleted-before.txt"), false);
+
+  const missingResponse = await fetch(
+    `http://127.0.0.1:${port}/api/turn/changes?sessionId=${encodeURIComponent(startBody.sessionId)}&turnId=does-not-exist`,
+  );
+  assert.equal(missingResponse.status, 400);
+  const missingBody = await missingResponse.json();
+  assert.equal(missingBody.ok, false);
+  assert.match(missingBody.error, /turn changes not found/);
+});
