@@ -1,17 +1,18 @@
 import type { PaneId } from '../types';
 
 interface PaneTabsProps {
+  actionCount?: number;
   activePane: PaneId;
   onSelectPane: (pane: PaneId) => void;
 }
 
 const panes: Array<{ id: PaneId; label: string }> = [
   { id: 'chat', label: 'Chat' },
-  { id: 'files', label: 'Files' },
-  { id: 'diff', label: 'Inspect' },
+  { id: 'actions', label: 'Actions' },
+  { id: 'inspect', label: 'Inspect' },
 ];
 
-export function PaneTabs({ activePane, onSelectPane }: PaneTabsProps) {
+export function PaneTabs({ actionCount = 0, activePane, onSelectPane }: PaneTabsProps) {
   return (
     <nav className="workspace-nav" aria-label="Workspace panes">
       {panes.map((pane) => (
@@ -22,6 +23,11 @@ export function PaneTabs({ activePane, onSelectPane }: PaneTabsProps) {
           type="button"
         >
           {pane.label}
+          {pane.id === 'actions' && actionCount > 0 ? (
+            <span className="pane-tab-badge" aria-label={`${actionCount} pending actions`}>
+              {actionCount}
+            </span>
+          ) : null}
         </button>
       ))}
     </nav>

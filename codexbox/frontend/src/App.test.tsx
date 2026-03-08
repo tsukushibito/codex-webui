@@ -230,6 +230,7 @@ describe('Preact App', () => {
 
     const readmeBlocks = await screen.findAllByText('# README');
     expect(readmeBlocks.length).toBeGreaterThan(0);
+    await fireEvent.click(screen.getByRole('tab', { name: 'Diff' }));
     expect(screen.getByText('# Old')).toBeTruthy();
     expect(screen.getAllByText('README.md').length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: 'notes.md??' })).toBeNull();

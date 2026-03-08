@@ -1,5 +1,5 @@
 export type ApprovalDecision = 'allow' | 'deny' | 'cancel';
-export type PaneId = 'chat' | 'files' | 'diff';
+export type PaneId = 'chat' | 'actions' | 'inspect';
 
 export interface ApiErrorResponse {
   ok: false;

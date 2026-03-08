@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import type {
   ApprovalDecision,
   ApprovalRequest,
@@ -9,12 +9,10 @@ import type {
   WorkspaceEntry,
   WorkspaceFile,
 } from '../types';
-import { ApprovalsSection } from './ApprovalsSection';
-import { DiffPreviewSection } from './DiffPreviewSection';
-import { FilePreviewSection } from './FilePreviewSection';
+import { ActionQueue } from './ActionQueue';
+import { InspectPanel, type InspectTabId } from './InspectPanel';
 import { PaneTabs } from './PaneTabs';
 import { TranscriptPane } from './TranscriptPane';
-import { UserInputsSection } from './UserInputsSection';
 import { WorkspaceTree } from './WorkspaceTree';
 
 const THEME_STORAGE_KEY = 'codex-webui-theme';
@@ -74,6 +72,54 @@ interface ShellProps {
   workspaceTree: WorkspaceEntry[];
 }
 
+function getStatusPresentation(props: {
+  approvalCount: number;
+  sending: boolean;
+  sessionReady: boolean;
+  statusText: string;
+  userInputCount: number;
+}) {
+  const { approvalCount, sending, sessionReady, statusText, userInputCount } = props;
+
+  if (approvalCount > 0) {
+    return {
+      label: 'Waiting for approval',
+      tone: 'warning',
+      summary: `${approvalCount} request${approvalCount === 1 ? '' : 's'} need a decision.`,
+    } as const;
+  }
+
+  if (userInputCount > 0) {
+    return {
+      label: 'Waiting for input',
+      tone: 'attention',
+      summary: `${userInputCount} browser prompt${userInputCount === 1 ? '' : 's'} need an answer.`,
+    } as const;
+  }
+
+  if (sending) {
+    return {
+      label: 'Running',
+      tone: 'running',
+      summary: 'Codex is processing the current turn.',
+    } as const;
+  }
+
+  if (sessionReady) {
+    return {
+      label: 'Ready',
+      tone: 'ready',
+      summary: 'Session is ready for the next turn.',
+    } as const;
+  }
+
+  return {
+    label: 'Starting',
+    tone: 'idle',
+    summary: statusText,
+  } as const;
+}
+
 export function Shell(props: ShellProps) {
   const {
     activePane,
@@ -99,9 +145,19 @@ export function Shell(props: ShellProps) {
     userInputs,
     workspaceTree,
   } = props;
+  const [inspectTab, setInspectTab] = useState<InspectTabId>('file');
   const [themeMode, setThemeMode] = useState<UiThemeMode>(() => getInitialThemeMode());
   const [systemTheme, setSystemTheme] = useState<UiTheme>(() => readSystemTheme());
   const theme = resolveTheme(themeMode, systemTheme);
+  const actionCount = approvals.length + userInputs.length;
+  const statusPresentation = useMemo(() => getStatusPresentation({
+    approvalCount: approvals.length,
+    sending,
+    sessionReady,
+    statusText,
+    userInputCount: userInputs.length,
+  }), [approvals.length, sending, sessionReady, statusText, userInputs.length]);
+  const showDesktopActionQueue = actionCount > 0;
 
   useEffect(() => {
     document.body.dataset.theme = theme;
@@ -131,35 +187,65 @@ export function Shell(props: ShellProps) {
   return (
     <div className="shell" data-active-pane={activePane}>
       <header className="topbar">
-        <div>
+        <div className="topbar-title">
           <h1>Codex WebUI</h1>
-          <p className="status">{statusText}</p>
+          <p className="status">{statusPresentation.summary}</p>
         </div>
+
+        <section className={`status-card tone-${statusPresentation.tone}`} aria-label="Current status">
+          <p className="eyebrow">Current Status</p>
+          <div className="status-card-main">
+            <h2>{statusPresentation.label}</h2>
+            <p>{statusText}</p>
+          </div>
+          <div className="status-card-badges">
+            <span className="status-badge">{approvals.length} approval{approvals.length === 1 ? '' : 's'}</span>
+            <span className="status-badge">{userInputs.length} input{userInputs.length === 1 ? '' : 's'}</span>
+          </div>
+        </section>
+
         <div className="meta">
-          <label className="theme-label" htmlFor="theme-mode">
-            Theme
-          </label>
-          <select
-            className="theme-select"
-            id="theme-mode"
-            onChange={(event) => setThemeMode((event.currentTarget as HTMLSelectElement).value as UiThemeMode)}
-            value={themeMode}
-          >
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-          <span>Session</span>
-          <code>{sessionId || '-'}</code>
+          <div className="theme-picker">
+            <label className="theme-label" htmlFor="theme-mode">
+              Theme
+            </label>
+            <select
+              className="theme-select"
+              id="theme-mode"
+              onChange={(event) => setThemeMode((event.currentTarget as HTMLSelectElement).value as UiThemeMode)}
+              value={themeMode}
+            >
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
+          <div className="session-meta">
+            <span>Session</span>
+            <code>{sessionId || '-'}</code>
+          </div>
         </div>
       </header>
 
-      <PaneTabs activePane={activePane} onSelectPane={onSelectPane} />
+      <PaneTabs actionCount={actionCount} activePane={activePane} onSelectPane={onSelectPane} />
+
+      {showDesktopActionQueue ? (
+        <div className="action-queue-strip">
+          <ActionQueue
+            approvals={approvals}
+            onResolveApproval={onResolveApproval}
+            onSkipUserInput={onSkipUserInput}
+            onSubmitUserInput={onSubmitUserInput}
+            requests={userInputs}
+          />
+        </div>
+      ) : null}
 
       <main className="layout">
-        <aside className="explorer-panel" data-pane="files">
+        <aside className="workspace-column">
           <section className="panel-section">
-            <div className="panel-heading">
+            <div className="section-heading">
+              <p className="eyebrow">Workspace</p>
               <h2>Files</h2>
               <p>Read-only workspace tree</p>
             </div>
@@ -168,67 +254,50 @@ export function Shell(props: ShellProps) {
               loading={loadingWorkspaceTree}
               onSelectPath={async (path) => {
                 await onSelectPath(path);
-                onSelectPane('diff');
+                setInspectTab('file');
+                onSelectPane('inspect');
               }}
               selectedPath={selectedPath}
             />
           </section>
         </aside>
 
-        <TranscriptPane
-          canSend={sessionReady}
-          messages={messages}
-          onSend={onSend}
-          sending={sending}
-        />
+        <section className="conversation-column">
+          <TranscriptPane
+            canSend={sessionReady}
+            messages={messages}
+            onSend={onSend}
+            sending={sending}
+          />
+        </section>
 
-        <aside className="side-panel" data-pane="diff">
+        <aside className="inspect-column">
           <section className="panel-section">
-            <div className="panel-heading">
-              <h2>File</h2>
-              <p className="selected-path">{selectedPath || 'Select a file to inspect.'}</p>
-            </div>
-            <FilePreviewSection
-              error={filePreviewError}
-              file={selectedFile}
-              loading={loadingSelection}
-              selectedPath={selectedPath}
-            />
-          </section>
-
-          <section className="panel-section">
-            <div className="panel-heading">
-              <h2>Diff</h2>
-              <p>HEAD vs worktree</p>
-            </div>
-            <DiffPreviewSection
+            <InspectPanel
               diff={selectedDiff}
-              error={diffError}
+              diffError={diffError}
+              file={selectedFile}
+              filePreviewError={filePreviewError}
               loading={loadingSelection}
+              onSelectTab={setInspectTab}
               selectedPath={selectedPath}
-            />
-          </section>
-
-          <section className="panel-section">
-            <div className="panel-heading">
-              <h2>Approvals</h2>
-              <p>Pending tool or file-change requests</p>
-            </div>
-            <ApprovalsSection approvals={approvals} onResolveApproval={onResolveApproval} />
-          </section>
-
-          <section className="panel-section">
-            <div className="panel-heading">
-              <h2>User Input</h2>
-              <p>Questions waiting on browser input</p>
-            </div>
-            <UserInputsSection
-              onSkipUserInput={onSkipUserInput}
-              onSubmitUserInput={onSubmitUserInput}
-              requests={userInputs}
+              tab={inspectTab}
             />
           </section>
         </aside>
+
+        {activePane === 'actions' ? (
+          <section className="actions-panel">
+            <ActionQueue
+              approvals={approvals}
+              onResolveApproval={onResolveApproval}
+              onSkipUserInput={onSkipUserInput}
+              onSubmitUserInput={onSubmitUserInput}
+              requests={userInputs}
+              showEmpty
+            />
+          </section>
+        ) : null}
       </main>
     </div>
   );
