@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { WorkspaceEntry } from '../types';
-import { describeGitStatus } from '../lib/workspace';
+import { collectChangedFiles, describeGitStatus, type ChangedWorkspaceFile } from '../lib/workspace';
 
 interface WorkspaceTreeProps {
   entries: WorkspaceEntry[];
@@ -32,6 +32,53 @@ function collectDirectoryPaths(entries: WorkspaceEntry[]): Set<string> {
   return directoryPaths;
 }
 
+function ChangedFilesSection(props: {
+  files: ChangedWorkspaceFile[];
+  onSelectPath: (path: string) => Promise<void>;
+  selectedPath: string | null;
+}) {
+  const { files, onSelectPath, selectedPath } = props;
+
+  return (
+    <section className="workspace-section">
+      <div className="workspace-section-heading">
+        <h3>Changed</h3>
+        <p>Files with current Git or worktree changes.</p>
+      </div>
+
+      {files.length === 0 ? (
+        <p className="workspace-section-empty">No changed files in the current workspace snapshot.</p>
+      ) : (
+        <div className="workspace-list changed-list">
+          {files.map((file) => {
+            const directoryLabel = file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/')) : 'workspace root';
+            return (
+              <button
+                aria-label={`Changed file ${file.path} ${file.gitStatus}`}
+                className={`workspace-row workspace-row-file${file.path === selectedPath ? ' is-selected' : ''}`}
+                key={`changed-${file.path}`}
+                onClick={async () => {
+                  await onSelectPath(file.path);
+                }}
+                type="button"
+              >
+                <span aria-hidden="true" className="workspace-row-icon tree-file-icon">
+                  •
+                </span>
+                <span className="workspace-row-copy">
+                  <span className="workspace-row-title">{file.name}</span>
+                  <span className="workspace-row-subtitle">{directoryLabel}</span>
+                </span>
+                <span className="workspace-row-status">{file.gitStatus}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function WorkspaceTreeNodes(props: WorkspaceTreeNodesProps) {
   const { depth, entries, expandedPaths, onSelectPath, onToggleDirectory, selectedPath } = props;
 
@@ -45,15 +92,15 @@ function WorkspaceTreeNodes(props: WorkspaceTreeNodesProps) {
               <button
                 aria-expanded={isExpanded}
                 aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${entry.name} directory`}
-                className="tree-directory-toggle"
+                className="workspace-row workspace-row-directory tree-directory-toggle"
                 onClick={() => onToggleDirectory(entry.path)}
-                style={{ paddingLeft: `${depth * 12}px` }}
+                style={{ paddingLeft: `${depth * 12 + 6}px` }}
                 type="button"
               >
-                <span aria-hidden="true" className="tree-directory-chevron">
+                <span aria-hidden="true" className="workspace-row-icon tree-directory-chevron">
                   {isExpanded ? '▾' : '▸'}
                 </span>
-                <span className="tree-directory-name">{entry.name}</span>
+                <span className="workspace-row-title tree-directory-name">{entry.name}</span>
               </button>
               {isExpanded ? (
                 <div className="tree-children">
@@ -74,16 +121,19 @@ function WorkspaceTreeNodes(props: WorkspaceTreeNodesProps) {
 
         return (
           <button
-            className={`tree-file${entry.path === selectedPath ? ' is-selected' : ''}`}
+            className={`workspace-row workspace-row-file tree-file${entry.path === selectedPath ? ' is-selected' : ''}`}
             key={entry.path}
             onClick={async () => {
               await onSelectPath(entry.path);
             }}
-            style={{ paddingLeft: `${depth * 12 + 10}px` }}
+            style={{ paddingLeft: `${depth * 12 + 22}px` }}
             type="button"
           >
-            <span className="tree-file-name">{entry.name}</span>
-            <span className="tree-file-status">{describeGitStatus(entry.gitStatus)}</span>
+            <span aria-hidden="true" className="workspace-row-icon tree-file-icon">
+              •
+            </span>
+            <span className="workspace-row-title tree-file-name">{entry.name}</span>
+            <span className="workspace-row-status tree-file-status">{describeGitStatus(entry.gitStatus)}</span>
           </button>
         );
       })}
@@ -95,6 +145,7 @@ export function WorkspaceTree(props: WorkspaceTreeProps) {
   const { entries, loading, onSelectPath, selectedPath } = props;
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set());
   const directoryPaths = useMemo(() => collectDirectoryPaths(entries), [entries]);
+  const changedFiles = useMemo(() => collectChangedFiles(entries), [entries]);
 
   useEffect(() => {
     if (!selectedPath) {
@@ -148,15 +199,28 @@ export function WorkspaceTree(props: WorkspaceTreeProps) {
 
   return (
     <div className="workspace-tree">
-      <WorkspaceTreeNodes
-        depth={0}
-        entries={entries}
-        expandedPaths={expandedPaths}
-        loading={loading}
+      <ChangedFilesSection
+        files={changedFiles}
         onSelectPath={onSelectPath}
-        onToggleDirectory={toggleDirectory}
         selectedPath={selectedPath}
       />
+      <section className="workspace-section">
+        <div className="workspace-section-heading">
+          <h3>Explorer</h3>
+          <p>Browse the full repository tree.</p>
+        </div>
+        <div className="workspace-list explorer-list">
+          <WorkspaceTreeNodes
+            depth={0}
+            entries={entries}
+            expandedPaths={expandedPaths}
+            loading={loading}
+            onSelectPath={onSelectPath}
+            onToggleDirectory={toggleDirectory}
+            selectedPath={selectedPath}
+          />
+        </div>
+      </section>
     </div>
   );
 }

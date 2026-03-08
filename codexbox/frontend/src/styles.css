@@ -518,86 +518,134 @@ body {
   color: var(--text-inverse);
 }
 
-.tree-directory {
+.workspace-section {
   display: grid;
   gap: 6px;
 }
 
-.tree-directory-toggle {
-  display: inline-flex;
+.workspace-section-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.workspace-section-heading h3 {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-1);
+}
+
+.workspace-section-heading p,
+.workspace-section-empty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ink-1);
+}
+
+.workspace-list,
+.tree-children {
+  display: grid;
+  gap: 2px;
+}
+
+.changed-list,
+.explorer-list {
+  padding: 4px 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.tree-directory {
+  display: grid;
+  gap: 2px;
+}
+
+.workspace-row {
+  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  min-width: 0;
   width: 100%;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
-  color: var(--ink-1);
-  font: inherit;
-  font-size: 0.82rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  color: var(--ink-0);
   cursor: pointer;
-  padding-top: 2px;
-  padding-bottom: 2px;
+  font: inherit;
+  font-size: 0.86rem;
+  line-height: 1.25;
   text-align: left;
+  padding: 6px 8px;
 }
 
-.tree-directory-toggle:hover {
+.workspace-row:hover {
   background: var(--surface-elevated);
 }
 
-.tree-directory-chevron {
-  width: 14px;
-  text-align: center;
-  color: var(--accent);
-}
-
-.tree-directory-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tree-children {
-  display: grid;
-  gap: 6px;
-}
-
-.tree-file {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-  border: 1px solid var(--line-soft);
-  color: var(--ink-0);
-  background: var(--surface-input);
-  border-radius: 10px;
-  padding: 8px 10px;
-  cursor: pointer;
-  text-align: left;
-  font: inherit;
-}
-
-.tree-file.is-selected {
+.workspace-row.is-selected {
   border-color: var(--line-accent);
   background: var(--surface-selected);
 }
 
+.workspace-row-directory {
+  color: var(--ink-1);
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+}
+
+.workspace-row-icon {
+  flex: none;
+  width: 14px;
+  text-align: center;
+  color: var(--ink-1);
+}
+
+.tree-directory-toggle {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.tree-directory-chevron {
+  color: var(--accent);
+}
+
+.workspace-row-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  flex: 1;
+}
+
+.workspace-row-title,
+.tree-directory-name,
 .tree-file-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.workspace-row-subtitle {
+  font-size: 0.74rem;
+  color: var(--ink-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-file-icon {
+  color: var(--line-accent);
+}
+
+.workspace-row-status,
 .tree-file-status {
   flex: none;
-  border-radius: 999px;
-  border: 1px solid var(--line-strong);
-  padding: 2px 7px;
-  font-size: 0.76rem;
+  min-width: 2ch;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   color: var(--ink-1);
-  background: var(--surface-elevated);
+  text-transform: uppercase;
 }
 
 .inspector-card,

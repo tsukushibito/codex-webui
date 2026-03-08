@@ -1,5 +1,11 @@
 import type { WorkspaceEntry } from '../types';
 
+export interface ChangedWorkspaceFile {
+  gitStatus: string;
+  name: string;
+  path: string;
+}
+
 export function splitAnswerText(text: string): string[] {
   return String(text || '')
     .split(/\r?\n/)
@@ -40,4 +46,34 @@ export function findEntryByPath(nodes: WorkspaceEntry[], targetPath: string): Wo
 export function describeGitStatus(code?: string): string {
   const trimmed = String(code || '').trim();
   return trimmed || 'clean';
+}
+
+export function isChangedGitStatus(code?: string): boolean {
+  return describeGitStatus(code) !== 'clean';
+}
+
+export function collectChangedFiles(nodes: WorkspaceEntry[]): ChangedWorkspaceFile[] {
+  const files: ChangedWorkspaceFile[] = [];
+
+  function walk(entries: WorkspaceEntry[]) {
+    for (const entry of entries || []) {
+      if (entry.type === 'directory') {
+        walk(entry.children || []);
+        continue;
+      }
+
+      if (!isChangedGitStatus(entry.gitStatus)) {
+        continue;
+      }
+
+      files.push({
+        gitStatus: describeGitStatus(entry.gitStatus),
+        name: entry.name,
+        path: entry.path,
+      });
+    }
+  }
+
+  walk(nodes);
+  return files;
 }
