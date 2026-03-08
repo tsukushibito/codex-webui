@@ -14,3 +14,5 @@ infra/certs/*.der
 codexbox/node_modules/
 
 codexbox/frontend/node_modules/
+
+.tmp/ui-captures/

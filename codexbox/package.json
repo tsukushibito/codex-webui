@@ -9,7 +9,9 @@
     "test:backend": "node --test webui-server.test.js",
     "test:all": "npm run test:frontend && npm run test:backend",
     "dev:backend": "node webui-server.js",
-    "dev:all": "node scripts/dev-all.mjs"
+    "dev:all": "node scripts/dev-all.mjs",
+    "ui:capture": "node scripts/capture-ui.mjs",
+    "ui:install-browser": "playwright install chromium"
   },
   "dependencies": {
     "preact": "^10.28.4"
@@ -18,6 +20,7 @@
     "@preact/preset-vite": "^2.10.3",
     "@testing-library/preact": "^3.2.4",
     "jsdom": "^28.1.0",
+    "playwright": "^1.54.2",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
     "vitest": "^4.0.18"
