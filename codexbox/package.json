@@ -10,7 +10,8 @@
     "test:all": "npm run test:frontend && npm run test:backend",
     "dev:backend": "node webui-server.js",
     "dev:all": "node scripts/dev-all.mjs",
-    "ui:capture": "node scripts/capture-ui.mjs",
+    "ui:capture": "node scripts/capture-ui.mjs --url=http://127.0.0.1:5173/ --start-command=\"npm run dev:all\"",
+    "ui:capture:integrated": "node scripts/capture-ui.mjs",
     "ui:install-browser": "playwright install chromium"
   },
   "dependencies": {
