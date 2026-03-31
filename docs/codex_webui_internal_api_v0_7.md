@@ -1,4 +1,4 @@
-# Codex WebUI 内部 API 仕様書 v0.6
+# Codex WebUI 内部 API 仕様書 v0.7
 
 ## 1. 文書の目的
 
@@ -12,7 +12,7 @@
 
 本仕様の目的は以下とする。
 
-- 公開 API v0.6 を成立させるための最小で堅い内部契約を定める
+- 公開 API v0.7 を成立させるための最小で堅い内部契約を定める
 - `codex-runtime` の責務と `frontend-bff` の責務を明確に分離する
 - App Server native primitive と WebUI resource の対応を明確にする
 - session / approval / message / event の状態整合と原子性を定義する
@@ -971,6 +971,8 @@ session を停止する。
 - `waiting_input` で stop した場合、App-owned session overlay を `stopped` にする
 - `waiting_approval` で stop した場合、関連 approval は `canceled` に遷移する
 - stop 後の session では `active_approval_id` は `null` とする
+- `canceled_approval` は、stop 対象 session に active pending approval が存在した場合のみ非 `null` とする
+- active pending approval が存在しない stop では、`canceled_approval` は `null` または省略可とする
 
 #### request
 
@@ -1089,6 +1091,7 @@ user message を受理する。
 - native thread に対して新しい turn を開始し、user message item を送信する
 - 返却される `message_id` は user message item の native item ID を用いる
 - assistant 生成と stream 配信は非同期継続する
+- 同一 workspace に別 active session が存在し、対象 session の `waiting_input -> running` 遷移を許可できない場合は `409 session_conflict_active_exists` とする
 - `client_message_id` は必須の冪等性キーとする
 - 同じ `session_id` と `client_message_id` で request body が同一なら、既存結果を返す冪等成功を許容する
 - 同じ key で `content` など request body が異なる場合は `409 message_idempotency_conflict` とする
@@ -1119,10 +1122,12 @@ user message を受理する。
 
 - `404 session_not_found`
 - `409 session_invalid_state`
+- `409 session_conflict_active_exists`
 - `409 message_idempotency_conflict`
 - `422 message_content_invalid`
 
 必要に応じて `details.current_status` を返してよい。
+`409 session_conflict_active_exists` の場合、必要に応じて `details.active_session_id` を返してよい。
 
 ---
 
@@ -1153,6 +1158,7 @@ session の activity / event projection を返す。
 - `sort=occurred_at` の場合、順序は `occurred_at asc, sequence asc, event_id asc`
 - `sort=-occurred_at` の場合、順序は `occurred_at desc, sequence desc, event_id desc`
 - cursor paging では指定 sort に対応する上記の安定順序を前提とする
+- session event resource の `occurred_at` は、同一 session 内では `sequence` と同順の単調非減少でなければならない
 
 #### response
 
@@ -1551,6 +1557,9 @@ BFF は `approve -> {"resolution":"approved"}`、
 public では `session` と `canceled_approval` を返す。  
 internal でも同 shape を維持し、BFF の変換負担を減らす。
 
+`canceled_approval` は、active pending approval を stop により `canceled` 解決した場合のみ非 `null` とする。  
+approval 取り消しを伴わない stop では、`canceled_approval` は `null` または省略可とする。
+
 ---
 
 ## 13. エラー仕様
@@ -1656,7 +1665,7 @@ internal でも同 shape を維持し、BFF の変換負担を減らす。
 
 ---
 
-## 17. 本版で固定した追加ルール（v0.6）
+## 17. 本版で固定した追加ルール（v0.7）
 
 - `completed` は runtime / app-server 側が session 終端と判断した場合のみ用いる
 - 1 turn 完了は原則 `waiting_input`
