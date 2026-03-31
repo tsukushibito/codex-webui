@@ -1,4 +1,4 @@
-# Codex WebUI MVP 要件定義 v0.7
+# Codex WebUI MVP 要件定義 v0.8
 
 ## 1. 目的
 

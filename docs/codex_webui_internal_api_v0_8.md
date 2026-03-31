@@ -1,4 +1,4 @@
-# Codex WebUI 内部 API 仕様書 v0.7
+# Codex WebUI 内部 API 仕様書 v0.8
 
 ## 1. 文書の目的
 
@@ -12,7 +12,7 @@
 
 本仕様の目的は以下とする。
 
-- 公開 API v0.7 を成立させるための最小で堅い内部契約を定める
+- 公開 API v0.8 を成立させるための最小で堅い内部契約を定める
 - `codex-runtime` の責務と `frontend-bff` の責務を明確に分離する
 - App Server native primitive と WebUI resource の対応を明確にする
 - session / approval / message / event の状態整合と原子性を定義する
@@ -972,7 +972,7 @@ session を停止する。
 - `waiting_approval` で stop した場合、関連 approval は `canceled` に遷移する
 - stop 後の session では `active_approval_id` は `null` とする
 - `canceled_approval` は、stop 対象 session に active pending approval が存在した場合のみ非 `null` とする
-- active pending approval が存在しない stop では、`canceled_approval` は `null` または省略可とする
+- active pending approval が存在しない stop では、`canceled_approval` は `null` とする
 
 #### request
 
@@ -1128,6 +1128,21 @@ user message を受理する。
 
 必要に応じて `details.current_status` を返してよい。
 `409 session_conflict_active_exists` の場合、必要に応じて `details.active_session_id` を返してよい。
+
+例:
+
+```json
+{
+  "error": {
+    "code": "session_conflict_active_exists",
+    "message": "another active session already exists in this workspace",
+    "details": {
+      "workspace_id": "ws_alpha",
+      "active_session_id": "thread_999"
+    }
+  }
+}
+```
 
 ---
 
@@ -1558,7 +1573,7 @@ public では `session` と `canceled_approval` を返す。
 internal でも同 shape を維持し、BFF の変換負担を減らす。
 
 `canceled_approval` は、active pending approval を stop により `canceled` 解決した場合のみ非 `null` とする。  
-approval 取り消しを伴わない stop では、`canceled_approval` は `null` または省略可とする。
+approval 取り消しを伴わない stop では、`canceled_approval` は `null` とする。
 
 ---
 
@@ -1665,7 +1680,7 @@ approval 取り消しを伴わない stop では、`canceled_approval` は `null
 
 ---
 
-## 17. 本版で固定した追加ルール（v0.7）
+## 17. 本版で固定した追加ルール（v0.8）
 
 - `completed` は runtime / app-server 側が session 終端と判断した場合のみ用いる
 - 1 turn 完了は原則 `waiting_input`
