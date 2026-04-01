@@ -1,0 +1,8 @@
+{
+  "id": 5,
+  "method": "turn/interrupt",
+  "params": {
+    "threadId": "019d496f-b79a-7412-95c7-596844f5c2a6",
+    "turnId": "019d496f-b951-7d81-b7e2-8e6ccd898d74"
+  }
+}

@@ -210,7 +210,7 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 - [x] thread ID は再取得後も同一
 - [x] user item ID が取得できる
 - [x] assistant item ID が取得できる
-- [ ] request ID が取得できるか確認した
+- [x] request ID が取得できるか確認した
 - [ ] request ID が pending / resolved 再取得時も同一か確認した
 - [x] turn ID が取得できるか確認した
 - [x] turn ID が完了判定や request 紐付けに使えるか確認した
@@ -241,32 +241,32 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 
 - [x] native thread 作成だけで idle に置けるか確認した
 - [x] `start without input` 的な安定操作があるか確認した
-- [ ] 無い場合、`session start` を App-owned façade action にすべきと判断できた
+- [x] 無い場合、`session start` を App-owned façade action にすべきと判断できた
 - [x] `created` 状態を app 側で安全に持てると判断できた
 
 ## F. approval 確認
 
-- [ ] approval request を発生させた
-- [ ] approval の最低確認情報5項目が native から取れるか確認した
-- [ ] request ID が stable か確認した
-- [ ] approve 後の native 変化を確認した
-- [ ] deny 後の native 変化を確認した
-- [ ] stop 後の native 変化を確認した
+- [x] approval request を発生させた
+- [x] approval の最低確認情報5項目が native から取れるか確認した
+- [x] request ID が stable か確認した
+- [x] approve 後の native 変化を確認した
+- [x] deny 後の native 変化を確認した
+- [x] stop 後の native 変化を確認した
 - [ ] pending approval を履歴再取得で再検出できるか確認した
 - [ ] resolved approval を履歴から判定できるか確認した
-- [ ] `approval_category` 相当の native 取得元を記録した
-- [ ] `title / summary` 相当の native 取得元を記録した
-- [ ] `description / reason` 相当の native 取得元を記録した
-- [ ] `operation_summary` 相当の native 取得元を記録した
-- [ ] `requested_at` 相当の native 取得元を記録した
-- [ ] `resolved_at` 相当の native 取得元を記録した
+- [x] `approval_category` 相当の native 取得元を記録した
+- [x] `title / summary` 相当の native 取得元を記録した
+- [x] `description / reason` 相当の native 取得元を記録した
+- [x] `operation_summary` 相当の native 取得元を記録した
+- [x] `requested_at` 相当の native 取得元を記録した
+- [x] `resolved_at` 相当の native 取得元を記録した
 
 ## G. signal / event 対応確認
 
 - [x] `message.user` に対応する native signal を決めた
 - [x] `message.assistant.delta` に対応する native signal を決めた
 - [x] `message.assistant.completed` に対応する native signal を決めた
-- [ ] `approval.requested` に対応する native signal を決めた
+- [x] `approval.requested` に対応する native signal を決めた
 - [ ] `approval.resolved` に対応する native signal を決めた
 - [x] `session.status_changed` を native から直接取るか、runtime で生成するか決めた
 - [ ] `error.raised` に対応する native signal を決めた
@@ -275,11 +275,11 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 
 - [x] `running` の根拠を確認した
 - [x] `waiting_input` の根拠を確認した
-- [ ] `waiting_approval` の根拠を確認した
-- [ ] `stopped` の根拠を確認した
+- [x] `waiting_approval` の根拠を確認した
+- [x] `stopped` の根拠を確認した
 - [ ] `failed` の根拠を確認した
-- [ ] `completed` を native だけで置けるか確認した
-- [ ] native だけで足りない場合、runtime 判定が必要と判断した
+- [x] `completed` を native だけで置けるか確認した
+- [x] native だけで足りない場合、runtime 判定が必要と判断した
 
 ## I. 履歴再構築確認
 
@@ -293,7 +293,7 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 ## J. timestamp 確認
 
 - [x] item に時刻が付くか確認した
-- [ ] request / resolution に時刻が付くか確認した
+- [x] request / resolution に時刻が付くか確認した
 - [x] event に時刻が付くか確認した
 - [x] 履歴再取得時に時刻で安定順序が取りやすいか確認した
 - [ ] 同一 thread / 同一 request 内で時刻が順序判定の補助として信頼できるか確認した
@@ -309,6 +309,17 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 - `running` / `waiting_input` の一次候補は `thread/status/changed: active` / `thread/status/changed: idle`
 - `thread/start` だけで `idle` / `turns=[]` の thread を作成できた。first user message 前は `includeTurns=true` が unavailable で、`created` は app-owned projection 候補
 - item / event / history では時刻を観測できず、timestamp 依存の順序判断は Phase 2 時点では採れない
+
+### Phase 3 一次判断メモ
+
+- `request_id` は approval case で native server request id を取得でき、approve / deny / approval 中 stop の各 case で `serverRequest/resolved.params.requestId` と一致した。ただし `thread/read` history には request object 自体が materialize されず、履歴再取得だけでは再検出できない
+- `approval.requested` の第一候補は native server request `item/commandExecution/requestApproval`
+- `approval.resolved` は `serverRequest/resolved` 単体では不十分。resolution 種別も `resolved_at` も無く、approve / deny は client reply raw と相関させないと区別できない
+- `waiting_approval` の一次候補は `thread/status/changed: active[waitingOnApproval]`。pending `thread/read` でも同じ status を再取得できた
+- approval の最低確認情報では `approval_category`、`title / summary`、`operation_summary` は native 由来候補がある。一方 `description / reason`、`requested_at`、`resolved_at` は native payload では埋まらず app 補完が必要
+- approve 後は `waiting_approval -> active[] -> commandExecution completed -> final agentMessage -> idle`、deny 後は `serverRequest/resolved -> commandExecution declined -> active[] -> interrupted -> idle`、approval 中 stop 後は client approval reply 無しで `interrupted -> idle -> serverRequest/resolved` が出た
+- 通常 stop は approval 中 stop と同じく `turn.status = interrupted` と `thread.status = idle` に落ちるが、`waitingOnApproval` も `serverRequest/resolved` も無い。`interrupted` だけでは approval canceled と通常 stop を区別できない
+- terminal `completed` は native session status としては観測できず、approve 後の `idle` は `waiting_input` 側、deny / stop 後の `idle` は interrupted turn 完了後の待機状態として扱うのが妥当
 
 ## K. 最終判定
 

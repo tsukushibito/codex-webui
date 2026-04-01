@@ -1,0 +1,50 @@
+{
+  "id": "019d4974-eb2b-7f70-b7ef-08c9f78d0540",
+  "preview": "Use a shell command to run `sleep 10; printf 'done\\n'`, then answer with exactly one short sentence containing the word done.",
+  "ephemeral": false,
+  "modelProvider": "openai",
+  "createdAt": 1775053892,
+  "updatedAt": 1775053902,
+  "status": {
+    "type": "idle"
+  },
+  "path": "/home/dev/.codex/sessions/2026/04/01/rollout-2026-04-01T23-31-32-019d4974-eb2b-7f70-b7ef-08c9f78d0540.jsonl",
+  "cwd": "/workspace/repos/codex-webui",
+  "cliVersion": "0.118.0",
+  "source": "vscode",
+  "agentNickname": null,
+  "agentRole": null,
+  "gitInfo": {
+    "sha": "0c018f81f57eef73045ee735c88c9e84c27828a4",
+    "branch": "main",
+    "originUrl": "https://github.com/tsukushibito/codex-webui.git"
+  },
+  "name": null,
+  "turns": [
+    {
+      "id": "019d4974-ed89-7141-aeb4-71e525ad82a2",
+      "items": [
+        {
+          "type": "userMessage",
+          "id": "item-1",
+          "content": [
+            {
+              "type": "text",
+              "text": "Use a shell command to run `sleep 10; printf 'done\\n'`, then answer with exactly one short sentence containing the word done.",
+              "text_elements": []
+            }
+          ]
+        },
+        {
+          "type": "agentMessage",
+          "id": "item-2",
+          "text": "Running the requested shell command and then I’ll reply with the exact one-sentence result.",
+          "phase": "commentary",
+          "memoryCitation": null
+        }
+      ],
+      "status": "interrupted",
+      "error": null
+    }
+  ]
+}

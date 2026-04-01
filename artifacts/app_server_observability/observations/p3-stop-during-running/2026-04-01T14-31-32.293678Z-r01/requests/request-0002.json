@@ -1,0 +1,13 @@
+{
+  "id": 3,
+  "method": "turn/start",
+  "params": {
+    "threadId": "019d4974-eb2b-7f70-b7ef-08c9f78d0540",
+    "input": [
+      {
+        "type": "text",
+        "text": "Use a shell command to run `sleep 10; printf 'done\\n'`, then answer with exactly one short sentence containing the word done."
+      }
+    ]
+  }
+}

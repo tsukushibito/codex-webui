@@ -1,0 +1,55 @@
+{
+  "id": 6,
+  "result": {
+    "thread": {
+      "id": "019d496f-b79a-7412-95c7-596844f5c2a6",
+      "preview": "Use a shell command to print the exact current UTC timestamp with nanoseconds using `date -u +%Y-%m-%dT%H:%M:%S.%NZ`, then summarize it in one short sentence.",
+      "ephemeral": false,
+      "modelProvider": "openai",
+      "createdAt": 1775053551,
+      "updatedAt": 1775053562,
+      "status": {
+        "type": "idle"
+      },
+      "path": "/home/dev/.codex/sessions/2026/04/01/rollout-2026-04-01T23-25-51-019d496f-b79a-7412-95c7-596844f5c2a6.jsonl",
+      "cwd": "/workspace/repos/codex-webui",
+      "cliVersion": "0.118.0",
+      "source": "vscode",
+      "agentNickname": null,
+      "agentRole": null,
+      "gitInfo": {
+        "sha": "0c018f81f57eef73045ee735c88c9e84c27828a4",
+        "branch": "main",
+        "originUrl": "https://github.com/tsukushibito/codex-webui.git"
+      },
+      "name": null,
+      "turns": [
+        {
+          "id": "019d496f-b951-7d81-b7e2-8e6ccd898d74",
+          "items": [
+            {
+              "type": "userMessage",
+              "id": "item-1",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Use a shell command to print the exact current UTC timestamp with nanoseconds using `date -u +%Y-%m-%dT%H:%M:%S.%NZ`, then summarize it in one short sentence.",
+                  "text_elements": []
+                }
+              ]
+            },
+            {
+              "type": "agentMessage",
+              "id": "item-2",
+              "text": "Printing the current UTC timestamp directly from the shell, then I’ll summarize the result in one short sentence.",
+              "phase": "commentary",
+              "memoryCitation": null
+            }
+          ],
+          "status": "interrupted",
+          "error": null
+        }
+      ]
+    }
+  }
+}
