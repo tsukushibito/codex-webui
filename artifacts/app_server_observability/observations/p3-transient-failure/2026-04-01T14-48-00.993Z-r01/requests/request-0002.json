@@ -1,0 +1,13 @@
+{
+  "id": 3,
+  "method": "turn/start",
+  "params": {
+    "threadId": "019d4984-0160-71f3-a4cb-764a7e596a5a",
+    "input": [
+      {
+        "type": "text",
+        "text": "Use a shell command to run `printf 'boom\\n' >&2; exit 42`, do not retry, and if it fails answer with exactly one short sentence that includes the text exit 42."
+      }
+    ]
+  }
+}

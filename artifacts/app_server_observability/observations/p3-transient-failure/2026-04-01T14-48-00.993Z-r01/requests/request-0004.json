@@ -1,0 +1,8 @@
+{
+  "id": 5,
+  "method": "thread/read",
+  "params": {
+    "threadId": "019d4984-0160-71f3-a4cb-764a7e596a5a",
+    "includeTurns": true
+  }
+}

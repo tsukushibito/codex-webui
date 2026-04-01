@@ -1,0 +1,57 @@
+{
+  "id": "019d4984-0160-71f3-a4cb-764a7e596a5a",
+  "preview": "Use a shell command to run `printf 'boom\\n' >&2; exit 42`, do not retry, and if it fails answer with exactly one short sentence that includes the text exit 42.",
+  "ephemeral": false,
+  "modelProvider": "openai",
+  "createdAt": 1775054881,
+  "updatedAt": 1775054896,
+  "status": {
+    "type": "idle"
+  },
+  "path": "/home/dev/.codex/sessions/2026/04/01/rollout-2026-04-01T23-48-01-019d4984-0160-71f3-a4cb-764a7e596a5a.jsonl",
+  "cwd": "/workspace/repos/codex-webui",
+  "cliVersion": "0.118.0",
+  "source": "vscode",
+  "agentNickname": null,
+  "agentRole": null,
+  "gitInfo": {
+    "sha": "dc8997bdf33243fbc7676af8395200f7875ae5c6",
+    "branch": "main",
+    "originUrl": "https://github.com/tsukushibito/codex-webui.git"
+  },
+  "name": null,
+  "turns": [
+    {
+      "id": "019d4984-0359-7912-a0fb-fe40a06d6cf9",
+      "items": [
+        {
+          "type": "userMessage",
+          "id": "item-1",
+          "content": [
+            {
+              "type": "text",
+              "text": "Use a shell command to run `printf 'boom\\n' >&2; exit 42`, do not retry, and if it fails answer with exactly one short sentence that includes the text exit 42.",
+              "text_elements": []
+            }
+          ]
+        },
+        {
+          "type": "agentMessage",
+          "id": "item-2",
+          "text": "Running the exact shell command once and returning based on its exit status.",
+          "phase": "commentary",
+          "memoryCitation": null
+        },
+        {
+          "type": "agentMessage",
+          "id": "item-3",
+          "text": "Command failed with exit 42.",
+          "phase": "final_answer",
+          "memoryCitation": null
+        }
+      ],
+      "status": "completed",
+      "error": null
+    }
+  ]
+}

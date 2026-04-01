@@ -269,7 +269,7 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 - [x] `approval.requested` に対応する native signal を決めた
 - [ ] `approval.resolved` に対応する native signal を決めた
 - [x] `session.status_changed` を native から直接取るか、runtime で生成するか決めた
-- [ ] `error.raised` に対応する native signal を決めた
+- [x] `error.raised` に対応する native signal を決めた
 
 ## H. status マッピング確認
 
@@ -277,7 +277,7 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 - [x] `waiting_input` の根拠を確認した
 - [x] `waiting_approval` の根拠を確認した
 - [x] `stopped` の根拠を確認した
-- [ ] `failed` の根拠を確認した
+- [x] `failed` の根拠を確認した
 - [x] `completed` を native だけで置けるか確認した
 - [x] native だけで足りない場合、runtime 判定が必要と判断した
 
@@ -320,6 +320,8 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 - approve 後は `waiting_approval -> active[] -> commandExecution completed -> final agentMessage -> idle`、deny 後は `serverRequest/resolved -> commandExecution declined -> active[] -> interrupted -> idle`、approval 中 stop 後は client approval reply 無しで `interrupted -> idle -> serverRequest/resolved` が出た
 - 通常 stop は approval 中 stop と同じく `turn.status = interrupted` と `thread.status = idle` に落ちるが、`waitingOnApproval` も `serverRequest/resolved` も無い。`interrupted` だけでは approval canceled と通常 stop を区別できない
 - terminal `completed` は native session status としては観測できず、approve 後の `idle` は `waiting_input` 側、deny / stop 後の `idle` は interrupted turn 完了後の待機状態として扱うのが妥当
+- `p3-transient-failure` では `item/completed` with `commandExecution.status = failed` と `exitCode = 42` を観測したが、turn 自体は `completed`、thread は `idle` に戻った。native の command execution failure は terminal `failed` ではなく、公開 `error.raised` の一次候補として app 側で投影するのが妥当
+- 同ケースの `thread/read` history には failed `commandExecution` item も turn error も materialize されず、残ったのは final `agentMessage` と `turn.status = completed` のみだった。failure 系は stream 由来補完が前提になる
 
 ## K. 最終判定
 
