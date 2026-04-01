@@ -1,0 +1,13 @@
+{
+  "id": 3,
+  "method": "turn/start",
+  "params": {
+    "threadId": "019d4816-6ff1-7ca3-927f-4779c96544ff",
+    "input": [
+      {
+        "type": "text",
+        "text": "List files in the current directory with a shell command and do not send any assistant message."
+      }
+    ]
+  }
+}

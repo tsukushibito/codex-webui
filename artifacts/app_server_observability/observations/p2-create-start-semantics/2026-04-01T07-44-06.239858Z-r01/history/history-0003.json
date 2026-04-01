@@ -1,0 +1,20 @@
+{
+  "id": "019d4800-6e58-7fe1-991b-b333453f8b47",
+  "preview": "",
+  "ephemeral": false,
+  "modelProvider": "openai",
+  "createdAt": 1775029481,
+  "updatedAt": 1775029481,
+  "status": {
+    "type": "idle"
+  },
+  "path": "/home/dev/.codex/sessions/2026/04/01/rollout-2026-04-01T16-44-41-019d4800-6e58-7fe1-991b-b333453f8b47.jsonl",
+  "cwd": "/workspace/repos/codex-webui",
+  "cliVersion": "0.117.0",
+  "source": "vscode",
+  "agentNickname": null,
+  "agentRole": null,
+  "gitInfo": null,
+  "name": null,
+  "turns": []
+}

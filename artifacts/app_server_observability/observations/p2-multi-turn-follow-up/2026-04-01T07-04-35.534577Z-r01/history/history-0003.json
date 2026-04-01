@@ -1,0 +1,50 @@
+{
+  "id": "019d47dc-87a8-7af0-a53e-81cc548f9912",
+  "preview": "Reply with exactly: turn one ok",
+  "ephemeral": false,
+  "modelProvider": "openai",
+  "createdAt": 1775027128,
+  "updatedAt": 1775027146,
+  "status": {
+    "type": "idle"
+  },
+  "path": "/home/dev/.codex/sessions/2026/04/01/rollout-2026-04-01T16-05-28-019d47dc-87a8-7af0-a53e-81cc548f9912.jsonl",
+  "cwd": "/workspace/repos/codex-webui",
+  "cliVersion": "0.117.0",
+  "source": "vscode",
+  "agentNickname": null,
+  "agentRole": null,
+  "gitInfo": {
+    "sha": "8cce3b9334433d87da04b527da8110e99d4b2c15",
+    "branch": "main",
+    "originUrl": "https://github.com/tsukushibito/codex-webui.git"
+  },
+  "name": null,
+  "turns": [
+    {
+      "id": "019d47dc-897a-77e2-92a9-704c54136fdb",
+      "items": [
+        {
+          "type": "userMessage",
+          "id": "item-1",
+          "content": [
+            {
+              "type": "text",
+              "text": "Reply with exactly: turn one ok",
+              "text_elements": []
+            }
+          ]
+        },
+        {
+          "type": "agentMessage",
+          "id": "item-2",
+          "text": "turn one ok",
+          "phase": "final_answer",
+          "memoryCitation": null
+        }
+      ],
+      "status": "completed",
+      "error": null
+    }
+  ]
+}

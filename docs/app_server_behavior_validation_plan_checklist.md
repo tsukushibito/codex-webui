@@ -206,43 +206,43 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 
 ## B. ID 安定性確認
 
-- [ ] thread ID が取得できる
-- [ ] thread ID は再取得後も同一
-- [ ] user item ID が取得できる
-- [ ] assistant item ID が取得できる
+- [x] thread ID が取得できる
+- [x] thread ID は再取得後も同一
+- [x] user item ID が取得できる
+- [x] assistant item ID が取得できる
 - [ ] request ID が取得できるか確認した
 - [ ] request ID が pending / resolved 再取得時も同一か確認した
-- [ ] turn ID が取得できるか確認した
-- [ ] turn ID が完了判定や request 紐付けに使えるか確認した
-- [ ] event ID が取得できるか確認した
-- [ ] event ID は安定 contract として使う価値があるか確認した
+- [x] turn ID が取得できるか確認した
+- [x] turn ID が完了判定や request 紐付けに使えるか確認した
+- [x] event ID が取得できるか確認した
+- [x] event ID は安定 contract として使う価値があるか確認した
 
 ## C. 通常 turn 確認
 
-- [ ] user message 送信で何が生成されるか確認した
-- [ ] assistant delta の signal / event を確認した
-- [ ] assistant completed の signal / event を確認した
-- [ ] delta と completed が同じ message に結び付くか確認した
-- [ ] 同一 turn で assistant item が複数生成されうるか確認した
-- [ ] turn 完了を示す signal を確認した
-- [ ] `running -> waiting_input` に戻す根拠を確認した
-- [ ] 複数 turn 継続ケースを観測した
-- [ ] follow-up user message で既存 thread が再利用されるか確認した
-- [ ] follow-up turn で `waiting_input -> running` に戻る根拠を確認した
+- [x] user message 送信で何が生成されるか確認した
+- [x] assistant delta の signal / event を確認した
+- [x] assistant completed の signal / event を確認した
+- [x] delta と completed が同じ message に結び付くか確認した
+- [x] 同一 turn で assistant item が複数生成されうるか確認した
+- [x] turn 完了を示す signal を確認した
+- [x] `running -> waiting_input` に戻す根拠を確認した
+- [x] 複数 turn 継続ケースを観測した
+- [x] follow-up user message で既存 thread が再利用されるか確認した
+- [x] follow-up turn で `waiting_input -> running` に戻る根拠を確認した
 
 ## D. assistant テキスト無し turn 確認
 
-- [ ] tool/log/request だけで終わる turn を観測した
-- [ ] assistant message が出ないまま turn 完了しうるか確認した
-- [ ] その場合でも `waiting_input` に戻せる根拠があるか確認した
-- [ ] message projection に含めない item を切り分けられるか確認した
+- [x] tool/log/request だけで終わる turn を観測した
+- [x] assistant message が出ないまま turn 完了しうるか確認した
+- [x] その場合でも `waiting_input` に戻せる根拠があるか確認した
+- [x] message projection に含めない item を切り分けられるか確認した
 
 ## E. create / start 確認
 
-- [ ] native thread 作成だけで idle に置けるか確認した
-- [ ] `start without input` 的な安定操作があるか確認した
+- [x] native thread 作成だけで idle に置けるか確認した
+- [x] `start without input` 的な安定操作があるか確認した
 - [ ] 無い場合、`session start` を App-owned façade action にすべきと判断できた
-- [ ] `created` 状態を app 側で安全に持てると判断できた
+- [x] `created` 状態を app 側で安全に持てると判断できた
 
 ## F. approval 確認
 
@@ -263,18 +263,18 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 
 ## G. signal / event 対応確認
 
-- [ ] `message.user` に対応する native signal を決めた
-- [ ] `message.assistant.delta` に対応する native signal を決めた
-- [ ] `message.assistant.completed` に対応する native signal を決めた
+- [x] `message.user` に対応する native signal を決めた
+- [x] `message.assistant.delta` に対応する native signal を決めた
+- [x] `message.assistant.completed` に対応する native signal を決めた
 - [ ] `approval.requested` に対応する native signal を決めた
 - [ ] `approval.resolved` に対応する native signal を決めた
-- [ ] `session.status_changed` を native から直接取るか、runtime で生成するか決めた
+- [x] `session.status_changed` を native から直接取るか、runtime で生成するか決めた
 - [ ] `error.raised` に対応する native signal を決めた
 
 ## H. status マッピング確認
 
-- [ ] `running` の根拠を確認した
-- [ ] `waiting_input` の根拠を確認した
+- [x] `running` の根拠を確認した
+- [x] `waiting_input` の根拠を確認した
 - [ ] `waiting_approval` の根拠を確認した
 - [ ] `stopped` の根拠を確認した
 - [ ] `failed` の根拠を確認した
@@ -292,11 +292,23 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 
 ## J. timestamp 確認
 
-- [ ] item に時刻が付くか確認した
+- [x] item に時刻が付くか確認した
 - [ ] request / resolution に時刻が付くか確認した
-- [ ] event に時刻が付くか確認した
-- [ ] 履歴再取得時に時刻で安定順序が取りやすいか確認した
+- [x] event に時刻が付くか確認した
+- [x] 履歴再取得時に時刻で安定順序が取りやすいか確認した
 - [ ] 同一 thread / 同一 request 内で時刻が順序判定の補助として信頼できるか確認した
+
+### Phase 2 一次判断メモ
+
+- `session_id` は native `thread_id` 候補として先行可。follow-up turn でも同一 thread が再利用された
+- `message_id = native item ID` は不採用寄り。stream 側 item id と history 側 item id が一致しない
+- `turn_id` は internal/debug 用の有力候補。複数 turn でも response / stream / history で一致した
+- `event_id` は native 露出を観測できず、app-owned 採番前提で先行可
+- `message.user` は `item/completed` with `userMessage`、`message.assistant.delta` は `item/agentMessage/delta`、`message.assistant.completed` は非空 text または history materialization を伴う `item/completed` with `agentMessage` が一次候補
+- assistant text なし turn では stream に空文字 `agentMessage` lifecycle が出ても、history に assistant message が materialize されないケースがあった。公開 message projection では empty `agentMessage` を除外候補とする
+- `running` / `waiting_input` の一次候補は `thread/status/changed: active` / `thread/status/changed: idle`
+- `thread/start` だけで `idle` / `turns=[]` の thread を作成できた。first user message 前は `includeTurns=true` が unavailable で、`created` は app-owned projection 候補
+- item / event / history では時刻を観測できず、timestamp 依存の順序判断は Phase 2 時点では採れない
 
 ## K. 最終判定
 

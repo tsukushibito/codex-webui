@@ -1,0 +1,50 @@
+{
+  "id": "019d47c5-7968-7992-80f3-c6bb56e06bef",
+  "preview": "Say exactly: observation ok",
+  "ephemeral": false,
+  "modelProvider": "openai",
+  "createdAt": 1775025617,
+  "updatedAt": 1775025624,
+  "status": {
+    "type": "idle"
+  },
+  "path": "/home/dev/.codex/sessions/2026/04/01/rollout-2026-04-01T15-40-17-019d47c5-7968-7992-80f3-c6bb56e06bef.jsonl",
+  "cwd": "/workspace/repos/codex-webui",
+  "cliVersion": "0.117.0",
+  "source": "vscode",
+  "agentNickname": null,
+  "agentRole": null,
+  "gitInfo": {
+    "sha": "8cce3b9334433d87da04b527da8110e99d4b2c15",
+    "branch": "main",
+    "originUrl": "https://github.com/tsukushibito/codex-webui.git"
+  },
+  "name": null,
+  "turns": [
+    {
+      "id": "019d47c5-7a83-7730-98af-85618767ee29",
+      "items": [
+        {
+          "type": "userMessage",
+          "id": "item-1",
+          "content": [
+            {
+              "type": "text",
+              "text": "Say exactly: observation ok",
+              "text_elements": []
+            }
+          ]
+        },
+        {
+          "type": "agentMessage",
+          "id": "item-2",
+          "text": "observation ok",
+          "phase": "final_answer",
+          "memoryCitation": null
+        }
+      ],
+      "status": "completed",
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "id": 3,
+  "method": "turn/start",
+  "params": {
+    "threadId": "019d47c5-7968-7992-80f3-c6bb56e06bef",
+    "input": [
+      {
+        "type": "text",
+        "text": "Say exactly: observation ok"
+      }
+    ]
+  }
+}

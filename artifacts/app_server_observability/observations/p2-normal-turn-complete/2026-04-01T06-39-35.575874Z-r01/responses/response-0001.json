@@ -1,0 +1,35 @@
+{
+  "id": 2,
+  "result": {
+    "thread": {
+      "id": "019d47c5-7968-7992-80f3-c6bb56e06bef",
+      "preview": "",
+      "ephemeral": false,
+      "modelProvider": "openai",
+      "createdAt": 1775025617,
+      "updatedAt": 1775025617,
+      "status": {
+        "type": "idle"
+      },
+      "path": "/home/dev/.codex/sessions/2026/04/01/rollout-2026-04-01T15-40-17-019d47c5-7968-7992-80f3-c6bb56e06bef.jsonl",
+      "cwd": "/workspace/repos/codex-webui",
+      "cliVersion": "0.117.0",
+      "source": "vscode",
+      "agentNickname": null,
+      "agentRole": null,
+      "gitInfo": null,
+      "name": null,
+      "turns": []
+    },
+    "model": "gpt-5.4",
+    "modelProvider": "openai",
+    "serviceTier": null,
+    "cwd": "/workspace/repos/codex-webui",
+    "approvalPolicy": "never",
+    "approvalsReviewer": "user",
+    "sandbox": {
+      "type": "dangerFullAccess"
+    },
+    "reasoningEffort": "high"
+  }
+}
