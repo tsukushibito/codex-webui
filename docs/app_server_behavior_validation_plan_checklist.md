@@ -76,6 +76,15 @@
 
 本実装ではなく、観測専用として行う。
 
+Phase 1 では、次の運用を固定済みとする。
+
+- 成果物と raw 証跡の正本は repo 内 `artifacts/app_server_observability/` に置く
+- 保存単位は `case_name / run_key` とする
+- `run_key` は高解像度 UTC 時刻と nonce で一意化し、再観測した tasks Phase は metadata に残す
+- `session_key` は観測者が付与する grouping key とし、native `session_id` や `thread_id` と同一視しない
+- request / response / history は同一採番で突合し、stream はケース単位の時系列で保存する
+- 判定メモは `採用 / 不採用 / 保留だが先行可 / 未完了` の 4 値で残す
+
 ## 5. 実施フェーズ
 
 ### Phase 1: 基本ケース観測
@@ -190,10 +199,10 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 
 ## A. 基本ログ準備
 
-- [ ] request / response / event を保存できる
-- [ ] ケース名を付けて保存できる
-- [ ] 時刻順に追える
-- [ ] thread 単位でまとまっている
+- [x] request / response / event / history snapshot をケース単位で保存できる
+- [x] ケース名と UTC 実行時刻を付けて保存できる
+- [x] 時刻順と request 順の両方で追える
+- [x] `session_key` / `thread_id` / `request_id` を対応付け、thread 単位で追える
 
 ## B. ID 安定性確認
 
