@@ -47,12 +47,15 @@
 - `ids.md`
 - `requests/`
 - `responses/`
+- `server_requests/`
+- `server_responses/`
 - `stream/`
 - `history/`
 - `judgment.md`
 
-`requests/`、`responses/`、`history/` は request または turn の観測順に `0001` から採番する。  
-同一番号の request / response / history snapshot を比較単位とする。
+`requests/`、`responses/`、`history/` は client initiated request または turn の観測順に `0001` から採番する。
+同一番号の client initiated request / response / history snapshot を比較単位とする。
+approval や user input request のような server initiated JSON-RPC は `server_requests/` と `server_responses/` に分離し、同一番号で request / reply を対応付ける。
 
 保存パスは `observations/<case_name>/<run_key>/` を正本とする。  
 `observed_in_tasks_phase` は metadata に残し、保存パスには使わない。
@@ -115,18 +118,20 @@
 - `request_id` または `unknown`
 - `operator_notes`
 
-`app_server_version` は `codex --version` など、観測時点で再取得可能な方法を併記する。  
-`runtime_version` は Docker image tag、container digest、または実行環境バージョンを記録し、取得不能なら取得不能理由を書く。
+`app_server_version` は app-server 固有の source から記録する。
+例: initialize response の `userAgent`、app-server health endpoint、server build metadata。CLI version と同一視しない。取得不能なら `unknown` と取得不能理由を書く。
+`runtime_version` は `codex --version`、Docker image tag、container digest、または実行環境バージョンを記録し、取得不能なら取得不能理由を書く。`result.thread.cliVersion` は runtime / CLI version として扱う。
 
 ## 8. stream と history の比較手順
 
 1. request または turn ごとに観測順を `0001`, `0002` と採番する
 2. 対応する raw request / response を同じ番号で保存する
-3. stream event はケース単位で時系列保存し、必要なら request 番号を注記する
-4. 各 request または turn の完了後に history snapshot を取得し、同じ番号で保存する
-5. `ids.md` に `session_key` / `thread_id` / `request_id` の対応を書く
-6. `judgment.md` に stream と history の一致点、不一致点、保留理由を書く
-7. prior phase のケース再観測時は `observed_in_tasks_phase` に実施 phase を記録する
+3. server initiated request が発生した場合は `server_requests/` と `server_responses/` を別系列で採番する
+4. stream event はケース単位で時系列保存し、必要なら request 番号を注記する
+5. 各 request または turn の完了後に history snapshot を取得し、同じ番号で保存する
+6. `ids.md` に `session_key` / `thread_id` / `request_id` の対応を書く
+7. `judgment.md` に stream と history の一致点、不一致点、保留理由を書く
+8. prior phase のケース再観測時は `observed_in_tasks_phase` に実施 phase を記録する
 
 差分が出た場合は観測失敗として消さず、そのまま証跡として残した上で判定欄に反映する。
 

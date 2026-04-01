@@ -1,0 +1,13 @@
+{
+  "id": 3,
+  "method": "turn/start",
+  "params": {
+    "threadId": "019d48ce-933a-7a70-bab8-1caaae131711",
+    "input": [
+      {
+        "type": "text",
+        "text": "Use a shell command to print the exact current UTC timestamp with nanoseconds using `date -u +%Y-%m-%dT%H:%M:%S.%NZ`, then summarize it in one short sentence."
+      }
+    ]
+  }
+}

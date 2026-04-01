@@ -5,10 +5,10 @@
 - run_key: `2026-04-01T06-39-35.575874Z-r01`
 - executed_at_utc: `2026-04-01T06:39:35.575874Z`
 - session_key: `sk-20260401-p2-normal-turn-complete-01`
-- app_server_version: `0.117.0`
-  source: `responses/response-0001.json` の `result.thread.cliVersion` と initialize response の `userAgent`
+- app_server_version: `unknown`
+  source: この run では app-server 固有 version source を成果物に別保存していない。`result.thread.cliVersion` は CLI version のため採用しない。
 - runtime_version: `codex-cli 0.117.0`
-  source: `codex --version`
+  source: `codex --version` と `responses/response-0001.json` の `result.thread.cliVersion`
 - case_description: approval を含まない通常 1 turn 完了ケース。`thread/start` で thread を作成し、1 回の `turn/start` を完了させ、最後に `thread/read` で履歴を再取得する。
 - input_summary: text input 1 件。内容は `Say exactly: observation ok`
 - thread_id: `019d47c5-7968-7992-80f3-c6bb56e06bef`

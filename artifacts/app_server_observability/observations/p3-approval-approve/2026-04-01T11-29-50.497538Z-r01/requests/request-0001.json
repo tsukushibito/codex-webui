@@ -1,0 +1,10 @@
+{
+  "id": 2,
+  "method": "thread/start",
+  "params": {
+    "cwd": "/workspace/repos/codex-webui",
+    "approvalPolicy": "untrusted",
+    "sandbox": "danger-full-access",
+    "personality": "pragmatic"
+  }
+}

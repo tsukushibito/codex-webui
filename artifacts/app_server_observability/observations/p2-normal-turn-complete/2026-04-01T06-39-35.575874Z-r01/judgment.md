@@ -7,7 +7,7 @@
 - run_key: `2026-04-01T06-39-35.575874Z-r01`
 - executed_at_utc: `2026-04-01T06:39:35.575874Z`
 - session_key: `sk-20260401-p2-normal-turn-complete-01`
-- app_server_version: `0.117.0`
+- app_server_version: `unknown`
 - runtime_version: `codex-cli 0.117.0`
 - thread_id: `019d47c5-7968-7992-80f3-c6bb56e06bef`
 - request_id: `unknown`

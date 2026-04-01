@@ -41,5 +41,7 @@
 - ids:
 - requests:
 - responses:
+- server_requests:
+- server_responses:
 - stream:
 - history:
