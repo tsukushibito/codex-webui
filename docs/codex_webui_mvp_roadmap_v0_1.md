@@ -22,12 +22,12 @@ The aim of this roadmap is to first solidify interfaces that require large rewor
 
 At present, the following has been organized as a general outline.
 
-- Conditions for MVP 
+- Conditions for MVP
 - Public boundary is only `frontend-bff`
 - `codex-runtime` has internal responsibilities
-- Conceptual separation of `workspace / session / message / approval / event` 
-- Conceptual separation of `session create` and `session start` 
-- active session constraint 
+- Conceptual separation of `workspace / session / message / approval / event`
+- Conceptual separation of `session create` and `session start`
+- active session constraint
 - approval Constraints
 - Restoration policy with REST + SSE
 - Internal/public responsibility boundaries
@@ -36,15 +36,17 @@ At present, the following has been organized as a general outline.
 
 - `session_status` is `created / running / waiting_input / waiting_approval / completed / failed / stopped`
 - active session is `running` or `waiting_approval`
-- Normal message can be sent only when `waiting_input` 
-- `completed` is not just one turn completion but only when determining the end of WebUI 
+- Normal message can be sent only when `waiting_input`
+- `completed` is not just one turn completion but only when determining the end of WebUI
 - If stopped during `waiting_approval`, approval has `canceled`
-- Session stream has `sequence`, and after reconnection, it converges with REST reacquisition 
+- Session stream has `sequence`, and after reconnection, it converges with REST reacquisition
+- `session_id` reuses native thread ID, while `message_id` / `approval_id` / `event_id` are app-owned stable IDs
+- Messages are restored primarily from history, while approvals are restored from runtime-managed projection/state
 - Both public API / internal API assume JSON, `snake_case`, UTC RFC 3339, opaque ID
 
 ### 2.3 What to do next
 
-The next thing to do is to eliminate only the app-server dependent uncertainties through observation, finalize the specifications based on the results, and move on to implementation.
+The observation phase is complete. The next thing to do is to reflect the confirmed app-server behavior into the maintained specifications, eliminate contradictions between requirements/common/public/internal docs, and then move on to implementation.
 
 ---
 
@@ -52,34 +54,34 @@ The next thing to do is to eliminate only the app-server dependent uncertainties
 
 ### 3.1 app-server Items that need to be observed
 
-1. ID stability of thread / turn / item / request / event 
-2. Type and order of native signal / event 
-3. Implementation meaning of `session create` / `session start` 
-4. `running -> waiting_input` decision basis 
-5. Approval pending / resolved redetectability 
-6. `completed / failed / stopped` native 
-7. stream Even if the first load is not connected, can it be restored by simply re-acquiring the history? 
+1. ID stability of thread / turn / item / request / event
+2. Type and order of native signal / event
+3. Implementation meaning of `session create` / `session start`
+4. `running -> waiting_input` decision basis
+5. Approval pending / resolved redetectability
+6. `completed / failed / stopped` native
+7. stream Even if the first load is not connected, can it be restored by simply re-acquiring the history?
 8. approval Native acquisition source of minimum confirmation information
 
 ### 3.2 Matters that should be incorporated into specifications after observation
 
-1. Final adoption table of `session_id / message_id / approval_id / turn_id / event_id / sequence` 
-2. Native signal → internal/public event correspondence table 
-3. `session.status` judgment rule 
-4. How to fix `session start` as façade action 
-5. Minimal schema for app-owned persistence 
-6. Atomicity / recovery finalization procedure 
-7. workspace unit exclusion rule 
-8. BFF field mapping / read model synthesis policy 
-9. UI restoration rule 
+1. Final adoption table of `session_id / message_id / approval_id / turn_id / event_id / sequence`
+2. Native signal → internal/public event correspondence table
+3. `session.status` judgment rule
+4. How to fix `session start` as façade action
+5. Minimal schema for app-owned persistence
+6. Atomicity / recovery finalization procedure
+7. workspace unit exclusion rule
+8. BFF field mapping / read model synthesis policy
+9. UI restoration rule
 10. contract test perspective
 
 ### 3.3 Items that may still be affected at the time of implementation but can be postponed
 
-- `workspace_id` / ID Specific format 
-- Retention period of projection cache 
-- Handling of `system` role item 
-- Default limit of pagination Final value 
+- `workspace_id` / ID Specific format
+- Retention period of projection cache
+- Handling of `system` role item
+- Default limit of pagination Final value
 - Details of `event:` name of SSE transport
 
 ---
@@ -107,11 +109,11 @@ Create a minimum verification environment that allows you to observe the actual 
 
 ### 5.2 Implementation details
 
-- Prepare a verification runtime that can stably start `codex app-server` 
-- Prepare a logger that can save native event / history / request / resolution 
-- Allow observation logs for each session to be saved separately 
-- Prepare a simple client that can verify both with and without stream connection 
-- Prepare a prompt set that intentionally generates approval 
+- Prepare a verification runtime that can stably start `codex app-server`
+- Prepare a logger that can save native event / history / request / resolution
+- Allow observation logs for each session to be saved separately
+- Prepare a simple client that can verify both with and without stream connection
+- Prepare a prompt set that intentionally generates approval
 - stop / deny Script a /stream disconnect/first restore test scenario
 
 ### 5.3 Products
@@ -123,8 +125,8 @@ Create a minimum verification environment that allows you to observe the actual 
 
 ### 5.4 Completion conditions
 
-- There is a reproducible observation environment 
-- The same case can be run multiple times and the differences can be compared 
+- There is a reproducible observation environment
+- The same case can be run multiple times and the differences can be compared
 - The lowest case including approval / stop / stream disconnection can be executed automatically or semi-automatically
 
 ---
@@ -159,7 +161,7 @@ Things to check:
 
 - Is it possible to create something equivalent to idle just by creating a native thread?
 - Is there a stable operation like `start without input`?
-- If not, can `session start` be a pure App-owned transition? 
+- If not, can `session start` be a pure App-owned transition?
 - Is bootstrap necessary or unnecessary?
 
 #### Phase 1-C: approval
@@ -192,20 +194,20 @@ Things to check:
 
 Things to check:
 
-- Can messages be reconstructed from history? 
-- Can approvals be reconstructed from history? 
-- Can we distinguish between pending / resolved? 
-- Can the latest state be re-estimated? 
+- Can messages be reconstructed from history?
+- Can approvals be reconstructed from history?
+- Can we distinguish between pending / resolved?
+- Can the latest state be re-estimated?
 - Should `sequence` be made app-owned?
 
 ### 6.3 Deliverables to be produced in this phase
 
-1. ID stability list 
-2. Native signal / event list 
-3. native → public/internal event correspondence candidate table 
-4. status judgment candidate table 
-5. approval minimum confirmation information mapping table 
-6. app-owned provisional table of required items 
+1. ID stability list
+2. Native signal / event list
+3. native → public/internal event correspondence candidate table
+4. status judgment candidate table
+5. approval minimum confirmation information mapping table
+6. app-owned provisional table of required items
 7. list of unresolved matters
 
 ### 6.4 Completion conditions
@@ -253,7 +255,7 @@ Reflect observation results in requirements, common, public API, and internal AP
 
 - public / internal `event_type`
 - Payload minimum shape
-- Relationship between `occurred_at` and `sequence` 
+- Relationship between `occurred_at` and `sequence`
 - stream / REST event consistency rules
 
 #### 7.2.5 persistence / recovery
@@ -268,15 +270,15 @@ Reflect observation results in requirements, common, public API, and internal AP
 
 ### 7.3 Document reflection target
 
-- Requirement definition: Reflect any prerequisite differences found through observation 
-- Common specifications: Adjust cross-cutting rules for event / sequence / transport 
-- Public API: Determine response / error / action semantics 
+- Requirement definition: Reflect any prerequisite differences found through observation
+- Common specifications: Adjust cross-cutting rules for event / sequence / transport
+- Public API: Determine response / error / action semantics
 - Internal API: Determine overlay / projection / atomicity / recovery
 
 ### 7.4 Completion conditions
 
-- There are no contradictions between requirements, common, public, and internal 
-- Undecided matters are limited to "details that do not affect implementation" 
+- There are no contradictions between requirements, common, public, and internal
+- Undecided matters are limited to "details that do not affect implementation"
 - runtime / BFF / UI implementers can start with only specifications
 
 ---
@@ -295,7 +297,7 @@ Implement `codex-runtime`, which is the core of MVP.
 2. workspace registry
 3. `workspace_id <-> session_id` Correspondence management
 4. session overlay
-5. final guarantee of active session constraints 
+5. final guarantee of active session constraints
 6. message complex state transition of accept / approval resolve / stop
 
 #### 8.2.2 Runner-up
@@ -309,8 +311,8 @@ Implement `codex-runtime`, which is the core of MVP.
 
 #### A. workspace management
 
-- `/workspaces` Enumeration 
-- Creation rule 
+- `/workspaces` Enumeration
+- Creation rule
 - Exclusion condition
 
 #### B. session management
@@ -323,8 +325,8 @@ Implement `codex-runtime`, which is the core of MVP.
 
 #### C. messaging
 
-- Idempotence by `client_message_id` 
-- Sending input to native thread 
+- Idempotence by `client_message_id`
+- Sending input to native thread
 - user message projection
 - assistant delta / completed processing
 
@@ -343,15 +345,15 @@ Implement `codex-runtime`, which is the core of MVP.
 
 #### F. recovery
 
-- partial failure detection 
-- Reconstruction from native history 
+- partial failure detection
+- Reconstruction from native history
  orphan / mismatch detection
 
 ### 8.4 Completion conditions
 
-- All runtime operations that satisfy the internal API run 
-- The active session constraints are guaranteed to be final at runtime 
-- The basic system of approval / stop / idempotency / recovery works 
+- All runtime operations that satisfy the internal API run
+- The active session constraints are guaranteed to be final at runtime
+- The basic system of approval / stop / idempotency / recovery works
 - The event source for SSE can be supplied to BFF
 
 ---
@@ -391,12 +393,12 @@ Convert runtime's internal contract to public API and smartphone-based UI.
 
 #### What you need for Chat
 
-- session detailed display 
-- message list 
+- session detailed display
+- message list
 - activity log
-- delta temporary display 
-- completed final display 
-- status display 
+- delta temporary display
+- completed final display
+- status display
 - stop
 - REST reacquisition after SSE reconnection
 
@@ -410,15 +412,15 @@ Convert runtime's internal contract to public API and smartphone-based UI.
 
 #### Smartphone perspective
 
-- Main operations can be completed with 360px width 
-- Main operations can be completed with 3 screens of Home / Chat / Approval 
+- Main operations can be completed with 360px width
+- Main operations can be completed with 3 screens of Home / Chat / Approval
 - Approval is within 2 taps after reaching the minimum confirmation information
 
 ### 9.4 Completion conditions
 
-- Public API returns as specified 
-- UI is completed with 3 screens of Home / Chat / Approval 
-- Main operations can be performed on smartphone without horizontal scrolling 
+- Public API returns as specified
+- UI is completed with 3 screens of Home / Chat / Approval
+- Main operations can be performed on smartphone without horizontal scrolling
 - Consistency is restored by REST reacquisition when SSE is disconnected
 
 ---
@@ -434,7 +436,7 @@ Confirm that it works according to specifications and satisfies the conditions f
 #### Contract Test
 
 - Consistency of message reject
-- active session constraints 
+- active session constraints
 - approval approve / deny / cancel
 - idempotent resend
 - error.code / status code except for workspace CRUD, MVP target function
@@ -443,10 +445,10 @@ Confirm that it works according to specifications and satisfies the conditions f
 
 #### Restore test
 
-- Browser reload 
-- SSE disconnect → reconnect → REST reacquire 
-- stream unconnected first load 
-- approval pending redisplay 
+- Browser reload
+- SSE disconnect → reconnect → REST reacquire
+- stream unconnected first load
+- approval pending redisplay
 - state / approval consistency after stop
 
 #### E2E test
@@ -459,9 +461,9 @@ Confirm that it works according to specifications and satisfies the conditions f
 
 #### UI acceptance testing
 
-- PC browser 
-- Width equivalent to smartphone browser 
-- Approval conductor 
+- PC browser
+- Width equivalent to smartphone browser
+- Approval conductor
 - banner / toast
 - Return to previous session
 
@@ -471,9 +473,9 @@ MVP is completed if the following are met.
 
 - Satisfies Must in requirement definition
 - App-server Specification differences based on observations have been reflected in the document
-- No significant ambiguity remains in the responsibility boundary of runtime / BFF / UI 
-- Consistency is restored by reacquiring after SSE disconnection 
-- Satisfies smartphone acceptance criteria 
+- No significant ambiguity remains in the responsibility boundary of runtime / BFF / UI
+- Consistency is restored by reacquiring after SSE disconnection
+- Satisfies smartphone acceptance criteria
 - Minimum confirmation information for approval can be confirmed from UI
 
 ---
@@ -496,8 +498,8 @@ MVP is completed if the following are met.
 
 ### 11.2 Things that can be parallelized
 
-- The second half of Phase 0 and part of Phase 1 
-- Document reflection in Phase 2 and template implementation of non-dependent parts in Phase 3 
+- The second half of Phase 0 and part of Phase 1
+- Document reflection in Phase 2 and template implementation of non-dependent parts in Phase 3
 - Workspace/session foundation of Phase 3 and UI framework of Phase 4
 
 ---
@@ -506,10 +508,10 @@ MVP is completed if the following are met.
 
 ### 12.1 Top priority
 
-1. app-server observation 
-2. Fixed meaning of `session start` / `waiting_input` / `completed` 
-3. Fixed source of approval rediscovery and minimum confirmation information 
-4. Runtime implementation of active session constraint 
+1. app-server observation
+2. Fixed meaning of `session start` / `waiting_input` / `completed`
+3. Fixed source of approval rediscovery and minimum confirmation information
+4. Runtime implementation of active session constraint
 5. Atomicity of message / approval / stop and recovery
 6. Consistency of session stream and REST reacquisition
 
@@ -522,9 +524,9 @@ MVP is completed if the following are met.
 
 ### 12.3 Postponement
 
-- diff display 
-- changed file list 
-- session title automatic generation 
+- diff display
+- changed file list
+- session title automatic generation
 - PC auxiliary panel enhancement
 
 ---
@@ -538,7 +540,7 @@ MVP is completed if the following are met.
 Impact:
 - `approval_id` / `event_id` / `turn_id` ripples through design
 
-Countermeasure: 
+Countermeasure:
 - Design fallback for app-owned stable key first
 
 #### R2. No stable native primitive corresponding to `session start`
@@ -546,40 +548,40 @@ Countermeasure:
 Impact:
 - public/internal action semantics are shaken
 
-Countermeasure: 
+Countermeasure:
 - Design with the premise that `start` is determined as an App-owned façade action
 
 #### R3. `completed / failed / stopped` cannot be determined by native alone
 
-Impact: 
+Impact:
 - runtime overlay is required
 
-Countermeasure: 
+Countermeasure:
 - Distinguish native from original and public state from app-owned overlay.
 
 #### R4. Cannot re-detect approval from history
 
-Impact: 
+Impact:
 - Reconnection restoration is broken.
 
-Countermeasure: Move 
+Countermeasure: Move
 - approval projection closer to the original version of runtime persistence.
 
 #### R5. Native and projection shift due to partial failure
 
-Impact: 
+Impact:
 - The latest state of the UI becomes unstable.
 
-Countermeasure: 
+Countermeasure:
 - Prepare `recovery_pending` and re-integration flow from the beginning
 
 ### 13.2 Product Risk
 
 #### R6. Approval UX is slow on smartphones
 
-Measures: 
-- Make the Approval screen independent 
-- Shorten the time to reach detail from the list 
+Measures:
+- Make the Approval screen independent
+- Shorten the time to reach detail from the list
 - Concentrate on the minimum confirmation information
 
 #### R7. Activity and message responsibilities are mixed
@@ -596,11 +598,11 @@ It is appropriate to do the following after MVP.
 - workspace rename / delete
 - session delete / archive
 - arbitrary path import
-- file browser 
+- file browser
 - terminal UI
 - advanced diff viewer
-- multi-user support 
-- advanced authorization policy editing 
+- multi-user support
+- advanced authorization policy editing
 - persistent tunnel management UI
 - full-scale audit log
 
@@ -612,7 +614,7 @@ Should items are also not included in the MVP judgment and are included separate
 
 ### M1. Observation completed
 
-- app-server behavior confirmation results 
+- app-server behavior confirmation results
 - There is a tentative conclusion on the main issues of ID / status / approval
 
 ### M2. Specifications frozen
@@ -630,7 +632,7 @@ Should items are also not included in the MVP judgment and are included separate
 
 ### M5. MVP convergence completed
 
-- Satisfies 
+- Satisfies
 - Must requirements for E2E including restoration, reconnection, authorization, suspension, and exclusive constraints.
 
 ---
@@ -641,10 +643,9 @@ The safest way to proceed is as follows.
 
 1. Create an observation environment for app-server
 2. Observe the 8 main cases
-3. Fix the ID / status / approval / event specifications 
-4. Implement overlay / projection / atomicity / recovery in runtime 
-5. Convert to public contract with BFF 
-6. UI to Home / Chat / Approval Implement in this order 
-7. Verify E2E with emphasis on reconnection / approval / stop / active session constraints 
+3. Fix the ID / status / approval / event specifications
+4. Implement overlay / projection / atomicity / recovery in runtime
+5. Convert to public contract with BFF
+6. UI to Home / Chat / Approval Implement in this order
+7. Verify E2E with emphasis on reconnection / approval / stop / active session constraints
 8. Determine MVP if Must requirements are met.
-
