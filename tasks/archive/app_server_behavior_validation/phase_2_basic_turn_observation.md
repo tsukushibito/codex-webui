@@ -152,7 +152,7 @@ At a minimum, leave the following judgment items.
 
 ## 11. `docs/...checklist` Update target
 
-When completed, update the following in [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md).
+When completed, update the following in [docs/validation/app_server_behavior_validation_plan_checklist.md](../../../docs/validation/app_server_behavior_validation_plan_checklist.md).
 
 - `B. ID stability check`'s `thread ID / user item ID / assistant item ID / turn ID / event ID` relevant part 
 - `C. Normal turn check`

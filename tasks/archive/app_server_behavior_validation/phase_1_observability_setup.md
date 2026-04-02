@@ -170,14 +170,14 @@ When on hold, write at least one of the following as a supplement.
 
 ## 11. Deliverables
 
-- [Observation infrastructure specification memo](../artifacts/app_server_observability/phase_1_observability_spike_spec.md)
-- [Case list](../artifacts/app_server_observability/phase_1_case_registry.md)
-- [Log storage rules](../artifacts/app_server_observability/observations/README.md)
-- [Judgment memo template](../artifacts/app_server_observability/phase_1_judgment_template.md)
+- [Observation infrastructure specification memo](../../../artifacts/app_server_observability/phase_1_observability_spike_spec.md)
+- [Case list](../../../artifacts/app_server_observability/phase_1_case_registry.md)
+- [Log storage rules](../../../artifacts/app_server_observability/observations/README.md)
+- [Judgment memo template](../../../artifacts/app_server_observability/phase_1_judgment_template.md)
 
 ## 12. `docs/...checklist` Update target
 
-When completed, update the following in [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md).
+When completed, update the following in [docs/validation/app_server_behavior_validation_plan_checklist.md](../../../docs/validation/app_server_behavior_validation_plan_checklist.md).
 
 - `A. Basic log preparation`
 - Operation notes corresponding to the implementation method

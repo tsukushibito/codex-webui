@@ -135,7 +135,7 @@ At a minimum, leave the following judgment items.
 
 ## 11. `docs/...checklist` Update target
 
-When completed, update the following in [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md).
+When completed, update the following in [docs/validation/app_server_behavior_validation_plan_checklist.md](../../../docs/validation/app_server_behavior_validation_plan_checklist.md).
 
 - Final judgment including message / approval / error of `G. signal / event correspondence confirmation`
 - Final judgment of `H. status mapping confirmation`
