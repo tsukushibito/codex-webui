@@ -177,7 +177,7 @@ Phase 1 完了時点で、少なくとも次を予約する。
 
 ## 12. `docs/...checklist` 更新対象
 
-完了時に [docs/app_server_behavior_validation_plan_checklist.md](../docs/app_server_behavior_validation_plan_checklist.md) の以下を更新する。
+完了時に [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md) の以下を更新する。
 
 - `A. 基本ログ準備`
 - 実施方法に相当する部分の運用メモ

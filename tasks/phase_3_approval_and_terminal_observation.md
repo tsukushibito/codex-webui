@@ -171,7 +171,7 @@ approval 系と terminal status 系の判定根拠をまとめて観測し、run
 
 ## 11. `docs/...checklist` 更新対象
 
-完了時に [docs/app_server_behavior_validation_plan_checklist.md](../docs/app_server_behavior_validation_plan_checklist.md) の以下を更新する。
+完了時に [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md) の以下を更新する。
 
 - `B. ID 安定性確認` の request ID 該当部分
 - `F. approval 確認`

@@ -3,7 +3,7 @@
 ## 1. このディレクトリの目的
 
 `tasks/` は、`codex app-server` 挙動確認を段階的に進めるための作業指示書を置くディレクトリとする。  
-設計判断の正本は [docs/app_server_behavior_validation_plan_checklist.md](../docs/app_server_behavior_validation_plan_checklist.md) に置き、`tasks/` は「どう進めるか」「何をもって完了とするか」を定義する。
+設計判断の正本は [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md) に置き、`tasks/` は「どう進めるか」「何をもって完了とするか」を定義する。
 
 このディレクトリの文書は、正本チェックリストを更新できるだけの観測手順と判断根拠を与える責務を持つ。
 `tasks/` 側で更新対象に挙げた項目には、必ず次のいずれかが存在しなければならない。
@@ -19,11 +19,11 @@
 ## 2. 用語
 
 このディレクトリで使う `Phase` は、`tasks/` 内の作業単位を指す。  
-[docs/app_server_behavior_validation_plan_checklist.md](../docs/app_server_behavior_validation_plan_checklist.md) に書かれた正本の `Phase` 番号とは一致しない。  
+[docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md) に書かれた正本の `Phase` 番号とは一致しない。  
 以後、曖昧さを避けるために次のように呼び分ける。
 
 - `tasks Phase N`: `tasks/` 配下の作業指示書の区切り
-- `正本 Phase N`: [docs/app_server_behavior_validation_plan_checklist.md](../docs/app_server_behavior_validation_plan_checklist.md) の `## 5. 実施フェーズ` にある区切り
+- `正本 Phase N`: [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md) の `## 5. 実施フェーズ` にある区切り
 - `ケース`: 1 回の観測として実行する最小単位。固有の case 名と実行時刻を持つ
 - `必須ケース`: そのフェーズを完了扱いにするために必ず観測するケース
 - `条件付き必須ケース`: 対応する checklist 項目を更新する場合に必ず観測するケース。未観測なら該当項目は未完了のまま持ち越し、更新しない
