@@ -1,4 +1,4 @@
-# 判定メモ
+# Judgment memo
 
 ## Case Info
 
@@ -12,56 +12,56 @@
 - thread_id: `019d4816-6ff1-7ca3-927f-4779c96544ff`
 - request_id: `unknown`
 - compared_artifacts: `requests/request-0001.json`, `requests/request-0002.json`, `requests/request-0003.json`, `responses/response-0001.json`, `responses/response-0002.json`, `responses/response-0003.json`, `stream/events.ndjson`, `history/history-0003.json`
-- summary: shell command 実行だけで turn は完了した。stream には `commandExecution` item と空文字 `agentMessage` item が出たが、history には `userMessage` しか残らず、assistant message が出ないまま turn 完了したケースとして扱える。
+- summary: Turn was completed just by executing the shell command. A `commandExecution` item and an empty string `agentMessage` item appear in the stream, but only `userMessage` remains in the history, which can be treated as a case where the turn completed without an assistant message appearing.
 
 ## Judgments
 
-### `assistant message が出ない turn の扱い`
+### `Handling a turn without an assistant message`
 
-- 判定: 保留だが先行可
-- 根拠: `stream/events.ndjson` では `commandExecution` item の started/completed があり、その後の `agentMessage` item も `text = ""` のまま completed した。`history/history-0003.json` の turn items は `userMessage` 1 件だけで、assistant message は materialize されなかった。
-- 補足: native stream には空文字 agentMessage lifecycle が存在するため、「stream に agentMessage 型通知が一切無い」わけではない。公開 message projection で assistant message を作る条件は、少なくとも非空 text または history materialization を要求した方が安全に見える。
-- 保留時のデフォルト判断: empty `agentMessage` は message projection から除外し、history に assistant message が無い turn は「assistant message なし完了」として扱う。
+- Judgment: Pending, but can be preceded 
+- Rationale: In `stream/events.ndjson`, the `commandExecution` item was started/completed, and the subsequent `agentMessage` item was also completed with `text = ""`. There was only one turn item in `history/history-0003.json`, `userMessage`, and the assistant message was not materialized. 
+- Supplement: Since the empty character agentMessage lifecycle exists in the native stream, it does not mean that there is no agentMessage type notification at all in the stream. The conditions for creating an assistant message in a public message projection seem safer by requiring at least non-empty text or history materialization. 
+- Default judgment when pending: empty `agentMessage` is excluded from message projection, and turn without assistant message in history is treated as "completed without assistant message".
 
 ### `message.user`
 
-- 判定: 保留だが先行可
-- 根拠: `item/completed` with `item.type = userMessage` は通常系と同じく完全 payload を持ち、history の `userMessage` と対応した。
-- 補足: no-assistant case でも user side の signal 候補は変わらない。
-- 保留時のデフォルト判断: `item/completed` with `item.type = userMessage` を `message.user` の一次候補とする。
+- Judgment: Pending, but possible to proceed 
+- Rationale: `item/completed` with `item.type = userMessage` has a complete payload like the normal system, and corresponds to `userMessage` in history. 
+- Note: Even in the no-assistant case, the signal candidates on the user side do not change. 
+- Default judgment when pending: `item/completed` with `item.type = userMessage` is the primary candidate for `message.user`.
 
 ### `message.assistant.completed`
 
-- 判定: 保留だが先行可
-- 根拠: stream 上の `item/completed` with `item.type = agentMessage` は存在するが `text = ""` で、history 側に item が materialize されなかった。
-- 補足: completed 通知だけでは公開 assistant message 完了イベントに昇格できないケースがある。
-- 保留時のデフォルト判断: `message.assistant.completed` は非空 text か history materialization を伴う場合にのみ採用し、empty agentMessage completed は除外する。
+- Judgment: Pending, but can be preceded 
+- Rationale: `item/completed` with `item.type = agentMessage` on stream exists, but `text = ""` and item was not materialized on the history side. 
+- Note: There are cases where a completed notification alone cannot be promoted to a public assistant message completion event. 
+- Default judgment when pending: `message.assistant.completed` is adopted only when accompanied by non-empty text or history materialization, and empty agentMessage completed is excluded.
 
 ### `running`
 
-- 判定: 保留だが先行可
-- 根拠: turn 開始時に `thread/status/changed` with `status.type = active` が出て、通常系と同じく実行中を示した。
-- 補足: no-assistant case でも running 候補は変わらない。
-- 保留時のデフォルト判断: `thread/status/changed` with `status.type = active` を `running` 候補として扱う。
+- Judgment: Pending, but can be preceded 
+- Reason: `thread/status/changed` with `status.type = active` appeared at the start of turn, indicating that it was running as in the normal system. 
+- Note: The running candidate does not change even in the no-assistant case. 
+- Default judgment when pending: Treat `thread/status/changed` with `status.type = active` as a `running` candidate.
 
 ### `waiting_input`
 
-- 判定: 保留だが先行可
-- 根拠: `commandExecution` 完了と空文字 agentMessage completed の後に `thread/status/changed` with `status.type = idle` が出て、`turn/completed` を経て history 再取得でも assistant message 無しで turn が閉じた。
-- 補足: assistant text が無くても `idle` に戻る根拠は得られた。
-- 保留時のデフォルト判断: assistant text が無い turn でも final `idle` を `waiting_input` 候補として扱う。
+- Judgment: Pending, but can be preceded 
+- Reason: `thread/status/changed` with `status.type = idle` appeared after `commandExecution` completed and empty string agentMessage completed, and even after `turn/completed`, the turn was closed without any assistant message even when history was reacquired. 
+- Supplement: Even without assistant text, I found a reason to return to `idle`. 
+- Default judgment when pending: treat final `idle` as a `waiting_input` candidate even on turns without assistant text.
 
 ### `session.status_changed`
 
-- 判定: 保留だが先行可
-- 根拠: no-assistant case でも `thread/status/changed` が `active -> idle` を表した。
-- 補足: assistant text の有無に依存せず、status 変更候補として機能した。
-- 保留時のデフォルト判断: `thread/status/changed` を session status 変更の native 候補として維持する。
+- Judgment: Pending but can be preceded 
+- Rationale: `thread/status/changed` indicated `active -> idle` even in the no-assistant case. 
+- Note: Functioned as a status change candidate regardless of the presence or absence of assistant text. 
+- Default decision on hold: Keep `thread/status/changed` as a native candidate for session status change.
 
 ## Open Questions
 
-- 未観測事項: item/event timestamp、native `event_id`、empty agentMessage を native 事実としてどこまで保存すべきかの最終方針。
-- 後続フェーズで再観測する case: なし。Phase 2 checklist 更新時に通常系ケースと統合判断する。
+- Unobserved items: Final policy on how much item/event timestamp, native `event_id`, empty agentMessage should be stored as native facts. 
+- Re-observation case in subsequent phase: None. Phase 2 checklist At the time of update, the judgment will be integrated with the normal case.
 
 ## Cross References
 

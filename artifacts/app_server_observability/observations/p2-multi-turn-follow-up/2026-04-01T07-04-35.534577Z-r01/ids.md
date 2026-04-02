@@ -6,7 +6,7 @@
 - `thread_id`: `019d47dc-87a8-7af0-a53e-81cc548f9912`
 - native `request_id`: `unknown`
 
-`thread_id` は `responses/response-0001.json`、`responses/response-0003.json`、`responses/response-0005.json`、`stream/events.ndjson` の全 thread 通知で一致した。turn を跨いでも thread は再利用された。
+`thread_id` matched in all thread notifications of `responses/response-0001.json`, `responses/response-0003.json`, `responses/response-0005.json`, and `stream/events.ndjson`. Threads were reused even across turns.
 
 ## Transport Request Mapping
 
@@ -20,9 +20,9 @@
 
 - `turn1_id`: `019d47dc-897a-77e2-92a9-704c54136fdb`
 - `turn2_id`: `019d47dc-cff5-7253-a09d-ee11d07e71f0`
-- `history/history-0005.json` の `turns` 配列順は turn1, turn2 の順で、両方とも completed だった
+- The `turns` array order of `history/history-0005.json` was turn1, turn2, both of which were completed.
 
-turn1/turn2 の各 `turn_id` は `responses/response-0002.json` / `responses/response-0004.json`、`stream/events.ndjson` の `turn/started` / `item/*` / `turn/completed`、`history/history-0005.json` の `turns[*].id` で一致した。
+Each `turn_id` of turn1/turn2 is `responses/response-0002.json` / `responses/response-0004.json`, `turn/started` / `item/*` / `turn/completed` of `stream/events.ndjson`, and `history/history-0005.json`. Matched with `turns[*].id`.
 
 ## Item IDs
 
@@ -40,9 +40,9 @@ turn1/turn2 の各 `turn_id` は `responses/response-0002.json` / `responses/res
 - history user message item id: `item-3`
 - history agent message item id: `item-4`
 
-2 turn とも、stream 側 item id と history 側 item id は一致しなかった。history では `item-1` からの通し番号に見える。
+In both turns, the item id on the stream side and the item id on the history side did not match. In history, it looks like a serial number starting from `item-1`.
 
 ## Event IDs
 
 - native `event_id`: `not observed`
-- 通知の一意キーは method と行順しか取れていない
+- Unique key of notification has only method and line order

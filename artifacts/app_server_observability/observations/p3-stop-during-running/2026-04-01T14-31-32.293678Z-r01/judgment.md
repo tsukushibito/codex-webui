@@ -1,4 +1,4 @@
-# 判定メモ
+# Judgment memo
 
 ## Case Info
 
@@ -12,79 +12,79 @@
 - thread_id: `019d4974-eb2b-7f70-b7ef-08c9f78d0540`
 - request_id: `none observed`
 - compared_artifacts: `requests/request-0001.json`, `requests/request-0002.json`, `requests/request-0003.json`, `requests/request-0004.json`, `requests/request-0005.json`, `responses/response-0001.json`, `responses/response-0002.json`, `responses/response-0003.json`, `responses/response-0004.json`, `responses/response-0005.json`, `stream/events.ndjson`, `history/history-0003.json`, `history/history-0005.json`
-- summary: `approvalPolicy = never` で長めの command execution を started させ、その実行中に `turn/interrupt` を送った。running 中は `thread.status = active[]` が thread/read でも見えた。interrupt 後は final `agentMessage` も `commandExecution` completed も出ず、turn は `interrupted` で終了した。approval 中 stop と違って `waitingOnApproval` と `serverRequest/resolved` は出ていない。
+- summary: I started a long command execution with `approvalPolicy = never` and sent a `turn/interrupt` during the execution. While running, `thread.status = active[]` was also visible in thread/read. After interrupt, neither final `agentMessage` nor `commandExecution` completed was issued, and turn ended with `interrupted`. During approval, unlike stop, `waitingOnApproval` and `serverRequest/resolved` are not displayed.
 
 ## Judgments
 
 ### `request_id`
 
-- 判定: 不採用
-- 根拠: approval 系 server request は発生せず、`stream/events.ndjson` に request-like native id は出ていない。
-- app 補完要否: 不要
-- 補足: このケースでは request ID 軸は比較に使えない。
-- 保留時のデフォルト判断: approval を伴わない通常 stop では request ID 無し前提で扱う。
+- Judgment: Rejected
+- Rationale: No approval-related server requests occur, and no request-like native id appears in `stream/events.ndjson`. 
+- app Completion required: Not required 
+- Note: In this case, the request ID axis cannot be used for comparison. 
+- Default judgment when on hold: Normal stop without approval is handled on the assumption that there is no request ID.
 
 ### `running`
 
-- 判定: 保留だが先行可
-- 根拠: `stream/events.ndjson` で `thread/status/changed: active[]` が出ており、`responses/response-0003.json` の `thread/read` でも `status = active[]` を再取得できた。
-- app 補完要否: 不要
-- 補足: approval 中 stop と違い `waitingOnApproval` flag は出ていない。
-- 保留時のデフォルト判断: `active[]` を通常 running の native 根拠として扱う。
+- Judgment: Pending, but possible to proceed 
+- Reason: `thread/status/changed: active[]` was displayed in `stream/events.ndjson`, and `status = active[]` was also reacquired in `thread/read` of `responses/response-0003.json`. 
+- app Completion required: Not required 
+- Note: During approval, unlike stop, `waitingOnApproval` flag is not displayed. 
+- Default judgment when pending: `active[]` is normally treated as the native basis for running.
 
 ### `stopped`
 
-- 判定: 保留だが先行可
-- 根拠: `requests/request-0004.json` の `turn/interrupt` に対し `responses/response-0004.json` は成功し、その後 `turn/completed` は `status = interrupted`、thread は `idle` に戻った。
-- app 補完要否: 不要
-- 補足: approval 中 stop と同じく turn 終了形は `interrupted` だった。
-- 保留時のデフォルト判断: `turn/interrupt` 起点の `turn.status = interrupted` を `stopped` 候補として扱う。
+- Judgment: Pending, but can be preceded 
+- Rationale: `responses/response-0004.json` succeeded in response to `turn/interrupt` of `requests/request-0004.json`, and then `turn/completed` returned to `status = interrupted` and thread returned to `idle`. 
+- app Completion required: Not required 
+- Supplement: During approval, like stop, the turn ending form was `interrupted`. 
+- Default judgment when suspended: Treat `turn.status = interrupted` at the starting point of `turn/interrupt` as a `stopped` candidate.
 
 ### `completed`
 
-- 判定: 不採用
-- 根拠: final `thread/read` で thread は `idle` だが、turn は `status = interrupted` で終了し、final `agentMessage` も生成されていない。
-- app 補完要否: 不要
-- 補足: 通常完了ケースや approval approve と明確に差分が出た。
-- 保留時のデフォルト判断: 通常 stop 後の `idle` は terminal `completed` ではなく、interrupted turn 完了後の待機状態として扱う。
+- Judgment: Rejected 
+- Rationale: In final `thread/read`, thread is `idle`, but turn ends with `status = interrupted`, and final `agentMessage` is not generated. 
+- app Completion required: Not required
+- Supplement: There was a clear difference from the normal completion case and approval approve. 
+- Default judgment when on hold: Normally, `idle` after stop is not treated as terminal `completed`, but as a waiting state after completing an interrupted turn.
 
-### `通常 stop と approval 中 stop の差分`
+### `Difference between normal stop and stop during approval`
 
-- 判定: 保留だが先行可
-- 根拠: 通常 stop では `waitingOnApproval` が無く、`serverRequest/resolved` も出ず、`commandExecution` item は `started` のみで `completed` が観測されなかった。一方 approval 中 stop では pending `waitingOnApproval` があり、`serverRequest/resolved` が turn 完了後に出た。
-- app 補完要否: 不要
-- 補足: 両者とも最終的な `turn.status = interrupted` と `thread.status = idle` は同じだった。
-- 保留時のデフォルト判断: stop 種別の識別は少なくとも `waitingOnApproval` と approval request の有無で分岐させる。
+- Judgment: Pending but can be preceded 
+- Rationale: Usually stop does not have `waitingOnApproval`, `serverRequest/resolved` does not appear, and `commandExecution` item only shows `started` and `completed` is not observed. On the other hand, during approval, there was a pending `waitingOnApproval`, and `serverRequest/resolved` appeared after the turn was completed. 
+- app Completion required: Not required 
+- Note: In both cases, the final `turn.status = interrupted` and `thread.status = idle` were the same. 
+- Default judgment when on hold: stop The type is distinguished based on at least `waitingOnApproval` and the presence or absence of an approval request.
 
-### `approval 中 stop を approval canceled と混同しない方針`
+### `Policy not to confuse stop during approval with approval canceled`
 
-- 判定: 保留だが先行可
-- 根拠: 通常 stop では approval resource 自体が存在せず、それでも `turn.status = interrupted` と `thread.status = idle` は approval 中 stop と同形だった。
-- app 補完要否: 不要
-- 補足: `interrupted` だけでは approval 由来 canceled と通常 stop を区別できない。
-- 保留時のデフォルト判断: approval request が無い stop を approval `canceled` と混同しない。
+- Judgment: Pending but can be preceded 
+- Rationale: Normally, the approval resource itself does not exist in stop, and even so, `turn.status = interrupted` and `thread.status = idle` were isomorphic to stop during approval. 
+- app Completion required: Not required
+- Supplement: `interrupted` alone cannot distinguish between approval-derived canceled and normal stop. 
+- Default decision when on hold: Don't confuse stop with no approval request with approval `canceled`.
 
-### `command execution stop 後の native 変化`
+### `native change after command execution stop`
 
-- 判定: 保留だが先行可
-- 根拠: `item/started` で `commandExecution.status = inProgress` は出たが、interrupt 後に `item/completed` は観測されなかった。代わりに `turn/completed` with `status = interrupted` と `thread/status/changed: idle` で終了した。
-- app 補完要否: 要確認
-- 補足: interrupt された command execution の終端状態を native item status からは直接取れていない。
-- 保留時のデフォルト判断: command execution stop の終端は item 単体ではなく turn interruption と thread idle を主根拠にする。
+- Judgment: Pending, but possible to proceed 
+- Reason: `commandExecution.status = inProgress` was observed in `item/started`, but `item/completed` was not observed after interrupt. Instead, it ended with `turn/completed` with `status = interrupted` and `thread/status/changed: idle`. 
+- app Completion required: Check 
+- Note: The terminal status of the interrupted command execution cannot be obtained directly from the native item status. 
+- Default judgment when suspending: The termination of command execution stop is based mainly on turn interruption and thread idle, not on the item itself.
 
 ### `session start`
 
-- 判定: 保留だが先行可
-- 根拠: このケースでも `thread/start` は idle thread を作る create primitive として振る舞い、実際の activity 開始は `turn/start` で起きた。
-- app 補完要否: façade action としては要
-- 補足: stop 観測は Phase 2 の create / start 一次判断を覆していない。
-- 保留時のデフォルト判断: `session start` は引き続き App-owned façade action 前提で進める。
+- Judgment: Pending, but can be preceded 
+- Rationale: In this case too, `thread/start` acted as a create primitive to create an idle thread, and the actual start of the activity occurred at `turn/start`. 
+- Necessity of app complementation: Necessary as a façade action 
+- Supplement: Stop observation does not overturn the create / start primary judgment of Phase 2. 
+- Default judgment when on hold: `session start` continues assuming App-owned façade action.
 
 ## Open Questions
 
-- interrupt された `commandExecution` item が native で `completed` / `failed` / 別 status を出さないのが安定仕様か。
-- stop 近接ケースで `turn/completed` と `thread/status/changed: idle` の順序が前後しうるか。
-- `p3-transient-failure` で `failed` と `interrupted` の差分がどこまで明確に出るか。
+- Is it a stable specification that the interrupted `commandExecution` item is native and does not display `completed` / `failed` / other status? 
+- Can the order of `turn/completed` and `thread/status/changed: idle` be reversed in the stop proximity case? 
+- How clear is the difference between `failed` and `interrupted` in `p3-transient-failure`?
 
 ## Cross References
 

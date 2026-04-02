@@ -1,4 +1,4 @@
-# 判定メモ
+# Judgment memo
 
 ## Case Info
 
@@ -12,56 +12,56 @@
 - thread_id: `019d4800-6e58-7fe1-991b-b333453f8b47`
 - request_id: `unknown`
 - compared_artifacts: `requests/request-0001.json`, `requests/request-0002.json`, `requests/request-0003.json`, `responses/response-0001.json`, `responses/response-0002.json`, `responses/response-0003.json`, `stream/events.ndjson`, `history/history-0003.json`
-- summary: `thread/start` だけで `idle` thread を作成できた。first user message 前は `includeTurns=true` の readback が unavailable で、thread はまだ materialized されていなかった。`includeTurns=false` なら `idle` / `turns=[]` の thread として再取得できた。
+- summary: `idle` thread was created just by `thread/start`. First user message Before, readback of `includeTurns=true` was unavailable and the thread was not materialized yet. If `includeTurns=false`, it could be reacquired as a thread of `idle` / `turns=[]`.
 
 ## Judgments
 
-### `session create / start` の基本 semantics
+### Basic semantics of `session create / start`
 
-- 判定: 保留だが先行可
-- 根拠: `responses/response-0001.json` で `thread/start` 直後に `status.type = idle`, `turns = []` の thread が返り、`responses/response-0003.json` でも同じ thread を `idle` / `turns = []` で再取得できた。
-- 補足: 現在の native surface では、thread 作成だけで idle container を得られる。一方、input 無しで turn を開始する独立 primitive は今回の観測では見えない。
-- 保留時のデフォルト判断: native `thread/start` は create 相当として扱い、公開上の `session start` は App-owned façade action 候補として進める。
+- Judgment: Pending, but can be preceded 
+- Reason: Immediately after `thread/start` in `responses/response-0001.json`, a thread with `status.type = idle`, `turns = []` is returned, and the same thread is `idle` / `turns = []` in `responses/response-0003.json`. I was able to reacquire it. 
+- Note: With the current native surface, you can get an idle container just by creating a thread. On the other hand, an independent primitive that starts a turn without input is not visible in this observation. 
+- Default judgment when on hold: treat native `thread/start` as equivalent to create, and proceed with public `session start` as an App-owned façade action candidate.
 
 ### `created`
 
-- 判定: 保留だが先行可
-- 根拠: first user message 前の thread は `idle` で存在し、かつ `includeTurns=true` の履歴取得が unavailable だったため、turn/materialization 前の段階が native に存在する。
-- 補足: native status 自体は `idle` なので、App の `created` は native status の写像ではなく app-owned projection になる。
-- 保留時のデフォルト判断: app 側では `thread/start` 成功直後から first user message 前までを `created` として安全に持てる候補とする。
+- Judgment: Pending, but can be preceded 
+- Rationale: The thread before the first user message existed in `idle`, and history acquisition with `includeTurns=true` was unavailable, so the stage before turn/materialization exists in native. 
+- Note: Since native status itself is `idle`, `created` of App is not a mapping of native status but an app-owned projection. 
+- Default judgment when pending: On the app side, the period from immediately after `thread/start` to before the first user message is considered to be a safe candidate for holding as `created`.
 
 ### `session_id`
 
-- 判定: 保留だが先行可
-- 根拠: create 直後の `thread_id` は `thread/start` response と `thread/read` readback で一致した。
-- 補足: follow-up case と合わせると `session_id = native thread ID` 候補は強い。
-- 保留時のデフォルト判断: `session_id = native thread ID` 候補として維持する。
+- Judgment: Pending, but can proceed 
+- Rationale: `thread_id` immediately after create matched in `thread/start` response and `thread/read` readback. 
+- Note: Combined with follow-up case, `session_id = native thread ID` is a strong candidate. 
+- Default judgment when pending: `session_id = native thread ID` Keep as a candidate.
 
 ### `running`
 
-- 判定: 保留だが先行可
-- 根拠: input を送らないこのケースでは `thread/status/changed` with `active` は一度も出なかった。
-- 補足: active 化は turn 開始に結び付いている可能性が高い。
-- 保留時のデフォルト判断: input 無し create 直後は `running` ではなく、通常系で観測した `active` を `running` 候補として扱う。
+- Judgment: Pending but can be preceded 
+- Rationale: In this case where input is not sent, `thread/status/changed` with `active` never appeared. 
+- Supplement: Activation is most likely linked to the start of turn. 
+- Default judgment when pending: No input Immediately after create, treat `active` observed in the normal system as a `running` candidate instead of `running`.
 
 ### `waiting_input`
 
-- 判定: 保留だが先行可
-- 根拠: create 直後から `status.type = idle` で安定しており、turn を開始していない状態でも idle が成立した。
-- 補足: この `idle` を `waiting_input` と完全同一視するか、App 上 `created` と分離するかは app-owned projection の設計判断になる。
-- 保留時のデフォルト判断: native `idle` は create 直後にも現れるため、公開上は `created` と `waiting_input` を分け、native `idle` だけでは区別しない。
+- Judgment: Pending, but possible to proceed 
+- Rationale: Immediately after create, `status.type = idle` was stable, and idle was established even when turn had not started. 
+- Supplement: It is up to the design decision of the app-owned projection whether to completely equate this `idle` with `waiting_input` or separate it from `created` on the app. 
+- Default judgment when pending: Since native `idle` also appears immediately after create, `created` and `waiting_input` are publicly separated, and native `idle` alone is not used to distinguish them.
 
 ### `session.status_changed`
 
-- 判定: 保留だが先行可
-- 根拠: このケースでは `thread/started` は見えたが `thread/status/changed` は出なかった。status 変化が無ければ通知されない挙動に見える。
-- 補足: 通常 turn ケースで観測した `thread/status/changed` は turn 実行時の状態遷移通知として解釈できる。
-- 保留時のデフォルト判断: `thread/status/changed` は state transition がある場合の native 候補とし、create 直後の初期確立は `thread/started` と response を併用して扱う。
+- Judgment: Pending, but can proceed 
+- Rationale: In this case, `thread/started` was visible, but `thread/status/changed` was not displayed. It seems that if there is no change in status, no notification will be issued. 
+- Supplement: `thread/status/changed` observed in the normal turn case can be interpreted as a state transition notification when the turn is executed. 
+- Default judgment when pending: `thread/status/changed` is the native candidate when there is a state transition, and the initial establishment immediately after create is handled using `thread/started` and response together.
 
 ## Open Questions
 
-- 未観測事項: assistant message が出ない turn、input 無しでの native turn 開始 primitive、item/event timestamp、native `event_id`。
-- 後続フェーズで再観測する case: `p2-no-assistant-message`
+- Unobserved: turn assistant message not displayed, native turn start without input primitive, item/event timestamp, native `event_id`. 
+- Re-observe in subsequent phase case: `p2-no-assistant-message`
 
 ## Cross References
 

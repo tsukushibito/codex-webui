@@ -1,136 +1,135 @@
-# Phase 3: approval / stop / 終端観測
+# Phase 3: approval / stop / terminal observation
 
-## 1. 目的
+## 1. Purpose
 
-approval 系と terminal status 系の判定根拠をまとめて観測し、runtime が補完すべき情報を切り分ける。  
-このフェーズで、approval / stop / 異常 / 終端を含む実装判断を可能にする。
+Observe the basis for approval system and terminal status system judgments together and isolate the information that should be supplemented by runtime.  
+This phase enables implementation decisions including approval/stop/abnormality/termination.
 
-## 2. このフェーズで確定する設計判断
+## 2. Design decisions finalized during this phase
 
-- `approval_id = native request ID` の採用可否
-- request ID の pending / resolved 再取得時同一性
-- approval 最低確認情報 5 項目の native 取得元
-- `resolved_at` の native 取得元
-- pending / resolved の履歴再検出可否
-- `approval.requested` / `approval.resolved` の対応候補
-- `waiting_approval` の根拠
-- 通常 stop と approval 中 stop の観測差分
-- `stopped` / `completed` の根拠
-- `session start` を App-owned façade action にすべきか
-- `error.raised` の対応候補
-- `failed` の根拠
-- 一時失敗と終端失敗の区別可否
+- Adoption of `approval_id = native request ID` 
+- Pending / resolved of request ID Identity when reacquiring 
+- approval Minimum confirmation information 5 items of native acquisition source 
+- Native acquisition source of `resolved_at` 
+- History of pending / resolved Possibility of redetection 
+- `approval.requested` / Correspondence candidates for `approval.resolved`
+- Basis for `waiting_approval`
+- Observed difference between normal stop and stop during approval
+- Basis for `stopped` / `completed`
+- Should `session start` be an app-owned façade action?
+- Correspondence candidates for `error.raised`
+- Reason for `failed`
+- Is it possible to distinguish between temporary failure and terminal failure?
 
-## 3. 対象ケース
+## 3. Target case
 
-必須ケース:
+Required case:
 
-- `p3-approval-approve`: approval 発生 -> approve
-- `p3-approval-deny`: approval 発生 -> deny
-- `p3-approval-stop`: approval 発生中 -> stop
-- `p3-stop-during-running`: approval を伴わない通常実行中 -> stop
+- `p3-approval-approve`: Approval occurring -> approve
+- `p3-approval-deny`: Approval occurring -> deny
+- `p3-approval-stop`: Approval occurring -> stop
+- `p3-stop-during-running`: Normal running without approval -> stop
 
-条件付き必須ケース:
+Conditionally required case:
 
-- `p3-transient-failure`: `failed` / `error.raised` / 一時失敗と終端失敗の区別を更新する場合に必須
+- `p3-transient-failure`: `failed` / `error.raised` / Required when updating the distinction between transient and terminal failures
 
-任意ケース:
+Optional case:
 
-- `p3-stop-close-to-approval-resolve`: stop と approval resolve が近接するケース
+- `p3-stop-close-to-approval-resolve`: Case where stop and approval resolve are close
 
-`p3-transient-failure` を観測しない場合、`failed` / `error.raised` / `一時失敗 / 終端失敗の区別` は Phase 3 の未完了項目として残し、`docs/...checklist` の該当項目は更新しない。
-`p3-stop-close-to-approval-resolve` を保留にする場合は、保留理由と当面のデフォルト判断を残す。
+If `p3-transient-failure` is not observed, `failed` / `error.raised` / `Temporary failure / Terminal failure distinction` will remain as an unfinished item in Phase 3, and the corresponding item in `docs/...checklist` will not be updated. 
+When putting `p3-stop-close-to-approval-resolve` on hold, leave the reason for the hold and the default decision for the time being.
 
-## 4. 事前条件
+## 4. Preconditions
 
-- Phase 2 までの session / message 基礎判断が記録済みである
-- approval を安定して発生させる入力または操作が定義されている
-- 通常実行中に stop を打てるケースが定義されている
+- Session/message basic decisions up to Phase 2 have been recorded 
+- Inputs or operations that stably generate approval are defined 
+- Cases where stop can be pressed during normal execution are defined
 
-## 5. 実施タスク
+## 5. Implementation tasks
 
-- [ ] approval 発生手順を固定する
-- [ ] `p3-approval-approve` を実行する
-- [ ] `p3-approval-deny` を実行する
-- [ ] `p3-approval-stop` を実行する
-- [ ] `p3-stop-during-running` を実行する
-- [ ] `failed` / `error.raised` を更新する場合は `p3-transient-failure` を実行する
-- [ ] 余力があれば `p3-stop-close-to-approval-resolve` を実行する
-- [ ] 全ケースで stream と history を比較する
-- [ ] request ID が pending / resolved 再取得時も同一か確認する
-- [ ] approval request / resolution の取得元を整理する
-- [ ] approval signal の対応候補を整理する
-- [ ] 通常 stop と approval 中 stop の差分を整理する
-- [ ] `p3-transient-failure` を観測した場合は error signal の対応候補を整理する
-- [ ] `p3-transient-failure` を観測した場合は 一時失敗と終端失敗を区別できるか整理する
-- [ ] `stopped` / `completed` の terminal status 判定根拠を整理する
-- [ ] `p3-transient-failure` を観測した場合は `failed` の terminal status 判定根拠を整理する
-- [ ] `session start` の判断を Phase 2 の create / start 一次判断から接続する
+- [ ] Fix the approval generation procedure 
+- [ ] Execute `p3-approval-approve` 
+- [ ] Execute `p3-approval-deny` 
+- [ ] Execute `p3-approval-stop` 
+- [ ] Execute `p3-stop-during-running` 
+- [ ] Run `p3-transient-failure` to update `failed` / `error.raised` 
+- [ ] Run `p3-stop-close-to-approval-resolve` if available 
+- [ ] Compare stream and history in all cases 
+- [ ] request ID is pending / resolved Check if it is the same when re-acquiring 
+- [ ] Organize the source of approval request / resolution 
+- [ ] Organize the correspondence candidates for approval signal 
+- [ ] Organize the difference between normal stop and stop during approval 
+- [ ] If `p3-transient-failure` is observed, organize the correspondence candidates for error signal 
+- [ ] If you observe `p3-transient-failure`, organize whether it is possible to distinguish between temporary failure and terminal failure.
+- [ ] If you observe `p3-transient-failure`, organize the terminal status judgment basis for `stopped` / `completed`.
+- [ ] If you observe `p3-transient-failure`, organize the terminal status judgment basis for `failed`.
+- [ ] Organize the judgment basis for `session start`. Phase 2 create / start Connect from initial decision
 
-## 6. 確認項目
+## 6. Check items
 
 ### approval
 
-- [ ] approval request を発生させた
-- [ ] request ID が取得できるか確認した
-- [ ] request ID が stable か確認した
-- [ ] request ID が pending / resolved 再取得時も同一か確認した
-- [ ] approval の最低確認情報 5 項目が native から取れるか確認した
-- [ ] approve 後の native 変化を確認した
-- [ ] deny 後の native 変化を確認した
-- [ ] approval 中 stop 後の native 変化を確認した
-- [ ] pending approval を履歴再取得で再検出できるか確認した
-- [ ] resolved approval を履歴から判定できるか確認した
-- [ ] `requested_at` 相当の取得元を記録した
-- [ ] `resolved_at` 相当の取得元を記録した
-- [ ] `approval.requested` の signal / event を確認した
-- [ ] `approval.resolved` の signal / event を確認した
+- [ ] Generated approval request 
+- [ ] Confirmed whether request ID can be obtained 
+- [ ] Confirmed whether request ID is stable 
+- [ ] Confirmed whether request ID remains the same when re-obtaining pending/resolved 
+- [ ] Confirmed whether minimum confirmation information 5 items for approval can be obtained from native 
+- [ ] Confirmed changes in native after approval 
+- [ ] Confirmed the native change after deny 
+- [ ] Confirmed the native change after stop during approval 
+- [ ] Confirmed whether pending approval can be redetected by reacquiring history 
+- [ ] Confirmed whether resolved approval can be determined from history 
+- [ ] `requested_at` Recorded the corresponding acquisition source 
+- [ ] `resolved_at` 
+- [ ] Confirmed the signal / event of `approval.requested` 
+- [ ] Confirmed the signal / event of `approval.resolved`
 
 ### stop / failure / terminal status
 
-- [ ] 通常実行中 stop 後の native 変化を確認した
-- [ ] approval 中 stop と通常 stop の差分を確認した
-- [ ] `waiting_approval` の根拠を確認した
-- [ ] `stopped` の根拠を確認した
-- [ ] `completed` を native だけで置けるか確認した
-- [ ] native だけで足りない場合、runtime 判定が必要と判断した
-- [ ] `p3-transient-failure` を観測した場合は `failed` の根拠を確認した
-- [ ] `p3-transient-failure` を観測した場合は 一時失敗と終端失敗を区別できるか確認した
-- [ ] `p3-transient-failure` を観測した場合は `error.raised` の signal / event を確認した
+- [ ] Confirmed the native change after stop during normal execution 
+- [ ] Confirmed the difference between stop and normal stop during approval 
+- [ ] Confirmed the basis for `waiting_approval` 
+- [ ] Confirmed the basis for `stopped` 
+- [ ] Confirmed whether `completed` can be placed with only native 
+- [ ] native 
+- [ ] If you observed `p3-transient-failure`, you checked the basis for `failed`. 
+- [ ] If you observed `p3-transient-failure`, you checked whether you could distinguish between a temporary failure and a terminal failure. Checked signal / event for `error.raised`
 
 ### semantics
 
-- [ ] `session start` を App-owned façade action にすべきか判断できた
-- [ ] approval 解決後に `waiting_input` へ戻す根拠を確認した
-- [ ] approval 中 stop 時に approval を `canceled` と扱える根拠を確認した
-- [ ] 通常 stop を approval `canceled` と混同しない方針を確認した
+- [ ] I was able to decide whether `session start` should be an App-owned façade action 
+- [ ] I confirmed the basis for returning it to `waiting_input` after resolution of approval 
+- [ ] I confirmed the basis for treating approval as `canceled` when it is stopped during approval 
+- [ ] I confirmed the policy not to confuse stop with approval `canceled`.
 
-## 7. 記録すべき証跡
+## 7. Trails to be recorded
 
-- approval request 発生時の raw request / response / event
-- approve / deny / approval 中 stop 後の raw event と history snapshot
-- 通常 stop 後の raw event と history snapshot
-- `p3-transient-failure` 観測時の raw request / response / event / history snapshot
-- request ID と resolution 事実の対応メモ
-- request ID の再取得同一性メモ
-- 一時失敗と終端失敗の切り分けメモ
-- terminal status 判定に使った event / history 項目
-- stop 種別ごとの差分メモ
+- approval request raw request / response / event
+- approve / deny / approval during stop raw event and history snapshot
+- normal stop raw event and history snapshot
+- `p3-transient-failure` raw request / response / event / history snapshot
+- request ID and resolution fact correspondence memo
+- request ID reacquisition identity memo
+- Memo for distinguishing between temporary failure and terminal failure
+- terminal status Event/history item used for determination
+- stop Difference memo for each type
 
-## 8. 判定欄
+## 8. Judgment column
 
 ```md
-### <判断項目名>
-- 判定:
-- 根拠:
-- app 補完要否:
-- 補足:
-- 保留時のデフォルト判断:
+### <judgment_item_name>
+- Judgment:
+- Evidence:
+- App completion required:
+- Notes:
+- Default decision while pending:
 ```
 
-`p3-transient-failure` 未観測のまま failure 系を持ち越す場合、`failed` / `error.raised` / `一時失敗 / 終端失敗の区別` の `判定` は `未完了` と明記する。
+`p3-transient-failure` If the failure system is carried over without being observed, the `judgment` of `failed` / `error.raised` / `distinguishing temporary failure / terminal failure` should be specified as `incomplete`.
 
-最低限、以下の判断項目を残す。
+At a minimum, leave the following judgment items.
 
 - `approval_id`
 - `approval_category`
@@ -142,42 +141,42 @@ approval 系と terminal status 系の判定根拠をまとめて観測し、run
 - `approval.requested`
 - `approval.resolved`
 - `waiting_approval`
-- `通常 stop と approval 中 stop の差分`
+- `Difference between normal stop and stop during approval`
 - `stopped`
 - `failed`
-- `一時失敗 / 終端失敗の区別`
+- `Distinguish between temporary failure/terminal failure`
 - `completed`
 - `error.raised`
 - `session start`
 
-## 9. 完了条件
+## 9. Completion conditions
 
-- [ ] approval 確認セクションが埋まっている
-- [ ] request ID の再取得同一性が記録されている
-- [ ] approval 最低確認情報の取得元一覧が記録されている
-- [ ] `requested_at` / `resolved_at` の取得元が記録されている
-- [ ] approval signal の対応候補が記録されている
-- [ ] 通常 stop と approval 中 stop の差分が記録されている
-- [ ] `stopped` / `completed` の terminal status 判定方針が記録されている
-- [ ] `p3-transient-failure` を観測した場合は raw request / response / event / history snapshot が保存され、`failed` / `error.raised` / `一時失敗 / 終端失敗の区別` が更新可能である
-- [ ] `p3-transient-failure` を観測していない場合は、その理由、再観測条件、保留時デフォルト判断、`判定: 未完了` が記録されている
-- [ ] `session start` を含む approval / stop 実装前提が固まっている
+- [ ] approval The confirmation section is filled 
+- [ ] The re-acquisition identity of the request ID is recorded 
+- [ ] approval The list of sources from which to obtain the minimum confirmation information is recorded 
+- [ ] The source of acquisition of `requested_at` / `resolved_at` is recorded 
+- [ ] The corresponding candidates for approval signal are recorded 
+- [ ] Normally stop and approval 
+- [ ] `stopped` / `completed` terminal status Determination policy is recorded 
+- [ ] When `p3-transient-failure` is observed, raw request / response / event / history snapshot is saved, and `failed` / `error.raised` / `Temporary failure / terminal failure distinction` can be updated 
+- [ ] If `p3-transient-failure` is not observed, the reason, re-observation conditions, default judgment on hold, and `judgment: incomplete` are recorded 
+- [ ] Approval / stop implementation assumptions including `session start` are fixed.
 
-## 10. 成果物
+## 10. Deliverables
 
-- approval / terminal 観測ログ
-- approval 取得元一覧
-- status 判定メモ
+- approval / terminal Observation log 
+- approval Source list 
+- status Judgment memo
 
-## 11. `docs/...checklist` 更新対象
+## 11. `docs/...checklist` Update target
 
-完了時に [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md) の以下を更新する。
+When completed, update the following in [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md).
 
-- `B. ID 安定性確認` の request ID 該当部分
-- `F. approval 確認`
-- `G. signal / event 対応確認` の approval 該当部分
-- `G. signal / event 対応確認` の `error.raised` 該当部分 (`p3-transient-failure` 観測時のみ)
-- `H. status マッピング確認` の `waiting_approval`、`stopped`、`completed`、`runtime 判定要否` 該当部分
-- `H. status マッピング確認` の `failed` 該当部分 (`p3-transient-failure` 観測時のみ)
-- `E. create / start 確認` の `session start を App-owned façade action にすべきか` 該当部分
-- `J. timestamp 確認` の request / resolution 該当部分
+- Request ID relevant part of `B. ID stability confirmation` 
+- `F. approval confirmation `
+- Approval relevant part of `G. signal / event correspondence confirmation`
+- `error.raised` relevant part of `G. signal / event correspondence confirmation` (only when observing `p3-transient-failure`)
+- `H. status Mapping confirmation` `waiting_approval`, `stopped`, `completed`, `runtime judgment necessity` relevant part
+- `failed` relevant part of `H. status mapping confirmation` (only when `p3-transient-failure` is observed)
+- Should `session start of `E. create / start confirmation` be App-owned façade action` Relevant part 
+- request / resolution relevant part of `J. timestamp confirmation`

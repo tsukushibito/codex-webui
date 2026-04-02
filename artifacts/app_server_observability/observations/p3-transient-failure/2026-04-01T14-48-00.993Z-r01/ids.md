@@ -6,7 +6,7 @@
 - `thread_id`: `019d4984-0160-71f3-a4cb-764a7e596a5a`
 - native `request_id`: `not observed`
 
-approval 系 server request は発生しておらず、stream / history / response でも request-like native id は見えなかった。
+No approval type server request occurred, and no request-like native ID was visible in stream/history/response.
 
 ## Transport Request Mapping
 
@@ -18,11 +18,11 @@ approval 系 server request は発生しておらず、stream / history / respon
 ## Turn IDs
 
 - `turn_id`: `019d4984-0359-7912-a0fb-fe40a06d6cf9`
-- `responses/response-0002.json` では `status = inProgress`
-- `history/history-0003.json` では `status = inProgress`
-- `history/history-0004.json` では `status = completed`
+- `status = inProgress`
+- in `history/history-0003.json` `status = in `responses/response-0002.json` inProgress`
+- `status = completed` in `history/history-0004.json`
 
-`turn_id` は `responses/response-0002.json`、`stream/events.ndjson` の `turn/started` / `item/*` / `turn/completed`、`history/history-0003.json`、`history/history-0004.json` で一致した。
+`turn_id` matched in `responses/response-0002.json`, `turn/started` / `item/*` / `turn/completed`, `history/history-0003.json`, and `history/history-0004.json` in `stream/events.ndjson`.
 
 ## Item IDs
 
@@ -33,11 +33,11 @@ approval 系 server request は発生しておらず、stream / history / respon
 - history pending item ids: `item-1` (`userMessage`), `item-2` (`agentMessage` commentary)
 - history final item ids: `item-1` (`userMessage`), `item-2` (`agentMessage` commentary), `item-3` (`agentMessage` final_answer)
 
-stream 側 item id と history 側 item id は今回も一致しなかった。failed `commandExecution` item は stream でのみ見え、history には materialize されなかった。
+The item id on the stream side and the item id on the history side did not match this time as well. The failed `commandExecution` item was visible only in stream and was not materialized in history.
 
 ## Event IDs
 
 - native `event_id`: `not observed`
-- transient failure を識別できた native key: `item/completed` with `item.type = commandExecution`, `status = failed`, `exitCode = 42`
+- could identify transient failure native key: `item/completed` with `item.type = commandExecution`, `status = failed`, `exitCode = 42`
 
-通知の一意キーは method と行順、および失敗 command execution では item id までしか取れていない。
+The unique keys for notifications are method, line order, and failure command execution, which only includes item id.

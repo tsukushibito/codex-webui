@@ -1,4 +1,4 @@
-# 判定メモ
+# Judgment memo
 
 ## Case Info
 
@@ -12,143 +12,143 @@
 - thread_id: `019d496f-b79a-7412-95c7-596844f5c2a6`
 - request_id: `0`
 - compared_artifacts: `requests/request-0001.json`, `requests/request-0002.json`, `requests/request-0003.json`, `requests/request-0004.json`, `requests/request-0005.json`, `responses/response-0001.json`, `responses/response-0002.json`, `responses/response-0003.json`, `responses/response-0004.json`, `responses/response-0005.json`, `server_requests/server-request-0001.json`, `stream/events.ndjson`, `history/history-0003.json`, `history/history-0005.json`
-- summary: `approvalPolicy = untrusted` で command execution approval を発生させ、client approval reply を返さず `turn/interrupt` を送った。pending 中は `thread.status = active(waitingOnApproval)` が thread/read でも見えたが、approval request 自体は history に materialize されなかった。interrupt 後は final `agentMessage` も `commandExecution` item も出ず、turn は `interrupted` で終了した。`serverRequest/resolved` は今回も `requestId` だけを返し、resolution 種別も `resolved_at` も分からなかった。
+- summary: Command execution approval occurred with `approvalPolicy = untrusted`, and `turn/interrupt` was sent without returning client approval reply. While pending, `thread.status = active(waitingOnApproval)` was visible in thread/read, but the approval request itself was not materialized into history. After the interrupt, neither the final `agentMessage` nor the `commandExecution` item was issued, and the turn ended with `interrupted`. `serverRequest/resolved` again returned only `requestId`, and neither the resolution type nor `resolved_at` was known.
 
 ## Judgments
 
 ### `approval_id`
 
-- 判定: 保留だが先行可
-- 根拠: `server_requests/server-request-0001.json` の top-level `id = 0` と、`stream/events.ndjson` の `serverRequest/resolved.params.requestId = 0` が一致した。
-- app 補完要否: このケース単体では不要。stop 近接ケースでも同じ安定性が出るかは要確認。
-- 補足: `thread/read` の pending / resolved history には request object 自体が materialize されず、履歴だけでは request id を再検出できなかった。
-- 保留時のデフォルト判断: native request ID を `approval_id` 第一候補として扱い、後続ケースで不安定なら runtime stable key にフォールバックする。
+- Judgment: Pending, but can proceed 
+- Reason: Top-level `id = 0` of `server_requests/server-request-0001.json` and `serverRequest/resolved.params.requestId = 0` of `stream/events.ndjson` matched. 
+- app Completion required: Not required in this case alone. It is necessary to confirm whether the same stability can be obtained in the case of stop proximity. 
+- Supplement: The request object itself was not materialized in the pending / resolved history of `thread/read`, and the request id could not be redetected using the history alone. 
+- Default decision when pending: treat native request ID as `approval_id` first candidate, fall back to runtime stable key if unstable in subsequent case.
 
 ### `approval_category`
 
-- 判定: 保留だが先行可
-- 根拠: request method が `item/commandExecution/requestApproval` で、`params.command` / `params.commandActions` を伴っていた。
-- app 補完要否: 公開 enum への投影は必要。
-- 補足: 少なくともこのケースは command execution approval として分類できる。
-- 保留時のデフォルト判断: method が `item/commandExecution/requestApproval` の場合は command execution category に写像する。
+- Judgment: Pending, but can proceed 
+- Rationale: The request method was `item/commandExecution/requestApproval`, accompanied by `params.command` / `params.commandActions`. 
+- app Completion required: Projection to public enum is required. 
+- Note: At least this case can be classified as command execution approval. 
+- Default judgment when pending: If method is `item/commandExecution/requestApproval`, map to command execution category.
 
 ### `title / summary`
 
-- 判定: 保留だが先行可
-- 根拠: native request に専用 `title` / `summary` field は無く、`params.command` が最も近い要約情報だった。
-- app 補完要否: 要
-- 補足: `command = /bin/bash -lc 'date -u +%Y-%m-%dT%H:%M:%S.%NZ'` をそのまま summary 候補として使える。
-- 保留時のデフォルト判断: title が無ければ `command` を summary に流用する。
+- Judgment: Pending, but can proceed 
+- Rationale: There is no dedicated `title` / `summary` field for native request, and `params.command` was the closest summary information. 
+- app Completion required: Required 
+- Note: `command = /bin/bash -lc 'date -u +%Y-%m-%dT%H:%M:%S.%NZ'` can be used as is as a summary candidate. 
+- Default judgment when on hold: If there is no title, use `command` as summary.
 
 ### `description / reason`
 
-- 判定: 未完了
-- 根拠: `server_requests/server-request-0001.json` に `reason` は無く、history 側にも説明文は出ていない。
-- app 補完要否: 要
-- 補足: `cwd` や `commandActions` はあるが、ユーザー向け説明文には足りない。
-- 保留時のデフォルト判断: native `reason` が無い場合は command と cwd を使った app 合成説明を前提にする。
+- Judgment: Incomplete 
+- Rationale: There is no `reason` in `server_requests/server-request-0001.json`, and there is no explanatory text on the history side. 
+- app Completion required: Required 
+- Note: There are `cwd` and `commandActions`, but they are not sufficient for user explanations. 
+- Default judgment when pending: If there is no native `reason`, assume app synthesis explanation using command and cwd.
 
 ### `operation_summary`
 
-- 判定: 保留だが先行可
-- 根拠: `server_requests/server-request-0001.json` に `command`、`cwd`、`commandActions`、`proposedExecpolicyAmendment`、`availableDecisions` が含まれていた。
-- app 補完要否: 不要
-- 補足: command execution approval では native だけで十分な操作要約を組み立てやすい。
-- 保留時のデフォルト判断: `command` と `cwd` を主、`commandActions` と decisions を補助として使う。
+- Judgment: Pending, but possible 
+- Rationale: `server_requests/server-request-0001.json` contained `command`, `cwd`, ​​`commandActions`, `proposedExecpolicyAmendment`, and `availableDecisions`. 
+- app Completion required: Not required
+- Supplement: For command execution approval, it is easy to assemble a sufficient operation summary with only native. 
+- Default decision when on hold: Use `command` and `cwd` primarily, and use `commandActions` and decisions as support.
 
 ### `requested_at`
 
-- 判定: 未完了
-- 根拠: `server_requests/server-request-0001.json` と `stream/events.ndjson` の approval request には timestamp field が無い。pending `thread/read` の `updatedAt = 1775053562` は thread 更新時刻であり、request 専用ではない。
-- app 補完要否: 要
-- 補足: native event payload だけでは request 単位 timestamp を直接保持できない。
-- 保留時のデフォルト判断: native が無い限り、app runtime の受信時刻を `requested_at` 候補として保持する。
+- Judgment: Not completed 
+- Rationale: There is no timestamp field in the approval requests of `server_requests/server-request-0001.json` and `stream/events.ndjson`. `updatedAt = 1775053562` of pending `thread/read` is the thread update time, not exclusive to request. 
+- app Completion required: Required 
+- Supplement: The timestamp per request cannot be directly stored using the native event payload alone. 
+- Default judgment when pending: Unless native is present, the reception time of app runtime is retained as a `requested_at` candidate.
 
 ### `resolved_at`
 
-- 判定: 未完了
-- 根拠: `stream/events.ndjson` の `serverRequest/resolved` は `threadId` と `requestId` しか持たず、resolved 専用 timestamp が無い。final `thread/read` の `updatedAt = 1775053562` も thread 更新時刻に留まる。
-- app 補完要否: 要
-- 補足: request-specific resolved timestamp は native payload から直接取れない。
-- 保留時のデフォルト判断: native が無い限り、app runtime の `serverRequest/resolved` 受信時刻を `resolved_at` 候補として保持する。
+- Judgment: Incomplete 
+- Rationale: `serverRequest/resolved` in `stream/events.ndjson` only has `threadId` and `requestId`, and there is no dedicated timestamp for resolved. `updatedAt = 1775053562` of final `thread/read` also remains at the thread update time. 
+- app Completion required: Required 
+- Note: request-specific resolved timestamp cannot be obtained directly from the native payload. 
+- Default judgment when pending: Unless native is present, the `serverRequest/resolved` reception time of the app runtime is held as a `resolved_at` candidate.
 
 ### `approval.requested`
 
-- 判定: 保留だが先行可
-- 根拠: `stream/events.ndjson` で `thread/status/changed: active[waitingOnApproval]` の直後に `item/commandExecution/requestApproval` が出た。
-- app 補完要否: canonical event 化には軽い補完が必要
-- 補足: request payload 本体は server request frame にのみあり、history には残らなかった。
-- 保留時のデフォルト判断: native server request の受信を `approval.requested` 候補として扱う。
+- Judgment: Pending but can be preceded 
+- Reason: `item/commandExecution/requestApproval` appeared immediately after `thread/status/changed: active[waitingOnApproval]` in `stream/events.ndjson`. 
+- Need for app completion: Light completion is required to make it a canonical event 
+- Note: The request payload body is only in the server request frame and is not saved in the history. 
+- Default judgment when pending: Treat reception of native server request as `approval.requested` candidate.
 
 ### `approval.resolved`
 
-- 判定: 未完了
-- 根拠: `stream/events.ndjson` で `turn/completed` の後に `serverRequest/resolved` with `requestId = 0` が出たが、この notification 自体は resolution enum も `resolved_at` も持たず、client approval reply も存在しない。
-- app 補完要否: 要
-- 補足: approve / deny と違い、このケースでは stop による resolution を示す専用 native payload が見えていない。
-- 保留時のデフォルト判断: `approval.resolved` は `serverRequest/resolved` 単体で決めず、approval 中 stop を app runtime で別相関する前提にする。
+- Judgment: Not completed 
+- Reason: `serverRequest/resolved` with `requestId = 0` appeared after `turn/completed` in `stream/events.ndjson`, but this notification itself does not have a resolution enum or `resolved_at`, and there is no client approval reply. 
+- app Completion required: Required 
+- Note: Unlike approve / deny, in this case the dedicated native payload indicating resolution by stop is not visible. 
+- Default judgment when pending: `approval.resolved` is not determined by `serverRequest/resolved` alone, but assumes that stop during approval is correlated separately in app runtime.
 
 ### `waiting_approval`
 
-- 判定: 保留だが先行可
-- 根拠: `stream/events.ndjson` の `thread/status/changed` で `status.type = active` かつ `activeFlags = ["waitingOnApproval"]` が出ており、`responses/response-0003.json` の `thread/read` でも同じ status が再取得できた。
-- app 補完要否: 不要
-- 補足: pending approval 本体は history に無くても、status は履歴再取得で確認できた。
-- 保留時のデフォルト判断: `active + waitingOnApproval` を `waiting_approval` の native 根拠として扱う。
+- Judgment: Pending but can be preceded 
+- Reason: `status.type = active` and `activeFlags = ["waitingOnApproval"]` appear in `thread/status/changed` of `stream/events.ndjson`, and the same status appears in `thread/read` of `responses/response-0003.json` was able to be reacquired. 
+- app Completion required: Not required 
+- Note: Even if the pending approval body was not in the history, the status could be confirmed by re-acquiring the history. 
+- Default decision on pending: Treat `active + waitingOnApproval` as the native basis for `waiting_approval`.
 
-### `通常 stop と approval 中 stop の差分`
+### `Difference between normal stop and stop during approval`
 
-- 判定: 保留だが先行可
-- 根拠: このケースでは stop 前に `waitingOnApproval` があり、interrupt 後は `commandExecution` item started/completed が一切出ず、`serverRequest/resolved` が `turn/completed` の後ろに現れた。
-- app 補完要否: なお通常 stop ケースとの比較は必要
-- 補足: deny では `serverRequest/resolved` の後に `commandExecution.status = declined` が出たが、approval 中 stop ではその item 自体が materialize されなかった。
-- 保留時のデフォルト判断: approval 中 stop は deny とも通常 stop とも別系列として扱い、少なくとも `waitingOnApproval` の有無で分岐させる。
+- Judgment: Pending but can be preceded 
+- Rationale: In this case, there was `waitingOnApproval` before stop, and after interrupt, `commandExecution` item started/completed did not appear at all, and `serverRequest/resolved` appeared after `turn/completed`. 
+- app Completion required: It is necessary to compare with the normal stop case 
+- Note: In deny, `commandExecution.status = declined` appeared after `serverRequest/resolved`, but in stop during approval, the item itself was not materialized. 
+- Default judgment when on hold: During approval, stop is treated as a different series from deny and normal stop, and at least branches depending on the presence or absence of `waitingOnApproval`.
 
 ### `stopped`
 
-- 判定: 保留だが先行可
-- 根拠: `requests/request-0004.json` の `turn/interrupt` に対し `responses/response-0004.json` は成功し、その後 `turn/completed` は `status = interrupted`、thread は `idle` に戻った。
-- app 補完要否: 通常 stop ケース比較までは要
-- 補足: approval 中 stop の native turn 終了形は deny と同じ `interrupted` だが、approval reply と `commandExecution` lifecycle が欠けている。
-- 保留時のデフォルト判断: `turn/interrupt` 起点の `turn.status = interrupted` を `stopped` 候補として扱い、通常 stop ケースで再確認する。
+- Judgment: Pending, but can be preceded 
+- Rationale: `responses/response-0004.json` succeeded in response to `turn/interrupt` of `requests/request-0004.json`, and then `turn/completed` returned to `status = interrupted` and thread returned to `idle`. 
+- app Completion required: Normally stop until case comparison is required 
+- Note: During approval, the native turn termination form of stop is `interrupted`, which is the same as deny, but approval reply and `commandExecution` lifecycle are missing. 
+- Default judgment when suspended: Treat `turn.status = interrupted` at the origin of `turn/interrupt` as a `stopped` candidate, and reconfirm normally in the stop case.
 
 ### `completed`
 
-- 判定: 不採用
-- 根拠: final `thread/read` で thread は `idle` だが、turn は `status = interrupted` で終了し、final `agentMessage` も生成されていない。
-- app 補完要否: 不要
-- 補足: approval approve の `turn.status = completed` と明確に差分が出た。
-- 保留時のデフォルト判断: approval 中 stop 後の `idle` は terminal `completed` ではなく、interrupted turn 完了後の待機状態として扱う。
+- Judgment: Rejected 
+- Rationale: In final `thread/read`, thread is `idle`, but turn ends with `status = interrupted`, and final `agentMessage` is not generated. 
+- app Completion required: Not required 
+- Note: There is a clear difference from `turn.status = completed` of approval approval. 
+- Default judgment when on hold: During approval, `idle` after stop is not treated as terminal `completed`, but as a waiting state after the completion of interrupted turn.
 
-### `approval 中 stop 時に approval を canceled と扱えるか`
+### `Can approval be treated as canceled when it is stopped during approval?`
 
-- 判定: 未完了
-- 根拠: native では client approval reply が存在せず、`serverRequest/resolved` も resolution 種別を返さない。stop によって approval がどう解決されたかは payload から直接は分からない。
-- app 補完要否: 要
-- 補足: 少なくとも今回の native 事実だけでは deny と同じ `canceled` を安全に確定できない。
-- 保留時のデフォルト判断: approval 中 stop は approval `canceled` と断定せず、app runtime の stop 起点相関が入るまで保留にする。
+- Judgment: Incomplete 
+- Rationale: There is no client approval reply in native, and `serverRequest/resolved` does not return the resolution type. It is not directly clear from the payload how approval is resolved by stop. 
+- app Completion required: Required 
+- Supplement: At least with this native fact alone, `canceled`, which is the same as deny, cannot be safely determined. 
+- Default judgment when on hold: During approval, stop does not conclude that the approval is `canceled`, and it is put on hold until the app runtime's stop origin correlation is received.
 
-### `approval の履歴再検出`
+### `Approval history redetection`
 
-- 判定: 不採用
-- 根拠: `history/history-0003.json` と `history/history-0005.json` の `turns[*].items` には `userMessage` と commentary `agentMessage` しか無く、approval request payload や request id、stop resolution は再構築できなかった。
-- app 補完要否: 要
-- 補足: history だけで再構築できたのは `waitingOnApproval` status と interrupted turn までだった。
-- 保留時のデフォルト判断: approval resource と stable request mapping は app runtime 側で保持する前提にする。
+- Judgment: Rejected 
+- Rationale: `turns[*].items` of `history/history-0003.json` and `history/history-0005.json` only had `userMessage` and commentary `agentMessage`, and the approval request payload, request id, and stop resolution could not be reconstructed. 
+- app Completion required: Required
+- Supplement: Only history could rebuild up to `waitingOnApproval` status and interrupted turn. 
+- Default judgment when pending: Approval resource and stable request mapping are assumed to be maintained on the app runtime side.
 
 ### `session start`
 
-- 判定: 保留だが先行可
-- 根拠: このケースでも `thread/start` は idle thread を作る create primitive として振る舞い、実際の activity 開始は `turn/start` で起きた。approval 観測は Phase 2 の create / start 一次判断を覆していない。
-- app 補完要否: façade action としては要
-- 補足: approval 導入後も start without input の native primitive は観測していない。
-- 保留時のデフォルト判断: `session start` は引き続き App-owned façade action 前提で進める。
+- Judgment: Pending, but can be preceded 
+- Rationale: In this case too, `thread/start` acted as a create primitive to create an idle thread, and the actual start of the activity occurred at `turn/start`. The approval observation does not overturn the Phase 2 create/start primary judgment. 
+- Necessity of app completion: Necessary as a façade action 
+- Note: Even after introducing approval, we have not observed any native primitives with start without input. 
+- Default judgment when on hold: `session start` continues assuming App-owned façade action.
 
 ## Open Questions
 
-- 通常 stop でも `turn.status = interrupted` と `thread.status = idle` の組み合わせになるか。
-- approval 中 stop で `serverRequest/resolved` が `turn/completed` より後ろに出るのが安定挙動か。
-- approval 中 stop を approval `canceled` と安全に写像するには、追加の app-owned 相関が必要か。
+- Is it a combination of `turn.status = interrupted` and `thread.status = idle` even for normal stop? 
+- Is it stable behavior that `serverRequest/resolved` appears after `turn/completed` during stop during approval? 
+- Do we need additional app-owned correlations to safely map stop during approval to approval `canceled`?
 
 ## Cross References
 

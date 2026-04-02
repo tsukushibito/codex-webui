@@ -1,145 +1,145 @@
-# Phase 4: 再構築・最終判断
+# Phase 4: Restructuring/Final Judgment
 
-## 1. 目的
+## 1. Purpose
 
-stream に依存せず履歴再取得だけでどこまで状態を復元できるかを確認し、app-owned 項目と保留時デフォルト判断を最終確定する。  
-このフェーズは「観測完了」ではなく「設計判断の終了」を目的とする。
+Check to what extent the state can be restored just by re-fetching the history without depending on the stream, and finalize the app-owned items and the default judgment when pending.  
+The purpose of this phase is not to "complete observations" but to "complete design decisions."
 
-## 2. このフェーズで確定する設計判断
+## 2. Design decisions finalized during this phase
 
-- stream なしで messages を再構築できるか
-- stream なしで approvals を再構築できるか
-- latest status 推定の材料が履歴にあるか
-- `session_id` / `message_id` / `approval_id` / `turn_id` の最終方針を確定できるか
-- `session start` を App-owned façade action とするか最終確定できるか
-- `sequence = app-owned` を最終確定できるか
-- `event_id` を native 流用するか app-owned にするか
-- Phase 2-3 で観測した ID / signal / status / create-start semantics 候補を最終確定できるか
-- app-owned 必須項目一覧
-- 保留時のデフォルト判断
+- Is it possible to rebuild messages without a stream?
+- Is it possible to rebuild approvals without a stream?
+- Is there evidence for latest status estimation in the history?
+- Is it possible to determine the final policy for `session_id` / `message_id` / `approval_id` / `turn_id`? 
+- `session start` is App-owned façade action 
+- Is it possible to finalize `sequence = app-owned`?
+- Can I use `event_id` as native or make it app-owned?
+- Can I finalize the ID / signal / status / create-start semantics candidates observed in Phase 2-3? 
+- app-owned List of required items 
+- Default judgment when pending
 
-## 3. 対象ケース
+## 3. Target case
 
-- `p4-stream-disconnect-reload`: stream 切断 -> 履歴再取得
-- `p4-initial-history-only-load`: stream 未接続の初回ロード -> 履歴再取得のみ
-- 必要に応じて prior phase のケース再観測
+- `p4-stream-disconnect-reload`: Disconnect stream -> Re-obtain history 
+- `p4-initial-history-only-load`: Initial load when stream is not connected -> Only re-obtain history 
+- Re-observe prior phase case as necessary
 
-## 4. 事前条件
+## 4. Preconditions
 
-- Phase 3 までの主要観測が完了している
-- 比較対象となる stream ログと history snapshot が揃っている
-- Phase 2-3 の一次判断メモが参照できる
+- Main observations up to Phase 3 have been completed 
+- Stream logs and history snapshots are available for comparison 
+- Primary judgment memo for Phase 2-3 can be referenced
 
-## 5. 実施タスク
+## 5. Implementation tasks
 
-- [ ] `p4-stream-disconnect-reload` を実行する
-- [ ] `p4-initial-history-only-load` を実行する
-- [ ] messages を履歴だけで再構築できるか確認する
-- [ ] approvals を履歴だけで再構築できるか確認する
-- [ ] latest status を履歴だけで再推定できるか確認する
-- [ ] timestamp だけで安定順序を補助できるか確認する
-- [ ] Phase 2-3 の ID / signal / status / create-start semantics 一次判断を最終統合する
-- [ ] Phase 2-3 の timestamp 観測を Phase 4 の順序判断へ統合する
-- [ ] `session_id` / `message_id` / `approval_id` / `turn_id` の最終方針を確認する
-- [ ] `session start` の最終方針を確認する
-- [ ] `approval.requested` / `approval.resolved` / `error.raised` の最終対応を確認する
-- [ ] `sequence` と `event_id` の最終判断を行う
-- [ ] app-owned 必須項目一覧を確定する
-- [ ] 最終成果物テンプレート 1-8 を埋める
-- [ ] 不足根拠がある項目は prior phase へ差し戻し、未観測のまま最終確定しない
+- [ ] Execute `p4-stream-disconnect-reload` 
+- [ ] Execute `p4-initial-history-only-load` 
+- [ ] Check whether messages can be reconstructed using history alone 
+- [ ] Check whether approvals can be reconstructed using history alone 
+- [ ] Check whether latest status can be re-estimated using history alone 
+- [ ] Check if timestamp alone can support stable order 
+- [ ] ID / signal / status / create-start semantics of Phase 2-3 Final integration of first order judgment 
+- [ ] Integrate timestamp observation of Phase 2-3 into order judgment of Phase 4 
+- [ ] `session_id` / `message_id` / `approval_id` / `turn_id` Check the final policy for 
+- [ ] Confirm the final policy for `session start` 
+- [ ] Confirm the final response for `approval.requested` / `approval.resolved` / `error.raised` 
+- [ ] Make final decisions on `sequence` and `event_id` 
+- [ ] app-owned Finalize the list of required items 
+- [ ] Fill in final deliverable template 1-8 
+- [ ] Items with insufficient evidence will be sent back to the prior phase and will not be finalized as they remain unobserved.
 
-## 6. 確認項目
+## 6. Check items
 
-### 再構築
+### Rebuild
 
-- [ ] stream なしで messages を再構築できる
-- [ ] stream なしで approvals を再構築できる
-- [ ] pending / resolved を区別できる
-- [ ] latest status 推定の材料が履歴にある
-- [ ] stream 未接続の初回ロードでも復元できる
+- [ ] Messages can be rebuilt without a stream 
+- [ ] Approvals can be rebuilt without a stream 
+- [ ] Pending/resolved can be distinguished 
+- [ ] Latest status Information for estimation is in the history 
+- [ ] Stream Can be restored even with an unconnected initial load
 
-### 順序
+### Order
 
-- [ ] `sequence` は app-owned にすべきと判断できる
-- [ ] event ID は native 流用か app-owned か判断できる
-- [ ] 履歴再取得時に時刻で安定順序が取りやすいか確認した
-- [ ] 同一 thread / 同一 request 内で時刻が順序判定の補助として信頼できるか確認した
+- [ ] It can be determined that `sequence` should be app-owned 
+- [ ] It can be determined whether the event ID is native diversion or app-owned 
+- [ ] Confirmed whether a stable order can be easily obtained by time when reacquiring the history 
+- [ ] Confirmed whether time can be relied upon as an aid for determining order within the same thread / same request
 
 ### app-owned
 
-- [ ] app-owned 必須項目を列挙した
-- [ ] 最低限 `workspace_id`、`sequence`、`active_approval_id`、session overlay、idempotency key を評価した
-- [ ] 必要なら approval stable key / event stable key を app-owned とする条件を列挙した
-- [ ] 保留時のデフォルト判断を列挙した
-- [ ] spec 更新に必要な差分論点を列挙した
+- [ ] app-owned 
+- [ ] At least `workspace_id`, `sequence`, `active_approval_id`, session overlay, and idempotency key were evaluated 
+- [ ] If necessary, 
+- listed the conditions for approval stable key / event stable key to be app-owned [ ] 
+- listed default judgment when pending [ ] spec Listed the differences necessary for updating
 
-### 最終統合
+### Final integration
 
-- [ ] `session_id` / `message_id` / `approval_id` / `turn_id` の最終方針を確定した
-- [ ] `session start` の最終方針を確定した
-- [ ] `message.user` / `message.assistant.*` の最終対応を確定した
-- [ ] `approval.requested` / `approval.resolved` / `error.raised` の最終対応を確定した
-- [ ] `session.status_changed` の扱いを最終確定した
-- [ ] `running` / `waiting_input` / `waiting_approval` / `stopped` / `failed` / `completed` の判定を整合させた
-- [ ] `event_id` の最終方針が Phase 2-3 の観測根拠と結び付いている
-- [ ] 未観測項目を誤って最終確定していない
+- [ ] The final policy for `session_id` / `message_id` / `approval_id` / `turn_id` has been decided 
+- [ ] The final policy for `session start` has been decided 
+- [ ] The final policy for `message.user` / `message.assistant.*` has been decided 
+- [ ] `approval.requested` / Finalized the handling of `approval.resolved` / `error.raised` 
+- [ ] Finalized the handling of `session.status_changed` 
+- [ ] Made the judgments of `running` / `waiting_input` / `waiting_approval` / `stopped` / `failed` / `completed` consistent 
+- [ ] The final policy of `event_id` is tied to the observation basis of Phase 2-3 
+- [ ] Unobserved items are not finalized by mistake.
 
-## 7. 記録すべき証跡
+## 7. Trails to be recorded
 
-- stream 切断前後の raw event
-- 同一ケースの history snapshot
-- 復元時に使った判定手順メモ
-- `sequence` / `event_id` / app-owned 項目の判断根拠
-- Phase 2-3 の一次判断を最終判断へ昇格または差し戻しした理由
+- Raw event before and after stream disconnection
+- History snapshot
+- of the same case Memo of the judgment procedure used during restoration
+- Basis for judgment of `sequence` / `event_id` / app-owned item
+- Reason for promoting or returning the initial judgment in Phase 2-3 to final judgment
 
-## 8. 判定欄
+## 8. Judgment column
 
 ```md
-### <判断項目名>
-- 判定:
-- 根拠:
-- 補足:
-- 保留時のデフォルト判断:
+### <judgment_item_name>
+- Judgment:
+- Evidence:
+- Notes:
+- Default decision while pending:
 ```
 
-最低限、以下の判断項目を残す。
+At a minimum, leave the following judgment items.
 
-- `messages 再構築`
-- `approvals 再構築`
-- `latest status 推定`
-- `ID 安定性一覧`
+- `messages Reconstruction`
+- `approvals Reconstruction`
+- `latest status Estimation`
+- `ID Stability List`
 - `create / start semantics`
 - `sequence`
 - `event_id`
-- `signal / event 対応最終表`
-- `app-owned 必須項目`
+- `signal / event Correspondence final table`
+- `app-owned required field`
 
-## 9. 完了条件
+## 9. Completion conditions
 
-- [ ] 履歴再構築セクションが埋まっている
-- [ ] 順序セクションの timestamp 観点が埋まっている
-- [ ] Phase 2-3 と Phase 4 の timestamp 観測が統合されている
-- [ ] ID / create-start semantics の最終統合が記録されている
-- [ ] approval / error を含む signal 最終統合が記録されている
-- [ ] 最終成果物テンプレート 1-8 が埋まっている
-- [ ] app-owned 必須項目一覧が明示されている
-- [ ] 保留時デフォルト判断が記録されている
-- [ ] internal spec 更新論点が列挙されている
-- [ ] 未観測項目が最終確定に紛れ込んでいない
+- [ ] The history reconstruction section is filled 
+- [ ] The timestamp perspective of the order section is filled 
+- [ ] The timestamp observations of Phase 2-3 and Phase 4 are integrated 
+- [ ] The final integration of ID / create-start semantics is recorded 
+- [ ] The final integration of signal including approval / error is recorded 
+- [ ] Final deliverable template 1-8 is filled in 
+- [ ] app-owned The list of required items is clearly stated 
+- [ ] Default decisions on hold are recorded 
+- [ ] internal spec Update issues are listed 
+- [ ] Unobserved items are not mixed into the final confirmation
 
-## 10. 成果物
+## 10. Deliverables
 
-- 再構築観測ログ
-- 最終判定メモ
-- spec 差分候補メモ
+- Reconstruction observation log 
+- Final judgment memo 
+- spec Difference candidate memo
 
-## 11. `docs/...checklist` 更新対象
+## 11. `docs/...checklist` Update target
 
-完了時に [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md) の以下を更新する。
+When completed, update the following in [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md).
 
-- `G. signal / event 対応確認` の message / approval / error を含む最終判断
-- `H. status マッピング確認` の最終判断
-- `I. 履歴再構築確認`
-- `J. timestamp 確認`
-- `K. 最終判定`
-- `最終成果物テンプレート（修正版）`
+- Final judgment including message / approval / error of `G. signal / event correspondence confirmation`
+- Final judgment of `H. status mapping confirmation`
+- `I. History reconstruction confirmation`
+- `J. timestamp confirmation`
+- `K. Final judgment `
+- `Final product template (revised version)`

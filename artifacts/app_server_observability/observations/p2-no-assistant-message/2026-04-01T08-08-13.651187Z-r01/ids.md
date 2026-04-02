@@ -7,7 +7,7 @@
 - `turn_id`: `019d4816-71b6-7641-bb18-47987b41599e`
 - native `request_id`: `unknown`
 
-`thread_id` は `responses/response-0001.json`、`stream/events.ndjson` の thread 系通知、`responses/response-0003.json` の `result.thread.id` で一致した。`turn_id` は `responses/response-0002.json`、stream の item 通知、`turn/completed` で一致した。
+`thread_id` matched in `responses/response-0001.json`, thread notification in `stream/events.ndjson`, and `result.thread.id` in `responses/response-0003.json`. `turn_id` matched in `responses/response-0002.json`, stream item notification, and `turn/completed`.
 
 ## Transport Request Mapping
 
@@ -24,14 +24,14 @@
 - history user message item id: `item-1`
 - history assistant message item id: `none observed`
 
-stream 上では `agentMessage` started/completed が出たが、`text` は空文字だった。`thread/read` の history には agentMessage item 自体が存在しなかった。
+`agentMessage` started/completed appeared on the stream, but `text` was an empty string. The agentMessage item itself did not exist in the history of `thread/read`.
 
 ## Message Projection Exclusion Note
 
-- `commandExecution` item は message projection 対象外候補
-- 空文字の `agentMessage` も history に materialize されていないため、公開 message projection では除外候補
+- `commandExecution` item is a candidate for exclusion in message projection 
+- The empty string `agentMessage` is also not materialized in history, so it is a candidate for exclusion in public message projection.
 
 ## Event IDs
 
 - native `event_id`: `not observed`
-- 通知の一意キーは method と行順しか取れていない
+- Unique key of notification has only method and line order

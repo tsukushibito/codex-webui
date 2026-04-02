@@ -1,228 +1,228 @@
-# Codex WebUI MVP 実装ロードマップ v0.1
+# Codex WebUI MVP implementation roadmap v0.1
 
-最終更新: 2026-04-01
+Last updated: 2026-04-01
 
-## 1. 目的
+## 1. Purpose
 
-本ドキュメントは、既存の以下文書を前提として、Codex WebUI の MVP 完成までの実行順序を整理するためのロードマップである。
+This document is a roadmap for organizing the execution order until the completion of the Codex WebUI MVP, based on the existing documents below.
 
-- MVP 要件定義 v0.8
-- 共通仕様 v0.8
-- 公開 API 仕様 v0.8
-- 内部 API 仕様 v0.8
-- app-server 挙動確認計画 / 引き継ぎメモ
+- MVP requirements definition v0.8
+- Common specifications v0.8
+- Public API specifications v0.8
+- Internal API specifications v0.8
+- app-server behavior confirmation plan/handover memo
 
-本ロードマップの狙いは、**手戻りコストの大きい境界面を先に固め、その後に runtime / BFF / UI / テストを順序良く収束させること**にある。
-
----
-
-## 2. 現状整理
-
-### 2.1 すでに固まっているもの
-
-現時点で以下は大枠として整理済みである。
-
-- MVP の成立条件
-- 公開境界が `frontend-bff` のみであること
-- `codex-runtime` が内部責務を持つこと
-- `workspace / session / message / approval / event` の概念分離
-- `session create` と `session start` の概念分離
-- active session 制約
-- approval 制約
-- REST + SSE による復元方針
-- internal/public の責務境界
-
-### 2.2 すでに固定済みの重要ルール
-
-- `session_status` は `created / running / waiting_input / waiting_approval / completed / failed / stopped`
-- active session は `running` または `waiting_approval`
-- `waiting_input` のときのみ通常メッセージ送信可
-- `completed` は単なる 1 turn 完了ではなく WebUI 終端判断時のみ
-- `waiting_approval` 中に stop した場合、approval は `canceled`
-- session stream では `sequence` を持ち、再接続後は REST 再取得で収束する
-- 公開 API / 内部 API ともに JSON, `snake_case`, UTC RFC 3339, opaque ID を前提とする
-
-### 2.3 次にやるべきこと
-
-次にやるべきことは、**app-server 依存の不確定点だけを先に観測で潰し、その結果をもとに仕様を最終固定し、実装へ進むこと**である。
+The aim of this roadmap is to first solidify interfaces that require large rework costs, and then converge runtime, BFF, UI, and tests in an orderly manner.
 
 ---
 
-## 3. 未確定事項一覧
+## 2. Organizing the current situation
 
-### 3.1 app-server 観測が必要な事項
+### 2.1 Things that are already solidified
 
-1. thread / turn / item / request / event の ID 安定性
-2. native signal / event の種類と順序
-3. `session create` / `session start` の実装上の意味
-4. `running -> waiting_input` 判定根拠
-5. approval の pending / resolved 再検出可否
-6. `completed / failed / stopped` を native だけで判定できるか
-7. stream 未接続初回ロードでも履歴再取得だけで復元できるか
-8. approval 最低確認情報の native 取得元
+At present, the following has been organized as a general outline.
 
-### 3.2 観測後に仕様へ落とし込むべき事項
+- Conditions for MVP 
+- Public boundary is only `frontend-bff`
+- `codex-runtime` has internal responsibilities
+- Conceptual separation of `workspace / session / message / approval / event` 
+- Conceptual separation of `session create` and `session start` 
+- active session constraint 
+- approval Constraints
+- Restoration policy with REST + SSE
+- Internal/public responsibility boundaries
 
-1. `session_id / message_id / approval_id / turn_id / event_id / sequence` の最終採用表
-2. native signal → internal/public event 対応表
-3. `session.status` 判定ルール
-4. `session start` を façade action としてどう固定するか
-5. app-owned 永続化の最小スキーマ
-6. 原子性 / recovery の確定手順
-7. workspace 単位排他ルール
-8. BFF の field mapping / read model 合成方針
-9. UI 復元ルール
-10. 契約テスト観点
+### 2.2 Important rules already fixed
 
-### 3.3 実装時にまだ揺れうるが後回し可能な事項
+- `session_status` is `created / running / waiting_input / waiting_approval / completed / failed / stopped`
+- active session is `running` or `waiting_approval`
+- Normal message can be sent only when `waiting_input` 
+- `completed` is not just one turn completion but only when determining the end of WebUI 
+- If stopped during `waiting_approval`, approval has `canceled`
+- Session stream has `sequence`, and after reconnection, it converges with REST reacquisition 
+- Both public API / internal API assume JSON, `snake_case`, UTC RFC 3339, opaque ID
 
-- `workspace_id` / ID 具体フォーマット
-- projection cache の保持期間
-- `system` role item の扱い
-- pagination の既定 limit 最終値
-- SSE transport の `event:` 名の細部
+### 2.3 What to do next
+
+The next thing to do is to eliminate only the app-server dependent uncertainties through observation, finalize the specifications based on the results, and move on to implementation.
 
 ---
 
-## 4. 全体フェーズ
+## 3. List of unconfirmed matters
 
-本ロードマップでは、MVP 完成までを以下 6 フェーズに分ける。
+### 3.1 app-server Items that need to be observed
 
-1. フェーズ 0: 実験基盤・観測準備
-2. フェーズ 1: app-server 挙動確認
-3. フェーズ 2: 仕様固定
-4. フェーズ 3: runtime 実装
-5. フェーズ 4: BFF / UI 実装
-6. フェーズ 5: テスト / 収束 / MVP 判定
+1. ID stability of thread / turn / item / request / event 
+2. Type and order of native signal / event 
+3. Implementation meaning of `session create` / `session start` 
+4. `running -> waiting_input` decision basis 
+5. Approval pending / resolved redetectability 
+6. `completed / failed / stopped` native 
+7. stream Even if the first load is not connected, can it be restored by simply re-acquiring the history? 
+8. approval Native acquisition source of minimum confirmation information
 
-依存関係としては、**フェーズ 1 の結果がフェーズ 2 の入力、フェーズ 2 の結果がフェーズ 3・4 の入力**になる。
+### 3.2 Matters that should be incorporated into specifications after observation
 
----
+1. Final adoption table of `session_id / message_id / approval_id / turn_id / event_id / sequence` 
+2. Native signal → internal/public event correspondence table 
+3. `session.status` judgment rule 
+4. How to fix `session start` as façade action 
+5. Minimal schema for app-owned persistence 
+6. Atomicity / recovery finalization procedure 
+7. workspace unit exclusion rule 
+8. BFF field mapping / read model synthesis policy 
+9. UI restoration rule 
+10. contract test perspective
 
-## 5. フェーズ 0: 実験基盤・観測準備
+### 3.3 Items that may still be affected at the time of implementation but can be postponed
 
-### 5.1 目的
-
-app-server の実挙動を観測できる最低限の検証環境を作る。
-
-### 5.2 実施内容
-
-- `codex app-server` を安定起動できる検証用 runtime を用意する
-- native event / history / request / resolution を保存できるロガーを用意する
-- 1 session ごとの観測ログを分離保存できるようにする
-- stream 接続あり / なしの両方を検証できる簡易クライアントを用意する
-- approval を意図的に発生させるプロンプトセットを用意する
-- stop / deny / stream 切断 / 初回復元の試験シナリオをスクリプト化する
-
-### 5.3 生成物
-
-- 観測用 runtime stub または CLI harness
-- raw log 保存形式
-- ケース一覧と実行手順書
-- 観測結果記録テンプレート
-
-### 5.4 完了条件
-
-- 再現可能な観測環境がある
-- 同じケースを複数回流して差分比較できる
-- approval / stop / stream 切断を含む最低ケースが自動または半自動で実行できる
+- `workspace_id` / ID Specific format 
+- Retention period of projection cache 
+- Handling of `system` role item 
+- Default limit of pagination Final value 
+- Details of `event:` name of SSE transport
 
 ---
 
-## 6. フェーズ 1: app-server 挙動確認
+## 4. Overall phase
 
-### 6.1 目的
+This roadmap divides the process until MVP completion into the following six phases.
 
-app-server 依存の不確定点を観測で潰す。
+1. Phase 0: Experimental infrastructure/observation preparation
+2. Phase 1: App-server behavior confirmation
+3. Phase 2: Specification fixation
+4. Phase 3: Runtime implementation
+5. Phase 4: BFF / UI implementation
+6. Phase 5: Testing / Convergence / MVP judgment
 
-### 6.2 観測対象
+As for dependencies, the results of Phase 1 are the inputs of Phase 2, and the results of Phase 2 are the inputs of Phases 3 and 4.
 
-#### Phase 1-A: 基本ケース
+---
 
-- 通常 1 turn 完了
-- assistant テキスト無し turn
-- 複数 turn 継続
+## 5. Phase 0: Experimental infrastructure/observation preparation
 
-確認事項:
+### 5.1 Purpose
 
-- thread ID の有無と安定性
-- turn ID の有無と安定性
-- message item ID の有無と安定性
-- delta / completed の到着順
-- message 系 item が複数生成されうるか
-- tool/log/request のみで終わる turn があるか
-- item / event / history に時刻が付くか
+Create a minimum verification environment that allows you to observe the actual behavior of app-server.
+
+### 5.2 Implementation details
+
+- Prepare a verification runtime that can stably start `codex app-server` 
+- Prepare a logger that can save native event / history / request / resolution 
+- Allow observation logs for each session to be saved separately 
+- Prepare a simple client that can verify both with and without stream connection 
+- Prepare a prompt set that intentionally generates approval 
+- stop / deny Script a /stream disconnect/first restore test scenario
+
+### 5.3 Products
+
+- Runtime stub or CLI harness for observation
+- Raw log storage format
+- Case list and execution procedure manual
+- Observation result record template
+
+### 5.4 Completion conditions
+
+- There is a reproducible observation environment 
+- The same case can be run multiple times and the differences can be compared 
+- The lowest case including approval / stop / stream disconnection can be executed automatically or semi-automatically
+
+---
+
+## 6. Phase 1: app-server behavior confirmation
+
+### 6.1 Purpose
+
+Eliminate uncertainty due to app-server dependence through observation.
+
+### 6.2 Observation target
+
+#### Phase 1-A: Basic case
+
+- Normally 1 turn completed
+- assistant No text turn
+- Multiple turns continued
+
+Things to check:
+
+- Presence of thread ID and stability
+- Presence of turn ID and stability
+- Presence of message item ID and stability
+- Arrival order of delta / completed
+- Is it possible to generate multiple message-based items?
+- Is there a turn that ends with only tool/log/request?
+- Is time attached to item / event / history?
 
 #### Phase 1-B: create / start semantics
 
-確認事項:
+Things to check:
 
-- native thread 作成だけで idle 相当を作れるか
-- `start without input` 的な安定操作があるか
-- 無い場合、`session start` は pure App-owned transition で良いか
-- bootstrap が必要か、不要か
+- Is it possible to create something equivalent to idle just by creating a native thread?
+- Is there a stable operation like `start without input`?
+- If not, can `session start` be a pure App-owned transition? 
+- Is bootstrap necessary or unnecessary?
 
 #### Phase 1-C: approval
 
-- approval 発生 → approve
-- approval 発生 → deny
-- approval 発生中 → stop
+- approval occurred → approve
+- approval occurred → deny
+- approval currently occurring → stop
 
-確認事項:
+Things to check:
 
-- request ID の有無と安定性
-- pending / resolved を履歴から再検出できるか
-- 最低確認情報の取得元
-- `resolved_at` の取得可否
-- approval 解決後に session がどう進むか
+- Presence of request ID and stability
+- Can pending/resolved be re-detected from the history?
+- Source of minimum confirmation information
+- Can `resolved_at` be obtained?
+- Approval How does the session proceed after resolution?
 
-#### Phase 1-D: stop / 異常 / 終端
+#### Phase 1-D: stop / abnormal / termination
 
-確認事項:
+Things to check:
 
-- stop が native へどう反映されるか
-- `stopped` の根拠を native だけで持てるか
-- 一時失敗と終端失敗を区別できるか
-- `completed` を native 単独で置けるか、runtime 判定が必要か
+- How is stop reflected on native?
+- Is it possible to have the basis for `stopped` only in native?
+- Is it possible to distinguish between temporary failure and terminal failure?
+- Can `completed` be placed in native alone, or is runtime judgment required?
 
-#### Phase 1-E: 再取得 / 再構築
+#### Phase 1-E: Reacquisition/Reconstruction
 
-- stream 切断 → 履歴再取得
-- stream 未接続の初回ロード → 履歴再取得のみで復元
+- stream disconnected → history reacquisition
+- stream unconnected first load → restore only by reacquiring history
 
-確認事項:
+Things to check:
 
-- messages を履歴から再構築できるか
-- approvals を履歴から再構築できるか
-- pending / resolved を区別できるか
-- 最新状態を再推定できるか
-- `sequence` を app-owned にすべきか
+- Can messages be reconstructed from history? 
+- Can approvals be reconstructed from history? 
+- Can we distinguish between pending / resolved? 
+- Can the latest state be re-estimated? 
+- Should `sequence` be made app-owned?
 
-### 6.3 このフェーズで出すべき成果物
+### 6.3 Deliverables to be produced in this phase
 
-1. ID 安定性一覧
-2. native signal / event 一覧
-3. native → public/internal event 対応候補表
-4. status 判定候補表
-5. approval 最低確認情報マッピング表
-6. app-owned 必須項目の暫定表
-7. 未解決事項リスト
+1. ID stability list 
+2. Native signal / event list 
+3. native → public/internal event correspondence candidate table 
+4. status judgment candidate table 
+5. approval minimum confirmation information mapping table 
+6. app-owned provisional table of required items 
+7. list of unresolved matters
 
-### 6.4 完了条件
+### 6.4 Completion conditions
 
-- handoff 文書で列挙された確認対象に全て回答が付いている
-- 「観測できた事実」と「推論」を分けて記録している
-- 未解決事項が残る場合も、MVP での暫定判断が置けている
+- All the confirmation targets listed in the handoff document have been answered.
+- "Observed facts" and "inferences" are recorded separately.
+- Even if unresolved matters remain, tentative decisions can be made using MVP.
 
 ---
 
-## 7. フェーズ 2: 仕様固定
+## 7. Phase 2: Specification fixed
 
-### 7.1 目的
+### 7.1 Purpose
 
-観測結果を要件・共通・公開 API・内部 API に反映し、以降の実装で迷わない状態にする。
+Reflect observation results in requirements, common, public API, and internal API to avoid confusion in subsequent implementations.
 
-### 7.2 固定対象
+### 7.2 Fixed target
 
 #### 7.2.1 ID / key
 
@@ -233,7 +233,7 @@ app-server 依存の不確定点を観測で潰す。
 - `event_id`
 - `sequence`
 
-#### 7.2.2 状態判定
+#### 7.2.2 Status determination
 
 - `running -> waiting_input`
 - `running -> waiting_approval`
@@ -252,9 +252,9 @@ app-server 依存の不確定点を観測で潰す。
 #### 7.2.4 event contract
 
 - public / internal `event_type`
-- payload の最低限 shape
-- `occurred_at` と `sequence` の関係
-- stream / REST event の整合ルール
+- Payload minimum shape
+- Relationship between `occurred_at` and `sequence` 
+- stream / REST event consistency rules
 
 #### 7.2.5 persistence / recovery
 
@@ -262,389 +262,389 @@ app-server 依存の不確定点を観測で潰す。
 - `workspace_id <-> session_id`
 - session overlay
 - approval projection
-- sequence 管理
+- sequence management
 - idempotency key
-- recovery_pending の扱い
+- handling of recovery_pending
 
-### 7.3 文書反映対象
+### 7.3 Document reflection target
 
-- 要件定義: 観測で判明した前提差分があれば反映
-- 共通仕様: event / sequence / transport の横断ルール調整
-- 公開 API: response / error / action semantics の確定
-- 内部 API: overlay / projection / atomicity / recovery を確定
+- Requirement definition: Reflect any prerequisite differences found through observation 
+- Common specifications: Adjust cross-cutting rules for event / sequence / transport 
+- Public API: Determine response / error / action semantics 
+- Internal API: Determine overlay / projection / atomicity / recovery
 
-### 7.4 完了条件
+### 7.4 Completion conditions
 
-- 要件・共通・公開・内部の間で矛盾がない
-- 未確定事項が「実装に影響しない細部」に限定されている
-- runtime / BFF / UI 実装者が仕様だけで着手できる
+- There are no contradictions between requirements, common, public, and internal 
+- Undecided matters are limited to "details that do not affect implementation" 
+- runtime / BFF / UI implementers can start with only specifications
 
 ---
 
-## 8. フェーズ 3: runtime 実装
+## 8. Phase 3: runtime implementation
 
-### 8.1 目的
+### 8.1 Purpose
 
-MVP の中核である `codex-runtime` を実装する。
+Implement `codex-runtime`, which is the core of MVP.
 
-### 8.2 実装優先順位
+### 8.2 Implementation Priority
 
-#### 8.2.1 最優先
+#### 8.2.1 Top priority
 
-1. App Server プロセス管理
+1. App Server process management
 2. workspace registry
-3. `workspace_id <-> session_id` 対応管理
+3. `workspace_id <-> session_id` Correspondence management
 4. session overlay
-5. active session 制約の最終保証
-6. message accept / approval resolve / stop の複合状態遷移
+5. final guarantee of active session constraints 
+6. message complex state transition of accept / approval resolve / stop
 
-#### 8.2.2 次点
+#### 8.2.2 Runner-up
 
 7. message / approval / event projection
-8. canonical `sequence` 採番
+8. canonical `sequence` numbering
 9. summary read model
 10. recovery / reconciliation
 
-### 8.3 実装単位
+### 8.3 Implementation unit
 
-#### A. workspace 管理
+#### A. workspace management
 
-- `/workspaces` 列挙
-- 作成ルール
-- 除外条件
+- `/workspaces` Enumeration 
+- Creation rule 
+- Exclusion condition
 
-#### B. session 管理
+#### B. session management
 
 - create
 - start
 - get / list
 - stop
-- session overlay 更新
+- session overlay update
 
 #### C. messaging
 
-- `client_message_id` による冪等化
-- native thread への input 送信
+- Idempotence by `client_message_id` 
+- Sending input to native thread 
 - user message projection
-- assistant delta / completed 処理
+- assistant delta / completed processing
 
 #### D. approval
 
-- request 検出
+- request detection
 - detail projection
 - approve / deny / cancel
-- `active_approval_id` 管理
+- `active_approval_id` management
 
 #### E. event / sequence
 
 - canonical event append
-- session stream 用 sequence
-- approval global stream 用 projection
+- for session stream sequence
+- approval for global stream projection
 
 #### F. recovery
 
-- partial failure 検出
-- native history からの再構築
-- orphan / mismatch 検知
+- partial failure detection 
+- Reconstruction from native history 
+ orphan / mismatch detection
 
-### 8.4 完了条件
+### 8.4 Completion conditions
 
-- internal API を満たす runtime 操作が一通り動く
-- active session 制約が runtime で最終保証される
-- approval / stop / idempotency / recovery の基本系が動く
-- SSE 用 event source を BFF に供給できる
+- All runtime operations that satisfy the internal API run 
+- The active session constraints are guaranteed to be final at runtime 
+- The basic system of approval / stop / idempotency / recovery works 
+- The event source for SSE can be supplied to BFF
 
 ---
 
-## 9. フェーズ 4: BFF / UI 実装
+## 9. Phase 4: BFF / UI implementation
 
-### 9.1 目的
+### 9.1 Purpose
 
-runtime の内部契約を公開 API とスマホ前提 UI に変換する。
+Convert runtime's internal contract to public API and smartphone-based UI.
 
-### 9.2 BFF 実装
+### 9.2 BFF implementation
 
-#### 優先順
+#### Priority order
 
 1. public REST endpoint
 2. internal → public mapping
-3. Home 集約
+3. Home aggregation
 4. session stream relay
 5. approvals stream relay
 6. public error mapping
-7. `can_*` 導出
+7. `can_*` Derivation
 
-#### 特に重要な変換
+#### Particularly important conversions
 
 - approval `summary/reason` → public `title/description`
 - public approve / deny → internal resolve
-- Home の集約 response
-- stop response の `canceled_approval` 変換
+- Home aggregation response
+- stop response `canceled_approval` conversion
 
-### 9.3 UI 実装
+### 9.3 UI implementation
 
-#### 画面優先順
+#### Screen priority order
 
 1. Home
 2. Chat
 3. Approval
 
-#### Chat で必要なもの
+#### What you need for Chat
 
-- session 詳細表示
-- message 一覧
+- session detailed display 
+- message list 
 - activity log
-- delta 仮表示
-- completed 確定表示
-- status 表示
+- delta temporary display 
+- completed final display 
+- status display 
 - stop
-- SSE 再接続後 REST 再取得
+- REST reacquisition after SSE reconnection
 
-#### Approval で必要なもの
+#### What you need for Approval
 
-- pending 一覧
+- pending list
 - detail
 - approve / deny
-- stop 由来 `canceled` 反映
+- stop origin `canceled` reflection
 - badge / banner / toast
 
-#### スマホ観点
+#### Smartphone perspective
 
-- 360px 幅で主要操作完結
-- Home / Chat / Approval の 3 画面で主操作完結
-- approval は最低確認情報到達後 2 タップ以内
+- Main operations can be completed with 360px width 
+- Main operations can be completed with 3 screens of Home / Chat / Approval 
+- Approval is within 2 taps after reaching the minimum confirmation information
 
-### 9.4 完了条件
+### 9.4 Completion conditions
 
-- 公開 API が仕様通り返る
-- UI が Home / Chat / Approval の 3 画面で完結する
-- スマホで主要操作が横スクロールなしで可能
-- SSE 切断時に REST 再取得で整合回復する
+- Public API returns as specified 
+- UI is completed with 3 screens of Home / Chat / Approval 
+- Main operations can be performed on smartphone without horizontal scrolling 
+- Consistency is restored by REST reacquisition when SSE is disconnected
 
 ---
 
-## 10. フェーズ 5: テスト / 収束 / MVP 判定
+## 10. Phase 5: Testing / Convergence / MVP Determination
 
-### 10.1 目的
+### 10.1 Purpose
 
-仕様通りに動くこと、MVP 成立条件を満たすことを確認する。
+Confirm that it works according to specifications and satisfies the conditions for establishing MVP.
 
-### 10.2 テスト観点
+### 10.2 Test perspective
 
-#### 契約テスト
+#### Contract Test
 
-- workspace CRUD のうち MVP 対象機能
-- session create / start / get / list / stop
-- `waiting_input` 以外での message reject
-- active session 制約
+- Consistency of message reject
+- active session constraints 
 - approval approve / deny / cancel
 - idempotent resend
-- error.code / status code の整合
+- error.code / status code except for workspace CRUD, MVP target function
+- session create / start / get / list / stop
+- `waiting_input`
 
-#### 復元テスト
+#### Restore test
 
-- ブラウザ再読み込み
-- SSE 切断 → 再接続 → REST 再取得
-- stream 未接続初回ロード
-- approval pending 再表示
-- stop 後の state / approval 整合
+- Browser reload 
+- SSE disconnect → reconnect → REST reacquire 
+- stream unconnected first load 
+- approval pending redisplay 
+- state / approval consistency after stop
 
-#### E2E テスト
+#### E2E test
 
-- workspace 作成 → session 作成 → start → 対話 → stop
-- approval 発生 → approve
-- approval 発生 → deny
-- approval 発生 → stop
-- runtime 部分失敗後の再取得収束
+- workspace creation → session creation → start → dialogue → stop
+- approval occurs → approve
+- approval occurs → deny
+- approval occurs → stop
+- runtime reacquisition convergence after partial failure
 
-#### UI 受け入れテスト
+#### UI acceptance testing
 
-- PC ブラウザ
-- スマホブラウザ相当幅
-- approval 導線
+- PC browser 
+- Width equivalent to smartphone browser 
+- Approval conductor 
 - banner / toast
-- 直前 session への復帰
+- Return to previous session
 
-### 10.3 MVP 判定基準
+### 10.3 MVP Judgment Criteria
 
-以下を満たせば MVP 完了とする。
+MVP is completed if the following are met.
 
-- 要件定義の Must を満たす
-- app-server 観測に基づく仕様差分が文書へ反映済み
-- runtime / BFF / UI の責務境界で重大な曖昧さが残っていない
-- SSE 切断後の再取得で整合回復する
-- スマホ受け入れ基準を満たす
-- approval の最低確認情報が UI から確認可能
-
----
-
-## 11. 依存関係
-
-### 11.1 強い依存
-
-- フェーズ 1 → フェーズ 2
-  - 観測なしでは `start semantics`, `status 判定`, `approval 再検出`, `ID 採用表` が固定しにくい
-
-- フェーズ 2 → フェーズ 3
-  - runtime 実装前に overlay / projection / atomicity の仕様固定が必要
-
-- フェーズ 3 → フェーズ 4
-  - BFF / UI は internal contract と event contract が固まっていないと手戻りが大きい
-
-- フェーズ 4 → フェーズ 5
-  - E2E / UX 検証は UI 実装完了後
-
-### 11.2 並行可能なもの
-
-- フェーズ 0 の後半とフェーズ 1 の一部
-- フェーズ 2 の文書反映と、フェーズ 3 の非依存部分の雛形実装
-- フェーズ 3 の workspace/session 基盤と、フェーズ 4 の UI 骨組み
+- Satisfies Must in requirement definition
+- App-server Specification differences based on observations have been reflected in the document
+- No significant ambiguity remains in the responsibility boundary of runtime / BFF / UI 
+- Consistency is restored by reacquiring after SSE disconnection 
+- Satisfies smartphone acceptance criteria 
+- Minimum confirmation information for approval can be confirmed from UI
 
 ---
 
-## 12. 優先順位
+## 11. Dependencies
 
-### 12.1 最優先
+### 11.1 Strong dependence
 
-1. app-server 観測
-2. `session start` / `waiting_input` / `completed` の意味固定
-3. approval 再検出と最低確認情報の取得元固定
-4. active session 制約の runtime 実装
-5. message / approval / stop の原子性と recovery
-6. session stream と REST 再取得の整合
+- Phase 1 → Phase 2
+ - Without observation, it is difficult to fix `start semantics`, `status judgment`, `approval re-detection`, and `ID recruitment table`
 
-### 12.2 次優先
+- Phase 2 → Phase 3
+ - Overlay / projection / atomicity specifications must be fixed before runtime implementation
 
-7. Home 集約
+- Phase 3 → Phase 4
+ - BFF / UI requires a lot of rework if internal contract and event contract are not solidified
+
+- Phase 4 → Phase 5
+ - E2E / UX verification after UI implementation
+
+### 11.2 Things that can be parallelized
+
+- The second half of Phase 0 and part of Phase 1 
+- Document reflection in Phase 2 and template implementation of non-dependent parts in Phase 3 
+- Workspace/session foundation of Phase 3 and UI framework of Phase 4
+
+---
+
+## 12. Priority
+
+### 12.1 Top priority
+
+1. app-server observation 
+2. Fixed meaning of `session start` / `waiting_input` / `completed` 
+3. Fixed source of approval rediscovery and minimum confirmation information 
+4. Runtime implementation of active session constraint 
+5. Atomicity of message / approval / stop and recovery
+6. Consistency of session stream and REST reacquisition
+
+### 12.2nd priority
+
+7. Home aggregation
 8. approval global stream
 9. activity log
-10. スマホ最適化の詰め
+10. Final details of smartphone optimization
 
-### 12.3 後回し
+### 12.3 Postponement
 
-- diff 表示
-- 変更ファイル一覧
-- session タイトル自動生成
-- PC 補助パネル強化
-
----
-
-## 13. リスク
-
-### 13.1 技術リスク
-
-#### R1. native ID が安定しない
-
-影響:
-- `approval_id` / `event_id` / `turn_id` 設計に波及
-
-対策:
-- app-owned stable key の fallback を先に設計する
-
-#### R2. `session start` に対応する安定 native primitive がない
-
-影響:
-- public/internal action semantics が揺れる
-
-対策:
-- `start` を App-owned façade action として確定する前提で設計する
-
-#### R3. `completed / failed / stopped` を native 単独で判定できない
-
-影響:
-- runtime overlay が必須になる
-
-対策:
-- native を正本、公開状態は app-owned overlay と割り切る
-
-#### R4. approval を履歴から再検出できない
-
-影響:
-- 再接続復元が壊れる
-
-対策:
-- approval projection を runtime 永続化の正本寄りに寄せる
-
-#### R5. partial failure により native と projection がずれる
-
-影響:
-- UI の最新状態が不安定になる
-
-対策:
-- `recovery_pending` と再整合フローを最初から用意する
-
-### 13.2 プロダクトリスク
-
-#### R6. スマホで approval UX が重い
-
-対策:
-- Approval 画面を独立させる
-- 一覧から detail 到達を短くする
-- 最低確認情報に集中する
-
-#### R7. activity と message の責務が混ざる
-
-対策:
-- `messages` と `events` を分離維持する
+- diff display 
+- changed file list 
+- session title automatic generation 
+- PC auxiliary panel enhancement
 
 ---
 
-## 14. 後回し項目
+## 13. Risk
 
-以下は MVP 後に回すのが妥当である。
+### 13.1 Technology risks
+
+#### R1. Native ID is unstable
+
+Impact:
+- `approval_id` / `event_id` / `turn_id` ripples through design
+
+Countermeasure: 
+- Design fallback for app-owned stable key first
+
+#### R2. No stable native primitive corresponding to `session start`
+
+Impact:
+- public/internal action semantics are shaken
+
+Countermeasure: 
+- Design with the premise that `start` is determined as an App-owned façade action
+
+#### R3. `completed / failed / stopped` cannot be determined by native alone
+
+Impact: 
+- runtime overlay is required
+
+Countermeasure: 
+- Distinguish native from original and public state from app-owned overlay.
+
+#### R4. Cannot re-detect approval from history
+
+Impact: 
+- Reconnection restoration is broken.
+
+Countermeasure: Move 
+- approval projection closer to the original version of runtime persistence.
+
+#### R5. Native and projection shift due to partial failure
+
+Impact: 
+- The latest state of the UI becomes unstable.
+
+Countermeasure: 
+- Prepare `recovery_pending` and re-integration flow from the beginning
+
+### 13.2 Product Risk
+
+#### R6. Approval UX is slow on smartphones
+
+Measures: 
+- Make the Approval screen independent 
+- Shorten the time to reach detail from the list 
+- Concentrate on the minimum confirmation information
+
+#### R7. Activity and message responsibilities are mixed
+
+Countermeasure:
+- Keep `messages` and `events` separate
+
+---
+
+## 14. Postponed items
+
+It is appropriate to do the following after MVP.
 
 - workspace rename / delete
 - session delete / archive
-- 任意 path import
-- ファイルブラウザ
-- ターミナル UI
-- 高機能 diff viewer
-- 複数ユーザー対応
-- 高度な承認ポリシー編集
-- persistent tunnel 管理 UI
-- 本格監査ログ
+- arbitrary path import
+- file browser 
+- terminal UI
+- advanced diff viewer
+- multi-user support 
+- advanced authorization policy editing 
+- persistent tunnel management UI
+- full-scale audit log
 
-Should 項目も、MVP 判定には含めず、収束後に個別投入する。
-
----
-
-## 15. 推奨マイルストーン
-
-### M1. 観測完了
-
-- app-server 挙動確認結果が揃う
-- ID / status / approval の主要論点に暫定結論がある
-
-### M2. 仕様凍結
-
-- 4 文書が整合済み
-- runtime / BFF / UI の境界が固定される
-
-### M3. runtime 最低完成
-
-- session / message / approval / stop / event が internal で動く
-
-### M4. UI 最低完成
-
-- Home / Chat / Approval が PC / スマホ相当で動く
-
-### M5. MVP 収束完了
-
-- 復元・再接続・承認・停止・排他制約を含む E2E が通る
-- Must 要件を満たす
+Should items are also not included in the MVP judgment and are included separately after convergence.
 
 ---
 
-## 16. 最小実行順サマリ
+## 15. Recommended Milestones
 
-最も安全な進め方は次の順である。
+### M1. Observation completed
 
-1. app-server の観測環境を作る
-2. 主要 8 ケースを観測する
-3. ID / status / approval / event の仕様を固定する
-4. runtime で overlay / projection / atomicity / recovery を実装する
-5. BFF で public 契約へ変換する
-6. UI を Home / Chat / Approval の順に実装する
-7. 再接続 / approval / stop / active session 制約を重点的に E2E 検証する
-8. Must 要件を満たしたら MVP と判定する
+- app-server behavior confirmation results 
+- There is a tentative conclusion on the main issues of ID / status / approval
+
+### M2. Specifications frozen
+
+- 4 Documents are aligned
+- runtime / BFF / UI boundaries are fixed
+
+### M3. runtime minimum completion
+
+- session / message / approval / stop / event works internally
+
+### M4. UI minimum completion
+
+- Home / Chat / Approval works on PC / smartphone equivalent
+
+### M5. MVP convergence completed
+
+- Satisfies 
+- Must requirements for E2E including restoration, reconnection, authorization, suspension, and exclusive constraints.
+
+---
+
+## 16. Minimum execution order summary
+
+The safest way to proceed is as follows.
+
+1. Create an observation environment for app-server
+2. Observe the 8 main cases
+3. Fix the ID / status / approval / event specifications 
+4. Implement overlay / projection / atomicity / recovery in runtime 
+5. Convert to public contract with BFF 
+6. UI to Home / Chat / Approval Implement in this order 
+7. Verify E2E with emphasis on reconnection / approval / stop / active session constraints 
+8. Determine MVP if Must requirements are met.
 

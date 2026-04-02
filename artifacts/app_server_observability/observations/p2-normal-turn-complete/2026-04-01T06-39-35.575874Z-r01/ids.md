@@ -6,7 +6,7 @@
 - `thread_id`: `019d47c5-7968-7992-80f3-c6bb56e06bef`
 - native `request_id`: `unknown`
 
-`thread_id` は `responses/response-0001.json` の `result.thread.id`、`stream/events.ndjson` の `thread/started` / `thread/status/changed` / `turn/started` / `item/*` / `turn/completed`、`responses/response-0003.json` の `result.thread.id` で一致した。
+`thread_id` is `result.thread.id` of `responses/response-0001.json`, `thread/started` / `thread/status/changed` / `turn/started` / `item/*` / of `stream/events.ndjson` `turn/completed`, `result.thread.id` of `responses/response-0003.json` matched.
 
 ## Transport Request Mapping
 
@@ -18,11 +18,8 @@
 
 - observed `turn_id`: `019d47c5-7a83-7730-98af-85618767ee29`
 - source:
-  - `responses/response-0002.json` の `result.turn.id`
-  - `stream/events.ndjson` の `turn/started.params.turn.id`
-  - `stream/events.ndjson` の `item/*` 各通知の `params.turnId`
-  - `stream/events.ndjson` の `turn/completed.params.turn.id`
-  - `responses/response-0003.json` の `result.thread.turns[0].id`
+ - `result.turn.id`
+ of `responses/response-0002.json` - `stream/events.ndjson` `turn/ started `result.thread.turns[0].id`
 
 ## Item IDs
 
@@ -32,9 +29,9 @@
 - history user message item id: `item-1`
 - history agent message item id: `item-2`
 
-同一論理 message に見える item でも、stream 側 item id と history 側 item id が一致しなかった。`message_id = native item ID` の採用はこの case だけでも不安定である。
+Even for items that appear to have the same logical message, the item id on the stream side and the item id on the history side did not match. Adopting `message_id = native item ID` is unstable in this case alone.
 
 ## Event IDs
 
 - native `event_id`: `not observed`
-- notification method は `stream/events.ndjson` の行順でのみ追跡できる
+- notification method can only be tracked in line order of `stream/events.ndjson`

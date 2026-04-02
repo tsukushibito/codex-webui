@@ -1,4 +1,4 @@
-# 判定メモテンプレート
+# Judgment Note Template
 
 ## Case Info
 
@@ -16,24 +16,24 @@
 
 ## Judgments
 
-### <判断項目名>
+### <judgment_item_name>
 
-- 判定: 採用 / 不採用 / 保留だが先行可 / 未完了
-- 根拠:
-- 補足:
-- 保留時のデフォルト判断:
+- Judgment: adopt / reject / pending but safe to proceed / incomplete
+- Evidence:
+- Notes:
+- Default decision while pending:
 
-### <判断項目名>
+### <judgment_item_name>
 
-- 判定: 採用 / 不採用 / 保留だが先行可 / 未完了
-- 根拠:
-- 補足:
-- 保留時のデフォルト判断:
+- Judgment: adopt / reject / pending but safe to proceed / incomplete
+- Evidence:
+- Notes:
+- Default decision while pending:
 
 ## Open Questions
 
-- 未観測事項:
-- 後続フェーズで再観測する case:
+- Unobserved items:
+- Case to re-observe in a later phase:
 
 ## Cross References
 

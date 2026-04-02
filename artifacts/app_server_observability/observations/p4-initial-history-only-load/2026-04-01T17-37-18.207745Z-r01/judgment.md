@@ -1,4 +1,4 @@
-# 判定メモ
+# Judgment memo
 
 ## Case Info
 
@@ -12,85 +12,85 @@
 - thread_id: `019d4a1e-fdcb-7f32-887c-78eedbf4d477`
 - request_id: `0`
 - compared_artifacts: `requests/request-0001.json`, `requests/request-0002.json`, `requests/request-0003.json`, `requests/request-0004.json`, `requests/request-0005.json`, `responses/response-0001.json`, `responses/response-0002.json`, `responses/response-0003.json`, `responses/response-0004.json`, `responses/response-0005.json`, `server_requests/server-request-0001.json`, `stream/no-stream.md`, `history/history-0004.json`, `history/history-0005.json`
-- summary: connection A で pending approval の thread を作成したあと、connection B では stream を一度も購読せず、初回から `thread/read(includeTurns=true)` のみを実行した。初回 read だけで turn1 completed messages と turn2 commentary message、`thread.status = active[waitingOnApproval]`、turn2 `status = inProgress` は再取得できた。一方、approval request payload、native `request_id`、approval `itemId` は history に materialize されず、approval resource 自体は初回 history-only load でも復元できなかった。
+- summary: After creating a pending approval thread in connection A, connection B never subscribed to the stream and only executed `thread/read(includeTurns=true)` from the beginning. I was able to re-obtain turn1 completed messages, turn2 commentary message, `thread.status = active[waitingOnApproval]`, and turn2 `status = inProgress` with just the first read. On the other hand, the approval request payload, native `request_id`, and approval `itemId` were not materialized to history, and the approval resource itself could not be restored even with the first history-only load.
 
 ## Judgments
 
-### `messages 再構築`
+### `messages rebuild`
 
-- 判定: 保留だが先行可
-- 根拠: `history/history-0004.json` の初回 read だけで turn1 の `userMessage` / final `agentMessage` と、turn2 の `userMessage` / commentary `agentMessage` を再構築できた。
-- 補足: `history/history-0005.json` でも同じ item 群が保持され、初回 load と再読込で message materialization は安定していた。
-- 保留時のデフォルト判断: message resource は history 主体で再構築し、stream は delta 補助として扱う。
+- Judgment: Pending, but possible to proceed 
+- Rationale: `userMessage` / final `agentMessage` of turn1 and `userMessage` / commentary `agentMessage` of turn2 could be reconstructed just by reading `history/history-0004.json` for the first time. 
+- Note: The same item group was retained in `history/history-0005.json`, and the message materialization was stable during the first load and reload. 
+- Default judgment when on hold: message resource is reconstructed as history principal, and stream is treated as delta auxiliary.
 
-### `approvals 再構築`
+### `approvals rebuild`
 
-- 判定: 不採用
-- 根拠: `server_requests/server-request-0001.json` にあった approval request payload、native `request_id = 0`、approval `itemId = call_3Jc2EeQx5rkK9iaCD8MvJOgT` は `history/history-0004.json` と `history/history-0005.json` のどちらにも materialize されなかった。
-- 補足: history-only load で分かるのは `thread.status = active[waitingOnApproval]` と turn2 `status = inProgress` までで、approval object 自体は復元できない。`p4-stream-disconnect-reload` と同じ結論になった。
-- 保留時のデフォルト判断: approval resource は app runtime 側で stable key と payload snapshot を保持する前提にする。
+- Judgment: Rejected 
+- Reason: The approval request payload in `server_requests/server-request-0001.json`, native `request_id = 0`, approval `itemId = call_3Jc2EeQx5rkK9iaCD8MvJOgT` is `history/history-0004.json`. Neither was materialized in `history/history-0005.json`. 
+- Note: history-only load only shows `thread.status = active[waitingOnApproval]` and turn2 `status = inProgress`, and the approval object itself cannot be restored. I got the same conclusion as `p4-stream-disconnect-reload`. 
+- Default judgment when pending: Approval resource is assumed to hold stable key and payload snapshot on the app runtime side.
 
-### `latest status 推定`
+### `latest status estimate`
 
-- 判定: 保留だが先行可
-- 根拠: connection B の初回 `thread/read` で `thread.status = active[waitingOnApproval]` と turn2 `status = inProgress` を再取得できた。
-- 補足: pending approval object が無くても、latest status 自体は history-only 初回 load だけで推定できた。
-- 保留時のデフォルト判断: latest status は `thread.status` と latest turn status から復元する。
+- Judgment: Pending, but can proceed 
+- Reason: `thread.status = active[waitingOnApproval]` and turn2 `status = inProgress` were reacquired in the first `thread/read` of connection B. 
+- Note: Even without the pending approval object, the latest status itself could be estimated by just the history-only first load. 
+- Default judgment when pending: latest status is restored from `thread.status` and latest turn status.
 
-### `ID 安定性一覧`
+### `ID stability list`
 
-- 判定: 保留だが先行可
-- 根拠: `thread_id` と `turn_id` は setup connection A と history-only connection B の間で一致した。一方 `approval_id = native request ID` と approval `itemId` は history で再取得できず、`message_id = native item ID` も history item ids だけでは最終方針を支えない。
-- 補足: connection B では transport request id が再初期化されたため、client 側 JSON-RPC request id は stable key にならない。
-- 保留時のデフォルト判断: `session_id = native thread ID` は採用寄り、`message_id` と `approval_id` は app-owned 補完前提のまま保留にする。
+- Judgment: Pending but can proceed 
+- Rationale: `thread_id` and `turn_id` matched between setup connection A and history-only connection B. On the other hand, `approval_id = native request ID` and approval `itemId` cannot be reacquired using history, and `message_id = native item ID` does not support the final policy with history item ids alone. 
+- Note: In connection B, the transport request id was reinitialized, so the client side JSON-RPC request id does not become a stable key. 
+- Default judgment when pending: `session_id = native thread ID` is more likely to be adopted, and `message_id` and `approval_id` are left on hold with app-owned completion assumption.
 
 ### `create / start semantics`
 
-- 判定: 保留だが先行可
-- 根拠: このケースでも `thread/start` は idle thread を作る create primitive で、実際の activity 開始は turn1 / turn2 の `turn/start` で起きた。initial history-only load の追加観測は Phase 2 の判断を覆していない。
-- 補足: pending approval thread を別 connection から初回 read できても、native `session start` 相当の独立 primitive は観測していない。
-- 保留時のデフォルト判断: `session start` は引き続き App-owned facade action 前提で進める。
+- Judgment: Pending, but can be preceded 
+- Rationale: In this case as well, `thread/start` is a create primitive that creates an idle thread, and the actual start of the activity occurred at `turn/start` of turn1 / turn2. Additional observations of initial history-only load did not overturn the Phase 2 decision. 
+- Note: Even if the pending approval thread can be read from another connection for the first time, an independent primitive equivalent to native `session start` is not observed. 
+- Default judgment when on hold: `session start` continues assuming App-owned facade action.
 
 ### `sequence`
 
-- 判定: 保留だが先行可
-- 根拠: history では turn 順と item 配列順は取れるが、approval request 自体が欠落しているため stream 上の発生順を完全には再現できない。
-- 補足: `history/history-0004.json` と `history/history-0005.json` の `updatedAt` はどちらも `1775065050` で変わらず、同一状態の再読込では timestamp も順序補助にならない。
-- 保留時のデフォルト判断: `sequence` は app-owned で持つ前提にする。
+- Judgment: Pending, but can be preceded 
+- Rationale: In history, turn order and item array order can be obtained, but the order of occurrence on stream cannot be completely reproduced because the approval request itself is missing. 
+- Supplement: `updatedAt` of `history/history-0004.json` and `history/history-0005.json` are both `1775065050` and do not change, and timestamp does not help in ordering when reloading the same state. 
+- Default judgment when pending: `sequence` is assumed to be app-owned.
 
 ### `event_id`
 
-- 判定: 保留だが先行可
-- 根拠: history-only 初回 load でも native `event_id` は露出せず、notification 単位の identity を復元する材料は見えなかった。
-- 補足: 復元できたのは thread / turn / items / latest status までで、event identity は state から逆算できない。
-- 保留時のデフォルト判断: `event_id` は app-owned 採番前提で進める。
+- Judgment: Pending, but can proceed 
+- Rationale: History-only The native `event_id` was not exposed even in the first load, and there was no material to restore the identity of the notification unit. 
+- Note: Only thread / turn / items / latest status could be restored, and event identity cannot be calculated backwards from state. 
+- Default judgment when on hold: `event_id` is assumed to be app-owned.
 
-### `signal / event 対応最終表`
+### `signal/event correspondence final table`
 
-- 判定: 保留だが先行可
-- 根拠: `message.user` と `message.assistant.completed` 相当は history-only 初回 load でも追えるが、`approval.requested` は `server_requests/server-request-0001.json` にしか出てこない。
-- 補足: `approval.resolved` と `error.raised` は今回のケースでは未発生。pending approval の存在は status からは分かるが、approval event 自体は再構築できない。
-- 保留時のデフォルト判断: message 系は history 再構築可、approval 系は stream / runtime snapshot 前提で統合する。
+- Judgment: Pending, but can be preceded 
+- Rationale: `message.user` and `message.assistant.completed` can be tracked by history-only initial load, but `approval.requested` only appears in `server_requests/server-request-0001.json`. 
+- Supplement: `approval.resolved` and `error.raised` did not occur in this case. The existence of pending approval can be seen from the status, but the approval event itself cannot be reconstructed. 
+- Default judgment when pending: message type can be reconstructed as history, approval type can be integrated on the premise of stream / runtime snapshot.
 
-### `app-owned 必須項目`
+### `app-owned required field`
 
-- 判定: 保留だが先行可
-- 根拠: history-only 初回 load でも approval payload、`active_approval_id`、event stable key は消えており、native だけでは pending approval resource を公開用に復元できない。
-- 補足: `preview` が latest turn ではなく turn1 prompt のまま残ったため、session overlay または app-owned preview 補正の必要性も未否定になった。
-- 保留時のデフォルト判断: 少なくとも `active_approval_id`、approval payload snapshot、`sequence`、event stable key、必要なら session overlay を app-owned 必須候補として保持する。
+- Judgment: Pending, but can go ahead 
+- Rationale: history-only The approval payload, `active_approval_id`, and event stable key have disappeared even on the first load, and the pending approval resource cannot be restored for publication using only native. 
+- Note: Since `preview` remained at turn1 prompt instead of latest turn, the need for session overlay or app-owned preview correction was also not ruled out. 
+- Default decision on hold: Keep at least `active_approval_id`, approval payload snapshot, `sequence`, event stable key, and session overlay if necessary as app-owned mandatory candidates.
 
-### `timestamp / 順序補助`
+### `timestamp / ordering aid`
 
-- 判定: 不採用
-- 根拠: `history/history-0004.json` と `history/history-0005.json` は `updatedAt = 1775065050` で同一、item 単位 timestamp も request / approval 専用 timestamp も無く、同一状態内の順序判定補助としては使えなかった。
-- 補足: history 再取得時の thread-level `updatedAt` は latest state の再読込には使えても、event / item sequence の stable ordering source にはならない。
-- 保留時のデフォルト判断: 順序は app-owned `sequence` を正本にし、timestamp は補助に留める。
+- Judgment: Rejected 
+- Rationale: `history/history-0004.json` and `history/history-0005.json` are the same with `updatedAt = 1775065050`, and there is no timestamp for each item or timestamp for request/approval, and they cannot be used as an aid for determining the order within the same state. 
+- Note: Although thread-level `updatedAt` when reacquiring history can be used to reload the latest state, it cannot be used as a stable ordering source for event / item sequence. 
+- Default judgment when pending: App-owned `sequence` is used as the original, and timestamp is used as an auxiliary.
 
 ## Open Questions
 
-- pending approval request を history-only load から再構築できる別 native API があるか。
-- `preview` が latest turn ではなく最初の prompt を保持する挙動を、公開 session summary で無視してよいか。
-- resolved approval でも history-only 初回 load から resolution metadata を取れる経路があるか。
+- Is there another native API that can rebuild a pending approval request from a history-only load? 
+- Can the behavior of `preview` retaining the first prompt instead of the latest turn be ignored in the public session summary? 
+- Even with resolved approval, is there a path to get resolution metadata from the history-only initial load?
 
 ## Cross References
 

@@ -6,7 +6,7 @@
 - `thread_id`: `019d4974-eb2b-7f70-b7ef-08c9f78d0540`
 - native `request_id`: `not observed`
 
-`thread_id` は `responses/response-0001.json`、`responses/response-0003.json`、`responses/response-0005.json`、`stream/events.ndjson` の全 thread 参照で一致した。approval 系 server request は発生していないため、native `request_id` は今回の case では観測していない。
+`thread_id` matched in all thread references of `responses/response-0001.json`, `responses/response-0003.json`, `responses/response-0005.json`, and `stream/events.ndjson`. Since no approval server request has occurred, native `request_id` is not observed in this case.
 
 ## Transport Request Mapping
 
@@ -19,10 +19,10 @@
 ## Turn IDs
 
 - `turn_id`: `019d4974-ed89-7141-aeb4-71e525ad82a2`
-- `history/history-0003.json` では `status = inProgress`
-- `history/history-0005.json` では `status = interrupted`
+- `status = inProgress`
+- in `history/history-0003.json` `status = interrupted` in `history/history-0005.json`
 
-`turn_id` は `responses/response-0002.json`、`requests/request-0004.json` の interrupt target、`stream/events.ndjson` の `turn/started` / `item/*` / `turn/completed`、`history/history-0003.json`、`history/history-0005.json` で一致した。
+`turn_id` is `responses/response-0002.json`, interrupt target in `requests/request-0004.json`, `turn/started` / `item/*` / in `stream/events.ndjson` Matched `turn/completed`, `history/history-0003.json`, `history/history-0005.json`.
 
 ## Item IDs
 
@@ -33,11 +33,11 @@
 - history pending item ids: `item-1` (`userMessage`), `item-2` (`agentMessage`)
 - history final item ids: `item-1` (`userMessage`), `item-2` (`agentMessage` commentary)
 
-stream 側 item id と history 側 item id は今回も一致しなかった。`commandExecution` item は stream で `started` までは見えたが、interrupt 後の `completed` は観測されず、history にも materialize されなかった。final `agentMessage` も生成されなかった。
+The item id on the stream side and the item id on the history side did not match this time as well. `commandExecution` item was visible up to `started` in the stream, but `completed` after interrupt was not observed and was not materialized in history. The final `agentMessage` was also not generated.
 
 ## Event IDs
 
 - native `event_id`: `not observed`
-- stop を識別できた native key: `requests/request-0004.json` の `turn/interrupt` と、`stream/events.ndjson` の `turn/completed.turn.status = interrupted`
+- Native key that could identify stop: `turn/interrupt` in `requests/request-0004.json` and `turn/completed.turn.status = interrupted` in `stream/events.ndjson`
 
-通知の一意キーは method と行順までしか取れていない。
+The unique key for notifications only includes method and line order.

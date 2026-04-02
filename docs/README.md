@@ -1,15 +1,15 @@
 # docs
 
-このディレクトリは、要件・仕様・検証計画などの正本ドキュメントを置くための領域とする。
+This directory is the area for source-of-truth documents such as requirements, specifications, and validation plans.
 
-## 配置方針
+## Placement Policy
 
-- `requirements/`: 何を作るかを定義する文書を置く
-- `specs/`: どう作るかを定義する仕様書を置く
-- `validation/`: 検証計画、確認観点、設計判断の正本を置く
-- `docs/` 直下: まだ分類先を確定していない文書、またはカテゴリ横断の案内文書だけを置く
+- `requirements/`: stores documents that define what to build
+- `specs/`: stores specifications that define how to build it
+- `validation/`: stores source-of-truth validation plans, review points, and design decisions
+- directly under `docs/`: only documents whose final category is not yet fixed, or guidance documents that cut across categories
 
-## 現在の構成
+## Current Structure
 
 - `requirements/codex_webui_mvp_requirements_v0_8.md`
 - `specs/codex_webui_common_spec_v0_8.md`
@@ -18,14 +18,14 @@
 - `validation/app_server_behavior_validation_plan_checklist.md`
 - `codex_webui_mvp_roadmap_v0_1.md`
 
-## 関連ディレクトリとの責務分離
+## Responsibility Boundaries with Related Directories
 
-- `tasks/`: 実施手順、フェーズ分割、更新責務などの作業指示書を置く
-- `artifacts/`: 観測ログ、証跡、判定メモなどの実行結果を置く
-- `docs/`: 実行結果を受けて維持される正本ドキュメントを置く
+- `tasks/`: stores work instructions such as execution steps, phase breakdowns, and update responsibilities
+- `artifacts/`: stores execution outputs such as observation logs, evidence, and judgment notes
+- `docs/`: stores the maintained source-of-truth documents updated based on those execution outputs
 
-## 命名ルール
+## Naming Rules
 
-- 既存文書との整合を優先し、当面は現在のファイル名を維持する
-- 新規追加時は、文書種別ではなく内容が属するカテゴリに応じて配置する
-- 1 つのファイルが複数カテゴリの責務を持つ場合は、必要に応じて分割を検討する
+- Prioritize consistency with existing documents, and keep the current filenames for now
+- When adding a new file, place it based on the category of its content rather than the document type alone
+- If a single file ends up spanning multiple responsibility categories, consider splitting it as needed

@@ -1,521 +1,521 @@
-# app-server 挙動確認実行計画（修正版）
+# app-server behavior check execution plan (revised version)
 
-## 1. 目的
+## 1. Purpose
 
-`codex app-server` の実挙動を観測し、次を確定する。
+Observe the actual behavior of `codex app-server` and determine the following.
 
-- どの native ID をそのまま採用できるか
-- どの native signal / event を internal/public event に対応付けられるか
-- `session create` と `session start` を実装上どう分離すべきか
-- `running -> waiting_input` を何で判定するか
-- approval の pending / resolved を何で判定するか
-- `completed` / `failed` / `stopped` を native だけで決められるか
-- stream を一度も見ていないクライアントでも、履歴再取得だけで message / approval / 最新状態を再構築できるか
-- app-owned で最低限保持すべきものは何か
+- Which native ID can be adopted as is?
+- Which native signal / event can be mapped to an internal/public event?
+- How should `session create` and `session start` be separated in implementation?
+- What should be used to determine `running -> waiting_input`?
+- What should be used to determine whether approval is pending/resolved?
+- `completed` / Can `failed` / `stopped` be determined only by native?
+- Even if a client has never seen a stream, can the message / approval / latest state be reconstructed just by re-fetching the history?
+- What is the minimum value that should be retained in app-owned?
 
-## 2. この作業で確定したい設計判断
+## 2. Design decisions you want to make in this task
 
-### 必須確定
+### RequiredConfirm
 
-- `session_id = native thread ID` にするか
-- `message_id = native item ID` にするか
-- `approval_id = native request ID` にするか
-- `sequence = app-owned` で確定か
-- `session start` を App-owned façade action として扱うべきか
-- `session.status` の遷移条件をどう置くか
-- approval の再検出を履歴から行えるか
-- approval の**最低確認情報**をどの native 事実から組み立てるか
+- Should it be `session_id = native thread ID`?
+- Should it be `message_id = native item ID`? 
+- Should it be `approval_id = native request ID`? 
+- Is it confirmed with `sequence = app-owned`?
+- Should `session start` be treated as an App-owned façade action?
+- `session.status` How to set the transition conditions for 
+- Is it possible to re-detect the approval from the history? What native facts should be used to assemble the **minimum confirmation information** for 
+- approval?
 
-### 条件付き確定
+### Conditional confirmation
 
-- `turn_id` は internal only で持つ価値があるか
-- `event_id` は native 流用するか、app-owned にするか
+- Is it worth having `turn_id` as internal only?
+- Should `event_id` be used as native or app-owned?
 
-### 保留でも先に進める項目
+### Items that can be moved forward even if they are on hold
 
-- `turn_id` は安定性が弱ければ debug / internal 補助のみ
-- `event_id` は安定性が弱ければ app-owned opaque ID
-- `approval_id` は native に stable ID が無ければ runtime stable key
-- `session start` は native primitive が弱ければ App-owned façade action
-- `sequence` は native に明確な安定連番が無ければ app-owned
+- `turn_id` is for debug / internal assistance only if stability is weak
+- `event_id` is for app-owned opaque ID
+- `approval_id` is for runtime stable key
+- if native has no stable ID. `session start` is for app-owned façade action
+- if native primitive is weak. app-owned if native has no clear stable sequence number
 
-## 3. スコープ
+## 3. Scope
 
-### 対象に含む
+### Included
 
-- thread / turn / item / request の ID と履歴
-- native signal / event の種類と順序
-- approval request / resolve / stop の挙動
-- stream 切断後の履歴再取得
-- stream 未接続の初回ロード時の履歴再取得
-- status マッピングに必要な観測
+- ID and history of thread / turn / item / request
+- Type and order of native signal / event
+- Behavior of approval request / resolve / stop
+- stream Reacquisition of history after disconnection
+- stream Reacquisition of history at the time of first load without connection
+- status Observations required for mapping
 - create / start / stop semantics
-- item / request / event / history の timestamp
-- approval 最低確認情報の native 取得元
-- approval 解決後メタデータの native 取得元
+- of item / request / event / history timestamp
+- approval Native source of minimum confirmation information 
+- approval Native source of post-resolution metadata
 
-### 対象外
+### Not applicable
 
-- UI 詳細
+- UI details 
 - keepalive
-- public API 整形
-- 本格 DB 実装
-- 冪等性の最終実装
-- pagination や limit の細部
+- public API formatting 
+- full-fledged DB implementation 
+- final implementation of idempotency 
+- details of pagination and limit
 
-## 4. 実施方法
+## 4. Implementation method
 
-観測用スパイクを使って app-server と直接やり取りし、以下を保存する。
+Use the observation spike to interact directly with the app-server and save the following:
 
 - request / response
 - event stream
-- 履歴再取得結果
-- ケース名
-- 時刻
-- 同一 thread 内の出来事の順序
+- history reacquisition result 
+- case name 
+- time 
+- order of events within the same thread
 
-本実装ではなく、観測専用として行う。
+This is not for actual implementation, but for observation only.
 
-Phase 1 では、次の運用を固定済みとする。
+In Phase 1, the following operations are fixed.
 
-- 成果物と raw 証跡の正本は repo 内 `artifacts/app_server_observability/` に置く
-- 保存単位は `case_name / run_key` とする
-- `run_key` は高解像度 UTC 時刻と nonce で一意化し、再観測した tasks Phase は metadata に残す
-- `session_key` は観測者が付与する grouping key とし、native `session_id` や `thread_id` と同一視しない
-- request / response / history は同一採番で突合し、stream はケース単位の時系列で保存する
-- 判定メモは `採用 / 不採用 / 保留だが先行可 / 未完了` の 4 値で残す
+- Original copies of artifacts and raw trails are placed in `artifacts/app_server_observability/` in the repo.
+- Storage unit is `case_name / run_key`.
+- `run_key` is made unique by high-resolution UTC time and nonce, and re-observed tasks Phase is left in metadata.
+- `session_key` is a grouping key assigned by the observer, and is not equated with native `session_id` or `thread_id` 
+- Request / response / history are matched with the same numbering, and stream is saved in chronological order for each case 
+- Judgment memo is left with 4 values: ``accepted / rejected / pending but can be preceded / uncompleted''
 
-## 5. 実施フェーズ
+## 5. Implementation phase
 
-### Phase 1: 基本ケース観測
+### Phase 1: Base case observation
 
-通常 1 turn と、assistant テキスト無し turn を観測する。
+Usually 1 turn and a turn without assistant text are observed.
 
-確認すること:
+Things to check:
 
-- thread ID が得られるか
-- turn ID が得られるか
-- user item / assistant item の ID が得られるか
-- delta と completed がどう来るか
-- 同一 turn で assistant message item が複数生成されうるか
-- tool/log/request だけで終わる turn があるか
-- turn 完了後に「継続可能」と判断できる signal があるか
-- item / event / history に時刻が付くか
+- Can I get the thread ID?
+- Can I get the turn ID? 
+- Can I get the user item / assistant item ID? 
+- How are delta and completed? 
+- Can multiple assistant message items be generated in the same turn? 
+- Is there a turn that ends with only tool/log/request? 
+- Can I determine that it is "continuable" after the turn is completed? Is there 
+- Is the time added to item / event / history?
 
-### Phase 2: create / start semantics 観測
+### Phase 2: create / start semantics observation
 
-`session create` と `session start` をどう置くべきか確認する。
+Check how to put `session create` and `session start`.
 
-確認すること:
+Things to check:
 
-- native thread 作成だけで idle に置けるか
-- `start without input` 的な安定操作があるか
-- 無い場合、`session start` を純粋な App-owned 状態遷移として扱うべきか
-- thread 作成直後に app 側で `created` を安全に持てるか
+- Is it possible to put a native thread in idle just by creating it?
+- Is there a stable operation like `start without input`?
+- If not, should `session start` be treated as a pure app-owned state transition? 
+- Can the app side safely have `created` immediately after thread creation?
 
-### Phase 3: approval ケース観測
+### Phase 3: approval case observation
 
-approval を発生させて観測する。
+Generate and observe approval.
 
-確認すること:
+Things to check:
 
-- request ID があるか
-- approval 内容として何が取れるか
-- approve / deny / stop 後にどういう native 事実が残るか
-- pending request を履歴から再検出できるか
-- resolved request を履歴から再構成できるか
-- request / resolution に時刻が付くか
-- **approval の最低確認情報の取得元が何か**
-  - `approval_category` 相当
-  - `title / summary` 相当
-  - `description / reason` 相当
-  - `operation_summary` 相当
-  - `requested_at` 相当
-- **approval の解決後メタデータの取得元が何か**
-  - `resolved_at` 相当
+- Is there a request ID?
+- What can be taken as the approval content? 
+- What native facts remain after approve / deny / stop? 
+- Can a pending request be re-detected from the history? 
+- Can a resolved request be reconstructed from the history? 
+- Does the request / resolution have a time? 
+- **What is the source of the minimum confirmation information for approval?**
+ - Equivalent to `approval_category` 
+ - Equivalent to `title / summary` 
+ - Equivalent to `description / reason` 
+ - Equivalent to `operation_summary` 
+ - Equivalent to `requested_at` 
+- **What is the source of metadata after resolution of approval?**
+ - Equivalent to `resolved_at`
 
-### Phase 4: stop / 異常 / 終端観測
+### Phase 4: stop / abnormal / terminal observation
 
-停止や失敗を含むケースを観測する。
+Observe cases that include outages and failures.
 
-確認すること:
+Things to check:
 
-- stop が native にどう反映されるか
-- `stopped` を置ける根拠があるか
-- 一時失敗と終端失敗を区別できるか
-- `completed` を native だけで置けるか
-- native だけで足りなければ、runtime 判定が必要か
+- How is stop reflected in native?
+- Is there a basis for placing `stopped`?
+- Can we distinguish between temporary failure and terminal failure?
+- Can `completed` be placed only in native?
+- If only native is not enough, is a runtime judgment necessary?
 
-### Phase 5: 再取得・再構築観測
+### Phase 5: Reacquisition/reconstruction observation
 
-stream を切るケースと、stream を一度も見ていない初回ロードの両方で、履歴再取得だけでどこまで戻せるかを見る。
+See how far you can go back just by re-acquiring the history, both in the case of cutting the stream and in the first load where the stream has never been seen.
 
-確認すること:
+Things to check:
 
-- messages を履歴から再構築できるか
-- approvals を履歴から再構築できるか
-- pending / resolved を区別できるか
-- 最新状態を再推定できるか
-- `sequence` は native ではなく app-owned で持つべきか
-- 時刻だけで安定順序が取りやすいか
-- 同一 thread / 同一 request 内で、時刻が順序判定の補助として信頼できるか
-- stream 未接続のクライアントでも初回復元できるか
+- Can messages be reconstructed from history? 
+- Can approvals be reconstructed from history? 
+- Can we distinguish between pending / resolved? 
+- Can we re-estimate the latest state? 
+- Should `sequence` be app-owned rather than native? 
+- Is it easy to obtain a stable order based on time alone? 
+- Same thread / Same request Is time reliable as an aid to ordering within 
+-stream Can unconnected clients restore it for the first time?
 
-## 6. 優先ケース
+## 6. Priority case
 
-最低限やるケース:
+Minimum case:
 
-1. 通常 1 turn 完了
-2. assistant テキスト無し turn
-3. 複数 turn 継続
-4. approval 発生 → approve
-5. approval 発生 → deny
-6. approval 発生中 → stop
-7. 一時失敗ケース
-8. stream 切断 → 履歴再取得
-9. stream 未接続の初回ロード → 履歴再取得のみで復元
+1. Normal 1 turn completed 
+2. assistant No text turn
+3. Multiple turns continued 
+4. approval occurred → approve
+5. approval occurred → deny
+6. approval occurring → stop
+7. temporary failure case 
+8. stream disconnected → history reacquisition 
+9. stream unconnected first load → Restoration by re-acquiring history only
 
-余力があれば:
+If you have the energy:
 
-- stop と approval resolve が近接するケース
+- Case where stop and approval resolve are close to each other
 
-## 7. 完了条件
+## 7. Completion conditions
 
-次が埋まったら終了。
+It ends when the next one is filled.
 
-- ID 安定性一覧
-- native signal / event 対応表
-- create / start semantics の判断
-- status マッピング方針
-- approval 再検出可否
-- approval 最低確認情報の取得元一覧
-- approval 解決後メタデータの取得元一覧
-- app-owned 必須項目一覧
-- 保留時のデフォルト判断
+- ID stability list 
+- Native signal / event correspondence table 
+- Create / start semantics judgment 
+- status Mapping policy 
+- approval Possibility of re-detection 
+- approval List of sources for minimum confirmation information 
+- approval List of sources for post-resolution metadata 
+- app-owned List of required items 
+- Default judgment when on hold
 
 ---
 
-# app-server 挙動確認チェックリスト（修正版）
+# app-server behavior confirmation checklist (revised version)
 
-## A. 基本ログ準備
+## A. Basic log preparation
 
-- [x] request / response / event / history snapshot をケース単位で保存できる
-- [x] ケース名と UTC 実行時刻を付けて保存できる
-- [x] 時刻順と request 順の両方で追える
-- [x] `session_key` / `thread_id` / `request_id` を対応付け、thread 単位で追える
+- [x] Request / response / event / history snapshot can be saved in case units 
+- [x] Case name and UTC execution time can be added and saved 
+- [x] Can be tracked in both time order and request order 
+- [x] `session_key` / `thread_id` / `request_id` can be associated and tracked in thread units
 
-## B. ID 安定性確認
+## B. ID stability check
 
-- [x] thread ID が取得できる
-- [x] thread ID は再取得後も同一
-- [x] user item ID が取得できる
-- [x] assistant item ID が取得できる
-- [x] request ID が取得できるか確認した
-- [ ] request ID が pending / resolved 再取得時も同一か確認した
-- [x] turn ID が取得できるか確認した
-- [x] turn ID が完了判定や request 紐付けに使えるか確認した
-- [x] event ID が取得できるか確認した
-- [x] event ID は安定 contract として使う価値があるか確認した
+- [x] Thread ID can be obtained 
+- [x] Thread ID is the same even after re-obtaining 
+- [x] User item ID can be obtained 
+- [x] assistant item ID can be obtained 
+- [x] Confirmed whether request ID can be obtained 
+- [ ] Request ID is pending / resolved Confirmed whether it is the same when re-obtaining 
+- [x] turn ID 
+- [x] Confirmed whether turn ID can be used for completion determination and request linking 
+- [x] Confirmed whether event ID can be acquired 
+- [x] Confirmed whether event ID is worth using as a stable contract
 
-## C. 通常 turn 確認
+## C. Normal turn confirmation
 
-- [x] user message 送信で何が生成されるか確認した
-- [x] assistant delta の signal / event を確認した
-- [x] assistant completed の signal / event を確認した
-- [x] delta と completed が同じ message に結び付くか確認した
-- [x] 同一 turn で assistant item が複数生成されうるか確認した
-- [x] turn 完了を示す signal を確認した
-- [x] `running -> waiting_input` に戻す根拠を確認した
-- [x] 複数 turn 継続ケースを観測した
-- [x] follow-up user message で既存 thread が再利用されるか確認した
-- [x] follow-up turn で `waiting_input -> running` に戻る根拠を確認した
+- [x] Confirmed what is generated when sending a user message 
+- [x] Confirmed signal / event of assistant delta 
+- [x] Confirmed signal / event of assistant completed 
+- [x] Confirmed whether delta and completed are connected to the same message 
+- [x] Confirmed whether multiple assistant items can be generated in the same turn 
+- [x] turn Confirmed the signal indicating completion 
+- [x] Confirmed the basis for returning to `running -> waiting_input` 
+- [x] Observed multiple turn continuation cases 
+- [x] Confirmed whether the existing thread will be reused in follow-up user message 
+- [x] Confirmed the basis for returning to `waiting_input -> running` in follow-up turn
 
-## D. assistant テキスト無し turn 確認
+## D. assistant no text turn confirm
 
-- [x] tool/log/request だけで終わる turn を観測した
-- [x] assistant message が出ないまま turn 完了しうるか確認した
-- [x] その場合でも `waiting_input` に戻せる根拠があるか確認した
-- [x] message projection に含めない item を切り分けられるか確認した
+- [x] Observed a turn that ended with only tool/log/request 
+- [x] Checked whether the turn could be completed without an assistant message appearing 
+- [x] Even in that case, checked whether there is a basis for returning it to `waiting_input` 
+- [x] Checked whether it is possible to separate items that are not included in the message projection
 
-## E. create / start 確認
+## E. create / start confirmation
 
-- [x] native thread 作成だけで idle に置けるか確認した
-- [x] `start without input` 的な安定操作があるか確認した
-- [x] 無い場合、`session start` を App-owned façade action にすべきと判断できた
-- [x] `created` 状態を app 側で安全に持てると判断できた
+- [x] Confirmed whether a native thread can be placed in idle by simply creating it 
+- [x] Confirmed whether there is a stable operation such as `start without input` 
+- [x] If not, determined that `session start` should be an app-owned façade action 
+- [x] Confirmed that the `created` state can be safely held on the app side
 
-## F. approval 確認
+## F. approval confirmation
 
-- [x] approval request を発生させた
-- [x] approval の最低確認情報5項目が native から取れるか確認した
-- [x] request ID が stable か確認した
-- [x] approve 後の native 変化を確認した
-- [x] deny 後の native 変化を確認した
-- [x] stop 後の native 変化を確認した
-- [ ] pending approval を履歴再取得で再検出できるか確認した
-- [ ] resolved approval を履歴から判定できるか確認した
-- [x] `approval_category` 相当の native 取得元を記録した
-- [x] `title / summary` 相当の native 取得元を記録した
-- [x] `description / reason` 相当の native 取得元を記録した
-- [x] `operation_summary` 相当の native 取得元を記録した
-- [x] `requested_at` 相当の native 取得元を記録した
-- [x] `resolved_at` 相当の native 取得元を記録した
+- [x] The approval request was generated 
+- [x] Confirmed that the minimum 5 items of confirmation information for approval can be obtained from native 
+- [x] Confirmed whether the request ID is stable 
+- [x] Confirmed the native change after approve 
+- [x] Confirmed the native change after deny 
+- [x] Confirmed the native change after stop 
+- [ ] pending Confirmed whether approval can be redetected by reacquiring the history 
+- [ ] Confirmed whether approval can be determined from history from the history 
+- [x] Recorded the native source corresponding to `approval_category` 
+- [x] Recorded the native source corresponding to `title / summary` 
+- [x] Recorded the native source corresponding to `description / reason` 
+- [x] 
+- recorded the native acquisition source corresponding to `operation_summary` [x] recorded the native acquisition source equivalent to `requested_at` 
+- [x] recorded the native acquisition source equivalent to `resolved_at`
 
-## G. signal / event 対応確認
+## G. signal / event compatibility confirmation
 
-- [x] `message.user` に対応する native signal を決めた
-- [x] `message.assistant.delta` に対応する native signal を決めた
-- [x] `message.assistant.completed` に対応する native signal を決めた
-- [x] `approval.requested` に対応する native signal を決めた
-- [ ] `approval.resolved` に対応する native signal を決めた
-- [x] `session.status_changed` を native から直接取るか、runtime で生成するか決めた
-- [x] `error.raised` に対応する native signal を決めた
+- [x] Decided the native signal corresponding to `message.user` 
+- [x] Decided the native signal corresponding to `message.assistant.delta` 
+- [x] Decided the native signal corresponding to `message.assistant.completed` 
+- [x] Decided the native signal corresponding to `approval.requested` 
+- [ ] Decided the native signal corresponding to `approval.resolved` 
+- [x] Decided whether to take `session.status_changed` directly from native or generate it in runtime 
+- [x] Decided the native signal corresponding to `error.raised`
 
-## H. status マッピング確認
+## H. status mapping confirmation
 
-- [x] `running` の根拠を確認した
-- [x] `waiting_input` の根拠を確認した
-- [x] `waiting_approval` の根拠を確認した
-- [x] `stopped` の根拠を確認した
-- [x] `failed` の根拠を確認した
-- [x] `completed` を native だけで置けるか確認した
-- [x] native だけで足りない場合、runtime 判定が必要と判断した
+- [x] Confirmed the basis for `running` 
+- [x] Confirmed the basis for `waiting_input` 
+- [x] Confirmed the basis for `waiting_approval` 
+- [x] Confirmed the basis for `stopped` 
+- [x] Confirmed the basis for `failed` 
+- [x] Confirmed the basis for `completed` Confirmed whether it can be installed with only native 
+- [x] If only native is insufficient, it was determined that runtime judgment is necessary
 
-## I. 履歴再構築確認
+## I. History reconstruction confirmation
 
-- [x] stream なしで messages を再構築できる
-- [ ] stream なしで approvals を再構築できる
-- [ ] pending / resolved を区別できる
-- [x] latest status 推定の材料が履歴にある
-- [x] `sequence` は app-owned にすべきと判断できる
-- [x] stream 未接続の初回ロードでも復元できるか確認した
+- [x] Messages can be rebuilt without stream 
+- [ ] Approvals can be rebuilt without stream 
+- [ ] Pending/resolved can be distinguished 
+- [x] Latest status There is material for estimation in the history 
+- [x] `sequence` can be determined to be app-owned 
+- [x] Stream Confirmed whether it can be restored even with an unconnected first load
 
-## J. timestamp 確認
+## J. timestamp confirmation
 
-- [x] item に時刻が付くか確認した
-- [x] request / resolution に時刻が付くか確認した
-- [x] event に時刻が付くか確認した
-- [x] 履歴再取得時に時刻で安定順序が取りやすいか確認した
-- [x] 同一 thread / 同一 request 内で時刻が順序判定の補助として信頼できるか確認した
+- [x] Confirmed whether time is attached to item 
+- [x] Confirmed whether time is attached to request / resolution 
+- [x] Confirmed whether time is attached to event 
+- [x] Confirmed whether stable order can be easily obtained by time when reacquiring history 
+- [x] Confirmed whether time is reliable as an aid for determining order within the same thread / same request
 
-### Phase 2 一次判断メモ
+### Phase 2 First judgment memo
 
-- `session_id` は native `thread_id` 候補として先行可。follow-up turn でも同一 thread が再利用された
-- `message_id = native item ID` は不採用寄り。stream 側 item id と history 側 item id が一致しない
-- `turn_id` は internal/debug 用の有力候補。複数 turn でも response / stream / history で一致した
-- `event_id` は native 露出を観測できず、app-owned 採番前提で先行可
-- `message.user` は `item/completed` with `userMessage`、`message.assistant.delta` は `item/agentMessage/delta`、`message.assistant.completed` は非空 text または history materialization を伴う `item/completed` with `agentMessage` が一次候補
-- assistant text なし turn では stream に空文字 `agentMessage` lifecycle が出ても、history に assistant message が materialize されないケースがあった。公開 message projection では empty `agentMessage` を除外候補とする
-- `running` / `waiting_input` の一次候補は `thread/status/changed: active` / `thread/status/changed: idle`
-- `thread/start` だけで `idle` / `turns=[]` の thread を作成できた。first user message 前は `includeTurns=true` が unavailable で、`created` は app-owned projection 候補
-- item / event / history では時刻を観測できず、timestamp 依存の順序判断は Phase 2 時点では採れない
+- `session_id` can precede native `thread_id` candidate. 
+- `message_id = native item ID` where the same thread is reused even in follow-up turn is more likely to be rejected. The stream side item id and the history side item id do not match 
+- `turn_id` is a strong candidate for internal/debug. 
+- `event_id` that matches response / stream / history even in multiple turns cannot observe native exposure, and can be preceded with app-owned numbering 
+- `message.user` is `item/completed` with `userMessage`, `message.assistant.delta` is `item/agentMessage/delta`, `message.assistant.completed` `item/completed` with `agentMessage` with non-empty text or history materialization is the primary candidate
+- No assistant text In turn, even if an empty string `agentMessage` lifecycle appeared in the stream, the assistant message was not materialized in the history in some cases. In public message projection, empty `agentMessage` is the exclusion candidate.
+- The primary candidate for `running` / `waiting_input` is `thread/status/changed: active` / `thread/status/changed: idle`
+- `thread/start` was enough to create a thread with `idle` / `turns=[]`. Before the first user message, `includeTurns=true` was unavailable, `created` was an app-owned projection candidate 
+- item / event / history cannot observe time, and timestamp-dependent order judgment cannot be made at Phase 2.
 
-### Phase 3 一次判断メモ
+### Phase 3 First judgment memo
 
-- `request_id` は approval case で native server request id を取得でき、approve / deny / approval 中 stop の各 case で `serverRequest/resolved.params.requestId` と一致した。ただし `thread/read` history には request object 自体が materialize されず、履歴再取得だけでは再検出できない
-- `approval.requested` の第一候補は native server request `item/commandExecution/requestApproval`
-- `approval.resolved` は `serverRequest/resolved` 単体では不十分。resolution 種別も `resolved_at` も無く、approve / deny は client reply raw と相関させないと区別できない
-- `waiting_approval` の一次候補は `thread/status/changed: active[waitingOnApproval]`。pending `thread/read` でも同じ status を再取得できた
-- approval の最低確認情報では `approval_category`、`title / summary`、`operation_summary` は native 由来候補がある。一方 `description / reason`、`requested_at`、`resolved_at` は native payload では埋まらず app 補完が必要
-- approve 後は `waiting_approval -> active[] -> commandExecution completed -> final agentMessage -> idle`、deny 後は `serverRequest/resolved -> commandExecution declined -> active[] -> interrupted -> idle`、approval 中 stop 後は client approval reply 無しで `interrupted -> idle -> serverRequest/resolved` が出た
-- 通常 stop は approval 中 stop と同じく `turn.status = interrupted` と `thread.status = idle` に落ちるが、`waitingOnApproval` も `serverRequest/resolved` も無い。`interrupted` だけでは approval canceled と通常 stop を区別できない
-- terminal `completed` は native session status としては観測できず、approve 後の `idle` は `waiting_input` 側、deny / stop 後の `idle` は interrupted turn 完了後の待機状態として扱うのが妥当
-- `p3-transient-failure` では `item/completed` with `commandExecution.status = failed` と `exitCode = 42` を観測したが、turn 自体は `completed`、thread は `idle` に戻った。native の command execution failure は terminal `failed` ではなく、公開 `error.raised` の一次候補として app 側で投影するのが妥当
-- 同ケースの `thread/read` history には failed `commandExecution` item も turn error も materialize されず、残ったのは final `agentMessage` と `turn.status = completed` のみだった。failure 系は stream 由来補完が前提になる
+- `request_id` was able to obtain the native server request id in the approval case, and it matched with `serverRequest/resolved.params.requestId` in each case of approve / deny / approval and stop. However, the request object itself is not materialized in the `thread/read` history, and cannot be redetected by reacquiring the history.
+- The first candidate for `approval.requested` is the native server request `item/commandExecution/requestApproval`
+- `approval.resolved` is not sufficient for `serverRequest/resolved` alone. There is no resolution type or `resolved_at`, and approve / deny cannot be distinguished unless correlated with client reply raw.
+- The primary candidate for `waiting_approval` is `thread/status/changed: active[waitingOnApproval]`. I was able to reacquire the same status even with pending `thread/read`
+- In the minimum confirmation information for approval, `approval_category`, `title/summary`, and `operation_summary` have native origin candidates. On the other hand, `description / reason`, `requested_at`, `resolved_at` are not filled in the native payload and require app completion
+- After approve, `waiting_approval -> active[] -> commandExecution completed -> final agentMessage -> idle`, after deny, `serverRequest/resolved -> commandExecution declined -> active[] -> interrupted -> idle`, approval After middle stop, `interrupted -> idle -> serverRequest/resolved` appeared without client approval reply 
+- Normally, stop falls to `turn.status = interrupted` and `thread.status = idle` like stop during approval, but there is no `waitingOnApproval` or `serverRequest/resolved`. `interrupted` alone cannot distinguish between approval canceled and normal stop.
+- terminal `completed` cannot be observed as native session status, `idle` after approve is treated as `waiting_input` side, and `idle` after deny/stop is treated as waiting state after interrupted turn completion.
+- In `p3-transient-failure`, `item/completed` with `commandExecution.status = failed` `exitCode = 42` was observed, but the turn itself was `completed` and the thread returned to `idle`. It is appropriate to project native command execution failure on the app side as a primary candidate for public `error.raised` instead of terminal `failed`.
+- In the same case, neither failed `commandExecution` item nor turn error were materialized in the `thread/read` history, and only final `agentMessage` and `turn.status = completed` remained. Failure systems require stream-derived completion.
 
-### Phase 4 最終判断メモ
+### Phase 4 Final Judgment Memo
 
-- `p4-stream-disconnect-reload` と `p4-initial-history-only-load` の両方で、messages は history 主体で再構築できた
-- 同 2 ケースで approval request payload、native `request_id`、approval `itemId` は history に materialize されず、approval resource は history-only では再構築できなかった
-- pending approval の latest status は `thread.status = active[waitingOnApproval]` と latest turn `status = inProgress` から history だけで再推定できた
-- `sequence` と `event_id` は native だけでは安定しない。approval event 欠落と event identity 不在のため app-owned 前提に倒すのが妥当
-- `updatedAt` は同一状態の再読込で変化せず、同一 thread / 同一 request 内の順序判定補助としては信頼できない
-- `preview` は latest turn ではなく古い prompt を保持するケースがあり、公開 session summary に流用するなら app 側 overlay を検討すべき
-- `session_id = native thread ID` は採用可、`message_id = native item ID` は不採用、`approval_id = native request ID` は debug 候補にはなるが公開安定 ID としては不採用寄り
-- `session start` は native primitive ではなく App-owned facade action として確定してよい
+- In both `p4-stream-disconnect-reload` and `p4-initial-history-only-load`, messages could be reconstructed mainly in history
+- In the same two cases, approval request payload, native `request_id`, and approval `itemId` were not materialized into history, and approval resource was history-only. 
+- The latest status of pending approval, which could not be reconstructed, could be re-estimated using only history from `thread.status = active[waitingOnApproval]` and latest turn `status = inProgress`.
+- `sequence` and `event_id` are not stable with only native. Due to missing approval event and event identity, it is reasonable to assume that it is app-owned 
+- `updatedAt` does not change when reloading the same state, and is unreliable as an aid for determining the order within the same thread / same request 
+- `preview` may retain the old prompt instead of the latest turn, so if you want to use it for the public session summary, you should consider overlay on the app side.
+- `session_id = native thread ID` can be adopted, `message_id = native item ID` cannot be adopted, `approval_id = native request ID` is a debug candidate but is not suitable as a public stable ID 
+- `session start` can be determined as an app-owned facade action rather than a native primitive
 
-## K. 最終判定
+## K. Final verdict
 
-### 必須確定
+### RequiredConfirm
 
-- [x] `session_id = native thread ID` 採用可否を確定
-- [x] `message_id = native item ID` 採用可否を確定
-- [x] `approval_id = native request ID` 採用可否を確定
-- [x] `sequence = app-owned` を確定
-- [x] `session start` を App-owned façade action とするか確定
-- [x] app-owned 必須情報を列挙した
-- [x] approval 最低確認情報の取得元を列挙した
-- [x] approval 解決後メタデータの取得元を列挙した
+- [x] `session_id = native thread ID` Confirm whether to adopt 
+- [x] `message_id = native item ID` Confirm whether to adopt 
+- [x] `approval_id = native request ID` Confirm whether to adopt 
+- [x] Confirm `sequence = app-owned` 
+- [x] `session start` to App-owned Façade action Confirmed 
+- [x] app-owned Listed the required information 
+- [x] approval Listed the sources for obtaining the minimum confirmation information 
+- [x] approval Listed the sources for obtaining the metadata after resolution
 
-### 条件付き確定
+### Conditional confirmation
 
-- [x] `turn_id` を internal only で保持する価値を確定
-- [x] `event_id` を native 流用するか app-owned にするか確定
+- [x] Determine the value of keeping `turn_id` as internal only 
+- [x] Determine whether to use `event_id` as native or app-owned.
 
-### 保留でも先に進める判断
+### Judgment to proceed even if pending
 
-- [x] `turn_id` は未判定でも debug / internal 補助のみで進められる
-- [x] `event_id` は未判定でも app-owned で進められる
-- [x] `approval_id` は未判定でも runtime stable key で進められる
-- [x] `session start` は未判定でも façade action として進められる
+- [x] `turn_id` can be advanced only with debug / internal assistance even if undetermined 
+- [x] `event_id` can be advanced with app-owned even if undetermined 
+- [x] `approval_id` can be advanced with runtime stable key even if undetermined 
+- [x] `session start` can be advanced as façade action even if undetermined
 
 ---
 
-# 最終成果物テンプレート（修正版）
+# Final deliverable template (revised version)
 
-## 1. ID 安定性一覧
+## 1. ID stability list
 
-### 必須
+### Required
 
-- thread ID  
-  - 判定: 採用
-  - 取得可否: 可
-  - 再取得後同一性: follow-up turn、disconnect reload、initial history-only load で同一
-  - `session_id` 流用可否: 可
-  - 保留時のデフォルト判断: なし
+- thread ID 
+ - Judgment: Adoption
+ - Acquisition availability: Possible
+ - Identity after reacquisition: Same for follow-up turn, disconnect reload, initial history-only load
+ - `session_id` Reusability: Possible
+ - Default judgment when pending: None
 
-- item ID  
-  - 判定: 不採用
-  - 取得可否: 可
-  - `message_id` 流用可否: 不可
-  - delta/completed との対応: stream 側 item id と history 側 item id が一致しない
-  - 保留時のデフォルト判断: app-owned message stable key を使う
+- item ID 
+ - Judgment: Rejected
+ - Can be obtained: Possible
+ - `message_id` Can be used: Not 
+ - Correspondence with delta/completed: Item id on stream side and item id on history side do not match 
+ - Default judgment when pending: Use app-owned message stable key
 
-- request ID  
-  - 判定: 不採用
-  - 取得可否: approval server request 上では可
-  - pending/resolved 再取得時の同一性: stream 上では同一だが history 再取得では消える
-  - `approval_id` 流用可否: 公開安定 ID としては不可
-  - 保留時のデフォルト判断: runtime stable key を使う
+- request ID 
+ - Judgment: Rejected
+ - Can be obtained: Possible on approval server request 
+ - pending/resolved Identity when reacquired: Same on stream, but disappears when history is reacquired 
+ - `approval_id` Possibility of reuse: Not available as a public stable ID 
+ - Default judgment when pending: Use runtime stable key
 
-### 条件付き
+### Conditional
 
-- turn ID  
-  - 判定: 採用
-  - 取得可否: 可
-  - 同一性: response / stream / history / reload で安定
-  - internal only 利用価値: 高い
-  - 保留時のデフォルト判断: debug / internal 補助のみで保持する
+- turn ID 
+ - Judgment: Adoption
+ - Acquisition availability: Possible 
+ - Identity: Stable with response / stream / history / reload 
+ - internal only Usage value: High 
+ - Default judgment when on hold: Keep only with debug / internal assistance
 
-- event ID  
-  - 判定: 不採用
-  - 取得可否: 不可
-  - 安定性: 未観測
-  - 流用価値: 無い
-  - 保留時のデフォルト判断: app-owned event stable key を使う
+- event ID 
+ - Judgment: Rejected
+ - Obtainability: Not possible 
+ - Stability: Not observed 
+ - Value for diversion: None 
+ - Default judgment when pending: Use app-owned event stable key
 
-## 2. native signal / event 対応表
+## 2. Native signal / event correspondence table
 
 - native signal: `item/completed` with `userMessage`
 - internal event: `message.user`
 - public event: `message.user`
-- 補足: history materialization と整合する
-- 判定: 採用
+- Supplement: 
+- consistent with history materialization Judgment: Adopted
 
 - native signal: `item/agentMessage/delta`
 - internal event: `message.assistant.delta`
 - public event: `message.assistant.delta`
-- 補足: stream 補助専用で、history-only では再生できない
-- 判定: 採用
+- Note: stream auxiliary only, cannot be played in history-only 
+- Judgment: Adopted
 
-- native signal: non-empty `item/completed` with `agentMessage` または history materialization
+- native signal: non-empty `item/completed` with `agentMessage` or history materialization
 - internal event: `message.assistant.completed`
 - public event: `message.assistant.completed`
-- 補足: empty `agentMessage` は projection から除外候補
-- 判定: 採用
+- Note: empty `agentMessage` is a candidate for exclusion from projection
+- Judgment: Adopted
 
 - native signal: server request `item/commandExecution/requestApproval`
 - internal event: `approval.requested`
 - public event: `approval.requested`
-- 補足: history には残らないため runtime snapshot が必要
-- 判定: 採用
+- Supplement: runtime snapshot is required because it is not recorded in history
+- Judgment: Adopted
 
-- native signal: `serverRequest/resolved` 単体は不足
+- native signal: `serverRequest/resolved` alone is insufficient
 - internal event: `approval.resolved`
 - public event: `approval.resolved`
-- 補足: resolution 種別と `resolved_at` は client reply/raw correlation で補完が必要
-- 判定: 保留だが先行可
+- Supplement: resolution type and `resolved_at` need to be complemented with reply client/raw correlation
+- Judgment: Pending but can be preceded
 
 - native signal: `item/completed` with `commandExecution.status = failed`
 - internal event: `error.raised`
 - public event: `error.raised`
-- 補足: terminal session failed ではない
-- 判定: 採用
+- Supplement: 
+- not terminal session failed Judgment: Adopted
 
-## 3. create / start semantics 判断
+## 3. create / start semantics judgment
 
-- native thread 作成だけで idle に置けるか: 置ける
-- `start without input` 的 primitive の有無: 無い
-- `session start` を App-owned façade action にすべきか: すべき
-- 判定: 採用
-- 補足: `thread/start` は create primitive、activity 開始は `turn/start`
+- Can I put it in idle by just creating a native thread? Can I put 
+- `start without input` primitive? No 
+- Should I make `session start` an app-owned façade action? Should I 
+- Decision: Adopt 
+- Supplement: `thread/start` is create primitive, activity start is `turn/start`
 
-## 4. status マッピング表
+## 4. status mapping table
 
-- native 観測: `thread/status/changed: active`
+- native Observation: `thread/status/changed: active`
 - internal/public status: `running`
-- 判定条件: `activeFlags = []`
-- runtime 補完要否: 不要
-- 判定: 採用
+- Judgment condition: `activeFlags = []`
+- runtime Completion required: Not required
+- Judgment: Adopted
 
-- native 観測: `thread/status/changed: idle` after completed turn
+- native observation: `thread/status/changed: idle` after completed turn
 - internal/public status: `waiting_input`
-- 判定条件: completed turn 後に idle へ戻る
-- runtime 補完要否: 不要
-- 判定: 採用
+- Judgment condition: Return to idle after completed turn
+- runtime Completion required: Not required
+- Judgment: Adopted
 
-- native 観測: `thread/status/changed: active[waitingOnApproval]`
+- native observation: `thread/status/changed: active[waitingOnApproval]`
 - internal/public status: `waiting_approval`
-- 判定条件: `activeFlags` に `waitingOnApproval`
-- runtime 補完要否: 不要
-- 判定: 採用
+- Judgment condition: `waitingOnApproval`
+- runtime completion required: Not required
+- Judgment: Adopted
 
-- native 観測: `turn.status = interrupted` and `thread.status = idle`
+- native observation: `turn.status = interrupted` and `thread.status = idle`
 - internal/public status: `stopped`
-- 判定条件: stop 系の raw request 相関が必要
-- runtime 補完要否: 要
-- 判定: 保留だが先行可
+- Judgment condition: stop raw request correlation required 
+- runtime completion required: required 
+- Judgment: Pending but possible to advance
 
-- native 観測: `item/completed` with `commandExecution.status = failed`
+- native observation: `item/completed` with `commandExecution.status = failed`
 - internal/public status: `failed`
-- 判定条件: session terminal ではなく `error.raised` 投影側で扱う
-- runtime 補完要否: 要
-- 判定: 保留だが先行可
+- Judgment condition: `error.raised` rather than session terminal 
+- runtime completion required on projection side: Required 
+- Judgment: Pending but possible to proceed
 
-- native 観測: approve 後も final state は `idle`
+- native observation: Even after approval, the final state is `idle`
 - internal/public status: `completed`
-- 判定条件: native session terminal status では置かない
-- runtime 補完要否: 要
-- 判定: 不採用
+- Judgment condition: Not placed in native session terminal status 
+- Runtime completion required: Required 
+- Judgment: Rejected
 
-## 5. approval 最低確認情報の取得元
+## 5. approval Source of minimum confirmation information
 
 - `approval_category`: request method `item/commandExecution/requestApproval`
-- `title / summary`: `params.command` を要約に流用
-- `description / reason`: native では欠落。必要なら `command` と `cwd` から app 合成
-- `operation_summary`: `params.command`, `cwd`, `commandActions`, `availableDecisions`
-- `requested_at`: native では欠落。runtime の server request 受信時刻
-- 欠ける場合の app 補完要否: 要
+- `title / summary`: `params.command` is used for summary 
+- `description / reason`: Missing in native. app synthesis from `command` and `cwd` if necessary 
+- `operation_summary`: `params.command`, `cwd`, ​​`commandActions`, `availableDecisions`
+- `requested_at`: Missing in native. Runtime server request reception time 
+- Necessity of app completion if missing: Required
 
-## 6. approval 解決後メタデータの取得元
+## 6. Approval Source of post-resolution metadata
 
-- `resolved_at`: native では欠落。runtime の client reply / `serverRequest/resolved` 受信時刻
-- 欠ける場合の app 補完要否: 要
+- `resolved_at`: Missing in native. Runtime client reply / `serverRequest/resolved` Reception time 
+- Necessity of app completion if missing: Yes
 
-## 7. app-owned 必須項目
+## 7. app-owned Required field
 
-- `workspace_id`: multi-session grouping 用に保持推奨
-- `sequence`: 必須
-- `active_approval_id`: 必須
-- session overlay: preview 補正と UI 向け summary のため必要候補
-- idempotency key: request replay / reconnect 耐性のため必要候補
-- 必要なら approval stable key: 必須候補
-- 必要なら event stable key: 必須候補
+- `workspace_id`: Recommended to keep for multi-session grouping 
+- `sequence`: Required 
+- `active_approval_id`: Required 
+- session overlay: Required candidate for preview correction and summary for UI 
+- idempotency key: Request required candidate for replay / reconnect resistance 
+- Approval stable key if necessary: Required candidate 
+- If necessary, event stable key: Required candidate
 
-## 8. 保留時のデフォルト判断
+## 8. Default judgment when on hold
 
-- `turn_id` は debug / internal 補助のみに使う
-- `event_id` は app-owned
-- `approval_id` は runtime stable key
-- `session start` は App-owned façade action
-- `sequence` は app-owned
+- `turn_id` is used only for debug / internal assistance
+- `event_id` is app-owned
+- `approval_id` is the runtime stable key
+- `session start` is App-owned façade action
+- `sequence` is app-owned

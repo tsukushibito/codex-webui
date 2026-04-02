@@ -1,9 +1,9 @@
-# app-server 観測成果物保存ルール
+# app-server Observation Artifact Storage Rules
 
-このディレクトリは app-server 観測成果物の raw 証跡正本とする。  
-Phase 1 完了後は、`tasks/` ではなくこの配下に同じ構造で成果物を残す。
+This directory is the source-of-truth location for raw evidence from app-server observations.  
+After Phase 1 is complete, leave artifacts here in the same structure rather than under `tasks/`.
 
-## 1. ルート構造
+## 1. Root structure
 
 ```text
 artifacts/app_server_observability/
@@ -24,7 +24,7 @@ artifacts/app_server_observability/
         history/
 ```
 
-例:
+Example:
 
 ```text
 artifacts/app_server_observability/
@@ -42,19 +42,19 @@ artifacts/app_server_observability/
         history/history-0001.json
 ```
 
-## 2. ディレクトリ命名
+## 2. Directory naming
 
-- `<case_name>` は [artifacts/app_server_observability/phase_1_case_registry.md](../phase_1_case_registry.md) の予約名を使う
-- `<run_key>` は `<executed_at_utc_pathsafe>-<nonce>` とする
-- `executed_at_utc_pathsafe` は `YYYY-MM-DDTHH-mm-ss.ffffffZ` を使う
-- `nonce` は同一時刻衝突を避けるため必須とし、`r01`, `r02` のような短い連番でよい
-- どの tasks Phase で再観測したかはパスに入れず、`metadata.md` の `observed_in_tasks_phase` に残す
+- `<case_name>` uses the reserved name from [artifacts/app_server_observability/phase_1_case_registry.md](../phase_1_case_registry.md) 
+- `<run_key>` uses `<executed_at_utc_pathsafe>-<nonce>` 
+- `executed_at_utc_pathsafe` uses `YYYY-MM-DDTHH-mm-ss.ffffffZ` 
+- `nonce` is required to avoid collision at the same time, and short sequential numbers like `r01`, `r02` can be used 
+- Do not include the `tasks Phase` used for re-observation in the path. Record it in `metadata.md` as `observed_in_tasks_phase`
 
-## 3. ファイル責務
+## 3. File responsibilities
 
-- `metadata.md`: ケース説明、入力要約、バージョン、実行メタデータ
-- `ids.md`: `session_key` / `thread_id` / `request_id` の対応
-- `judgment.md`: 判定欄、保留理由、先行用デフォルト判断
+- `metadata.md`: Case description, input summary, version, execution metadata 
+- `ids.md`: mapping between `session_key` / `thread_id` / `request_id`
+- `judgment.md`: judgment entries, pending reasons, and default decisions used while proceeding
 - `requests/`: client initiated raw request
 - `responses/`: client initiated raw response
 - `server_requests/`: server initiated raw request
@@ -62,15 +62,15 @@ artifacts/app_server_observability/
 - `stream/`: raw stream event
 - `history/`: raw history snapshot
 
-## 4. 採番ルール
+## 4. Numbering rules
 
-- client initiated request / response / history snapshot は観測順に `0001` から採番する
-- 対応する client initiated raw request / response / history は同じ番号にそろえる
-- server initiated request / response があるケースでは `server-request-0001.json` と `server-response-0001.json` のように別系列で採番する
-- server initiated request とその reply は同じ番号でそろえる
-- stream はケース単位の時系列保存を基本とし、必要なら request 番号を行メモで補う
+- Client initiated request / response / history snapshots are numbered from `0001` in the order of observation
+- Use the same number for corresponding client-initiated raw request / response / history files
+- When server-initiated request / response pairs exist, use a separate series such as `server-request-0001.json` and `server-response-0001.json`
+- Pair each server-initiated request and its reply with the same number
+- Save stream data in chronological order per case, and annotate the request number if needed
 
-命名例:
+Naming example:
 
 - `requests/request-0001.json`
 - `responses/response-0001.json`
@@ -79,30 +79,30 @@ artifacts/app_server_observability/
 - `history/history-0001.json`
 - `stream/events.ndjson`
 
-JSON に落としにくい raw payload は `.txt` で保存してよいが、番号とファイル責務は変えない。
+Raw payloads that are difficult to convert to JSON can be saved as `.txt`, but the number and file responsibility will not change.
 
-## 5. ケース完了時の必須ファイル
+## 5. Required files for case completion
 
-最低限、次がそろっていれば Phase 1 の保存ルールを満たす。
+At a minimum, the preservation rules of Phase 1 are satisfied if the following are present.
 
 - `metadata.md`
 - `ids.md`
 - `judgment.md`
-- `requests/` 内の 1 件以上の raw request
-- `responses/` 内の対応する raw response
-- approval や user input request を含むケースでは `server_requests/` 内の 1 件以上の raw server request
-- approval や user input request に reply したケースでは `server_responses/` 内の対応する raw client reply
-- `stream/` 内の raw stream event または空である理由のメモ
-- `history/` 内の 1 件以上の history snapshot
+- one or more raw requests in `requests/`
+- the corresponding raw responses in `responses/`
+- one or more raw server requests in `server_requests/` for cases that include approval or user input requests
+- the corresponding raw client replies in `server_responses/` for cases that reply to approval or user input requests
+- raw stream events in `stream/`, or a note explaining why it is empty
+- one or more history snapshots in `history/`
 
-## 6. 比較ルール
+## 6. Comparison rules
 
-- 同一ケース内では request または turn 番号で比較する
-- 同一ケースの全実行は常に `observations/<case_name>/` 配下で辿る
-- ケース間では `session_key` を共通キーとして比較する
-- 差分や欠落があっても raw 証跡を削除せず、`judgment.md` に反映する
+- Compare by request or turn number within the same case 
+- All executions of the same case are always traced under `observations/<case_name>/` 
+- Compare using `session_key` as a common key between cases 
+- Even if there are differences or omissions, do not delete the raw trail and reflect it in `judgment.md`
 
-## 7. テンプレート参照
+## 7. Template reference
 
-- `metadata.md` は [artifacts/app_server_observability/phase_1_observability_spike_spec.md](../phase_1_observability_spike_spec.md) のメタデータ項目に従う
-- `judgment.md` は [artifacts/app_server_observability/phase_1_judgment_template.md](../phase_1_judgment_template.md) を起点に作る
+- `metadata.md` follows metadata items in [artifacts/app_server_observability/phase_1_observability_spike_spec.md](../phase_1_observability_spike_spec.md) 
+- `judgment.md` should be created starting from [artifacts/app_server_observability/phase_1_judgment_template.md](../phase_1_judgment_template.md)

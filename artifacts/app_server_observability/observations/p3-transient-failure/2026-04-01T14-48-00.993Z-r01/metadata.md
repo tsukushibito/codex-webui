@@ -6,11 +6,11 @@
 - executed_at_utc: `2026-04-01T14:48:00.993Z`
 - session_key: `sk-20260401-terminal-02`
 - app_server_version: `unknown`
-  source: この run では app-server 固有 version source を別保存していない。`result.thread.cliVersion` は CLI version のため採用しない。
+ source: In this run, the app-server-specific version source is not saved separately. `result.thread.cliVersion` is not adopted because it is the CLI version. 
 - runtime_version: `codex-cli 0.118.0`
-  source: `codex --version` と `responses/response-0001.json` の `result.thread.cliVersion`
-- case_description: `approvalPolicy = never` で thread を作成し、non-zero exit の shell command を 1 回だけ実行させ、command execution failure が transient failure として処理されるかを観測するケース。
-- input_summary: text input 1 件。内容は `Use a shell command to run \`printf 'boom\\n' >&2; exit 42\`, do not retry, and if it fails answer with exactly one short sentence that includes the text exit 42.`
+ source: `codex --version` and `result.thread.cliVersion`
+- of `responses/response-0001.json` case_description: Create thread with `approvalPolicy = never` and use non-zero exit A case where you want to execute a shell command only once and observe whether a command execution failure is treated as a transient failure. 
+- input_summary: text input 1 item. The content is `Use a shell command to run \`printf 'boom\\n' >&2; exit 42\`, do not retry, and if it fails answer with exactly one short sentence that includes the text exit 42.`
 - thread_id: `019d4984-0160-71f3-a4cb-764a7e596a5a`
 - request_id: `none observed`
-- operator_notes: stream では `thread/status/changed` が `active[] -> idle` と遷移した。`item/completed` で `commandExecution.status = failed` と `exitCode = 42` を観測したが、続いて final `agentMessage` が生成され、`turn/completed` は `status = completed`、final `thread/read` / `history/history-0004.json` でも thread は `idle` だった。history には failed `commandExecution` item も turn error も materialize されず、残ったのは commentary / final `agentMessage` と `turn.status = completed` だけだった。
+- operator_notes: In stream, `thread/status/changed` transitioned to `active[] -> idle`. I observed `commandExecution.status = failed` and `exitCode = 42` in `item/completed`, but then a final `agentMessage` was generated, `turn/completed` showed `status = completed`, and thread was `idle` even in final `thread/read` / `history/history-0004.json`. Neither failed `commandExecution` item nor turn error were materialized in history, and only commentary / final `agentMessage` and `turn.status = completed` remained.

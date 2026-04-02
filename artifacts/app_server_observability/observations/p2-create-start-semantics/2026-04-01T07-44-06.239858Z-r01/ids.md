@@ -7,7 +7,7 @@
 - native `request_id`: `unknown`
 - observed `turn_id`: `none observed`
 
-`thread_id` は `responses/response-0001.json` の `result.thread.id`、`stream/events.ndjson` の `thread/started.params.thread.id`、`responses/response-0003.json` の `result.thread.id` で一致した。
+`thread_id` matched with `result.thread.id` of `responses/response-0001.json`, `thread/started.params.thread.id` of `stream/events.ndjson`, and `result.thread.id` of `responses/response-0003.json`.
 
 ## Transport Request Mapping
 
@@ -21,9 +21,9 @@
 - `responses/response-0002.json`: error `includeTurns is unavailable before first user message`
 - `responses/response-0003.json`: `turns = []`
 
-このケースでは turn も item も一切 materialize されなかった。first user message 前に `includeTurns=true` で履歴を読むことはできなかった。
+In this case, neither turn nor item was materialized at all. It was not possible to read the history with `includeTurns=true` before the first user message.
 
 ## Event IDs
 
 - native `event_id`: `not observed`
-- stream で観測できた method は `thread/started` と MCP startup status 更新だけだった
+- The only methods observed in stream were `thread/started` and MCP startup status update.

@@ -1,128 +1,128 @@
-# app-server 挙動確認タスク
+# app-server Behavior Validation Tasks
 
-## 1. このディレクトリの目的
+## 1. Purpose of This Directory
 
-`tasks/` は、`codex app-server` 挙動確認を段階的に進めるための作業指示書を置くディレクトリとする。  
-設計判断の正本は [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md) に置き、`tasks/` は「どう進めるか」「何をもって完了とするか」を定義する。
+`tasks/` is the directory for work instructions that advance `codex app-server` behavior validation in stages.  
+The source of truth for design decisions lives in [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md), while `tasks/` defines how to proceed and what counts as complete.
 
-このディレクトリの文書は、正本チェックリストを更新できるだけの観測手順と判断根拠を与える責務を持つ。
-`tasks/` 側で更新対象に挙げた項目には、必ず次のいずれかが存在しなければならない。
+Documents in this directory are responsible for providing the observation procedure and judgment evidence needed to update the source-of-truth checklist.
+Any item listed as an update target on the `tasks/` side must include at least one of the following:
 
-- 実行すべきケース
-- 確認すべき観測点
-- 保存すべき証跡
-- 残すべき判定欄
-- フェーズ完了条件
+- A case to execute
+- An observation point to verify
+- Evidence to preserve
+- A judgment section to leave behind
+- A phase completion condition
 
-これらの裏付けが無い項目は、更新対象に含めない。
+Do not include any item as an update target if it lacks this support.
 
-## 2. 用語
+## 2. Terms
 
-このディレクトリで使う `Phase` は、`tasks/` 内の作業単位を指す。  
-[docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md) に書かれた正本の `Phase` 番号とは一致しない。  
-以後、曖昧さを避けるために次のように呼び分ける。
+In this directory, `Phase` refers to a unit of work within `tasks/`.  
+It does not match the numbering of the source-of-truth `Phase` values written in [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md).  
+To avoid ambiguity, use the following terminology:
 
-- `tasks Phase N`: `tasks/` 配下の作業指示書の区切り
-- `正本 Phase N`: [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md) の `## 5. 実施フェーズ` にある区切り
-- `ケース`: 1 回の観測として実行する最小単位。固有の case 名と実行時刻を持つ
-- `必須ケース`: そのフェーズを完了扱いにするために必ず観測するケース
-- `条件付き必須ケース`: 対応する checklist 項目を更新する場合に必ず観測するケース。未観測なら該当項目は未完了のまま持ち越し、更新しない
-- `任意ケース`: 実行すると判断精度は上がるが、そのフェーズ完了の必須条件ではないケース
-- `一次判断`: 後続フェーズで覆りうるが、先行実装の前提として使ってよい暫定判断
-- `最終判断`: Phase 4 で確定し、最終成果物テンプレートへ反映する判断
+- `tasks Phase N`: a boundary in the work-instruction documents under `tasks/`
+- `source-of-truth Phase N`: a boundary in `## 5. Execution Phases` of [docs/validation/app_server_behavior_validation_plan_checklist.md](../docs/validation/app_server_behavior_validation_plan_checklist.md)
+- `case`: the smallest unit executed as a single observation; each case has a unique case name and execution time
+- `required case`: a case that must be observed for the phase to count as complete
+- `conditionally required case`: a case that must be observed if the corresponding checklist item is to be updated; if unobserved, leave the item incomplete and do not update it
+- `optional case`: a case that improves judgment accuracy when executed, but is not required for phase completion
+- `preliminary judgment`: a temporary judgment that may be overturned in a later phase, but may be used as a premise for implementation work
+- `final judgment`: a judgment finalized in Phase 4 and reflected into the final deliverable template
 
-## 3. フェーズ一覧
+## 3. Phase List
 
-1. [Phase 1: 観測基盤定義](./phase_1_observability_setup.md)
-2. [Phase 2: 基本 turn 観測](./phase_2_basic_turn_observation.md)
-3. [Phase 3: approval / stop / 終端観測](./phase_3_approval_and_terminal_observation.md)
-4. [Phase 4: 再構築・最終判断](./phase_4_reconstruction_and_final_decisions.md)
+1. [Phase 1: Observation Foundation Definition](./phase_1_observability_setup.md)
+2. [Phase 2: Basic Turn Observation](./phase_2_basic_turn_observation.md)
+3. [Phase 3: Approval / Stop / Terminal Observation](./phase_3_approval_and_terminal_observation.md)
+4. [Phase 4: Reconstruction and Final Decisions](./phase_4_reconstruction_and_final_decisions.md)
 
-## 4. フェーズ依存関係
+## 4. Phase Dependencies
 
-- Phase 1 完了前に Phase 2 以降へ進まない
-- Phase 2 は message / session の基礎判断を先に固めるため、approval 系より先に実施する
-- Phase 3 は approval / stop / 異常 / 終端の観測を担当し、request ID と terminal status の一次判断を固める
-- Phase 4 は stream 非依存の復元可否、app-owned 項目、保留時デフォルト判断を最終確定する
-- 前フェーズの未観測項目を後フェーズで完了扱いにしてはならない。後続へ持ち越す場合は、保留理由と保留時のデフォルト判断を残す
+- Do not proceed to Phase 2 or later before Phase 1 is complete
+- Execute Phase 2 before approval-related work so the base judgments for message / session are fixed first
+- Phase 3 covers approval / stop / abnormal / terminal observations and fixes preliminary judgments for request IDs and terminal status
+- Phase 4 finalizes history reconstruction without stream dependence, app-owned items, and default decisions while pending
+- Do not mark unobserved items from an earlier phase as complete in a later phase. If they are carried forward, leave both the pending reason and the default decision while pending
 
-## 5. 正本との対応
+## 5. Mapping to the Source of Truth
 
-`tasks Phase` は実作業しやすい単位に畳み替えているため、`正本 Phase` とは 1 対 1 では対応しない。  
-会話や進捗報告で `Phase` という語を使う場合は、必要に応じて `tasks Phase` か `正本 Phase` を明示する。
+`tasks Phase` is folded into units that are easier to execute in practice, so it does not map 1:1 to `source-of-truth Phase`.  
+When using the word `Phase` in discussion or progress reports, explicitly say `tasks Phase` or `source-of-truth Phase` as needed.
 
-- `tasks Phase 1` は正本の `## 4. 実施方法` と `## A. 基本ログ準備` を実行に落としたもの
-- `tasks Phase 2` は正本の `Phase 1: 基本ケース観測` と `Phase 2: create / start semantics 観測` をまとめて扱い、basic signal / status / event ID の一次観測も担当する
-- `tasks Phase 3` は正本の `Phase 3: approval ケース観測` と `Phase 4: stop / 異常 / 終端観測` をまとめて扱い、approval / error / terminal signal の一次観測も担当する
-- `tasks Phase 4` は正本の `Phase 5: 再取得・再構築観測` と `## K. 最終判定` をまとめて扱う
+- `tasks Phase 1` operationalizes `## 4. Execution Method` and `## A. Basic Log Preparation` from the source of truth
+- `tasks Phase 2` combines `Phase 1: Basic Case Observation` and `Phase 2: create / start semantics observation` from the source of truth, and also handles preliminary observation of basic signal / status / event IDs
+- `tasks Phase 3` combines `Phase 3: approval case observation` and `Phase 4: stop / abnormal / terminal observation` from the source of truth, and also handles preliminary observation of approval / error / terminal signals
+- `tasks Phase 4` combines `Phase 5: re-fetch / reconstruction observation` and `## K. Final Decisions` from the source of truth
 
-更新責務の原則は次の通りとする。
+The principles for update responsibility are as follows.
 
-- `tasks Phase 1` は全フェーズで共通に使うケース命名、ログ粒度、判定メモ書式を固定する
-- `tasks Phase 2` は `thread / item / turn / event` と basic message / status の一次観測を更新する
-- `tasks Phase 3` は request ID / approval / stop / terminal status の一次観測を更新する
-- `tasks Phase 4` は Phase 2-3 の一次判断を `G. signal / event 対応確認`、`H. status マッピング確認`、`I. 履歴再構築確認`、`J. timestamp 確認`、`K. 最終判定`、最終成果物テンプレートへ統合して最終確定する
+- `tasks Phase 1` fixes case naming, log granularity, and judgment note format used across all phases
+- `tasks Phase 2` updates preliminary observations for `thread / item / turn / event` and basic message / status behavior
+- `tasks Phase 3` updates preliminary observations for request ID / approval / stop / terminal status
+- `tasks Phase 4` integrates the preliminary judgments from Phase 2-3 into `G. Signal / Event Mapping`, `H. Status Mapping`, `I. History Reconstruction`, `J. Timestamp Verification`, `K. Final Decisions`, and the final deliverable template to finalize them
 
-## 6. 共通実行ルール
+## 6. Common Execution Rules
 
-- raw request / response / stream event / history snapshot を残す
-- 各ケースに固有の case 名を付ける
-- 実行時刻を UTC で残す
-- 観測用の `session_key` を各ケースに付け、native の `session_id` 意味論は確定前に仮定しない
-- `thread_id` / `request_id` が分かる場合は `session_key` と対応付けて後追いできる形にする
-- stream と history は同一ケース単位で比較できるように保存する
-- 観測対象の `app-server version` と `runtime version` を残す
-- approval / stop / failure など更新対象ケースは、同じ粒度で raw request / response / stream event / history snapshot を残す
-- 観測結果だけでは設計判断を確定できない場合は、その不足理由を残す
-- 保留判断には必ず `保留時のデフォルト判断` を添える
-- あるフェーズの更新対象に含めた項目は、未観測のまま完了扱いにしない
+- Preserve raw request / response / stream event / history snapshot data
+- Assign each case a unique case name
+- Record execution time in UTC
+- Give each case an observation `session_key`, and do not assume the semantics of native `session_id` before they are confirmed
+- If `thread_id` / `request_id` is known, record it in a way that allows it to be traced back via `session_key`
+- Store stream and history so they can be compared within the same case unit
+- Record the observed `app-server version` and `runtime version`
+- For update-target cases such as approval / stop / failure, preserve raw request / response / stream event / history snapshot data at the same granularity
+- If design judgment cannot be fixed from the observation results alone, leave the reason for the gap
+- Every pending judgment must include a `default decision while pending`
+- Do not treat any item included in a phase's update target as complete if it remains unobserved
 
-## 7. ドキュメント更新ルール
+## 7. Document Update Rules
 
-- 作業前に対象フェーズ文書を読み、そのフェーズが更新責務を持つ項目だけを更新する
-- `docs/...checklist` の section 名だけで更新範囲を広げず、各フェーズ文書に書かれた担当項目だけを更新する
-- 判定は `採用 / 不採用 / 保留だが先行可 / 未完了` のいずれかで残す
-- 保留時は `保留時のデフォルト判断` を同時に記録する
-- 1 つの checklist 項目を更新する前に、対応するケース・証跡・判定欄が揃っていることを確認する
-- 後続フェーズへ持ち越す判断は、`未観測` と `保留だが先行可` を混同しない
-- `条件付き必須ケース` が未観測なら、そのケースに依存する checklist 項目は更新せず、判定欄を `未完了` として持ち越す
+- Before starting work, read the target phase document and update only the items for which that phase has update responsibility
+- Do not expand the update scope based only on section names in `docs/...checklist`; update only the assigned items written in each phase document
+- Leave each judgment as one of `adopt / reject / pending but safe to proceed / incomplete`
+- When a judgment is pending, record the `default decision while pending` at the same time
+- Before updating a checklist item, confirm that its corresponding case, evidence, and judgment section are all present
+- When carrying a judgment into a later phase, do not confuse `unobserved` with `pending but safe to proceed`
+- If a `conditionally required case` remains unobserved, do not update the checklist items that depend on it, and carry them forward as `incomplete`
 
-## 8. レビューサイクル
+## 8. Review Cycle
 
-`tasks/` の見直しや新規追加を行った後は、少なくとも次の 3 段階でセルフレビューする。
+After revising `tasks/` or adding new files, perform self-review in at least the following three stages.
 
-1. 構造レビュー
-   - 各 Phase の責務、依存関係、更新対象が矛盾していないか確認する
-2. 網羅性レビュー
-   - 更新対象の各項目に対して、ケース・確認項目・証跡・判定欄・完了条件の裏付けがあるか確認する
-3. 運用レビュー
-   - 実作業者が迷う表現、未観測でも完了扱いできる穴、複数解釈できる語が残っていないか確認する
+1. Structural review
+   - Confirm that the responsibilities, dependencies, and update targets of each phase are not contradictory
+2. Coverage review
+   - Confirm that each update-target item is supported by a case, verification point, evidence, judgment section, and completion condition
+3. Operational review
+   - Confirm that no ambiguous wording remains, that there are no holes allowing completion without observation, and that no term can be interpreted in multiple ways
 
-レビューで finding が出た場合は、修正後に同じ観点で再レビューする。
-`tasks/` を完了状態と呼ぶのは、最新レビューで finding が 0 件になったときだけとする。
+If review findings are identified, review again from the same perspectives after making corrections.
+Call `tasks/` complete only when the latest review produces zero findings.
 
-## 9. フェーズ完了時に残すもの
+## 9. Artifacts to Leave When Each Phase Completes
 
 ### Phase 1
 
-- 観測スパイク仕様メモ
-- ケース一覧
-- ログ保存ルール
+- Observation spike specification note
+- Case registry
+- Log storage rules
 
 ### Phase 2
 
-- 基本ケース観測ログ
-- ID 一次判定メモ
-- session / message 系の仮確定メモ
+- Basic case observation logs
+- ID preliminary judgment notes
+- Provisional notes for session / message decisions
 
 ### Phase 3
 
-- approval / terminal 観測ログ
-- approval 取得元一覧
-- status 判定メモ
+- Approval / terminal observation logs
+- Approval source registry
+- Status judgment notes
 
 ### Phase 4
 
-- 再構築観測ログ
-- 最終判定メモ
-- spec 差分候補メモ
+- Reconstruction observation logs
+- Final decision notes
+- Candidate spec delta notes

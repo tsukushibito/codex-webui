@@ -1,2 +1,2 @@
 # codex-webui
-codex向けWebUI作成プロジェクト（実験）
+Experimental project to build a WebUI for codex

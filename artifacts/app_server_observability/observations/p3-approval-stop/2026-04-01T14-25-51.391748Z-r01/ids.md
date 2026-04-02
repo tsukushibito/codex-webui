@@ -6,7 +6,7 @@
 - `thread_id`: `019d496f-b79a-7412-95c7-596844f5c2a6`
 - native `request_id`: `0`
 
-`thread_id` は `responses/response-0001.json`、`responses/response-0003.json`、`responses/response-0005.json`、`server_requests/server-request-0001.json`、`stream/events.ndjson` の全 thread 参照で一致した。native `request_id` は `server_requests/server-request-0001.json` の top-level `id = 0` と、`stream/events.ndjson` の `serverRequest/resolved.params.requestId = 0` で一致した。
+`thread_id` matched in all thread references of `responses/response-0001.json`, `responses/response-0003.json`, `responses/response-0005.json`, `server_requests/server-request-0001.json`, and `stream/events.ndjson`. Native `request_id` matched with top-level `id = 0` in `server_requests/server-request-0001.json` and `serverRequest/resolved.params.requestId = 0` in `stream/events.ndjson`.
 
 ## Transport Request Mapping
 
@@ -21,7 +21,7 @@
 - `server-request-0001.json`: server initiated JSON-RPC request id `0`, method `item/commandExecution/requestApproval`
 - `server-response`: `none observed`
 
-approval pending 中に `turn/interrupt` を送ったため、approve / deny と違って client reply to server request は存在しなかった。
+Since `turn/interrupt` was sent during approval pending, there was no client reply to server request unlike approve/deny.
 
 ## Approval Request IDs
 
@@ -30,15 +30,15 @@ approval pending 中に `turn/interrupt` を送ったため、approve / deny と
 - approval turn id: `019d496f-b951-7d81-b7e2-8e6ccd898d74`
 - approval item id: `call_1aV1K63PKowbIUOcu6BkPqhU`
 
-approval request の `threadId` / `turnId` / `itemId` は `server_requests/server-request-0001.json` で取得できた。解決時は `serverRequest/resolved` が `requestId` だけを返し、resolution enum や timestamp は含まなかった。
+`threadId` / `turnId` / `itemId` of approval request could be obtained from `server_requests/server-request-0001.json`. When resolved, `serverRequest/resolved` returned only the `requestId` and did not include the resolution enum or timestamp.
 
 ## Turn IDs
 
 - `turn_id`: `019d496f-b951-7d81-b7e2-8e6ccd898d74`
-- `history/history-0003.json` では `status = inProgress`
-- `history/history-0005.json` では `status = interrupted`
+- `status = inProgress`
+- in `history/history-0003.json` `status = interrupted` in `history/history-0005.json`
 
-`turn_id` は `responses/response-0002.json`、`server_requests/server-request-0001.json`、`requests/request-0004.json` の interrupt target、`stream/events.ndjson` の `turn/started` / `item/*` / `turn/completed`、`history/history-0003.json`、`history/history-0005.json` で一致した。
+`turn_id` is `responses/response-0002.json`, `server_requests/server-request-0001.json`, interrupt target of `requests/request-0004.json`, `turn/started` / `item/*` / of `stream/events.ndjson` Matched `turn/completed`, `history/history-0003.json`, `history/history-0005.json`.
 
 ## Item IDs
 
@@ -50,11 +50,11 @@ approval request の `threadId` / `turnId` / `itemId` は `server_requests/serve
 - history pending item ids: `item-1` (`userMessage`), `item-2` (`agentMessage`)
 - history final item ids: `item-1` (`userMessage`), `item-2` (`agentMessage` commentary)
 
-stream 側 item id と history 側 item id は今回も一致しなかった。approval request の `itemId` は request payload でのみ見え、interrupt 後に `commandExecution` item の started/completed は流れず、history にも materialize されなかった。
+The item id on the stream side and the item id on the history side did not match this time as well. The `itemId` of the approval request was visible only in the request payload, and the started/completed of the `commandExecution` item did not flow after the interrupt, nor was it materialized in the history.
 
 ## Event IDs
 
 - native `event_id`: `not observed`
-- approval 解決を識別できた native key: `serverRequest/resolved.params.requestId = 0`
+- approval Resolution could be identified native key: `serverRequest/resolved.params.requestId = 0`
 
-通知の一意キーは method と行順、および approval 系では `requestId` までしか取れていない。
+The unique keys for notifications are only method, line order, and `requestId` in the approval system.
