@@ -1,0 +1,83 @@
+{
+  "id": 6,
+  "result": {
+    "thread": {
+      "id": "019d4991-9162-7b82-8804-b539df2d37b5",
+      "preview": "Reply with exactly one short sentence: baseline ok.",
+      "ephemeral": false,
+      "modelProvider": "openai",
+      "createdAt": 1775055769,
+      "updatedAt": 1775055780,
+      "status": {
+        "type": "active",
+        "activeFlags": [
+          "waitingOnApproval"
+        ]
+      },
+      "path": "/home/dev/.codex/sessions/2026/04/02/rollout-2026-04-02T00-02-49-019d4991-9162-7b82-8804-b539df2d37b5.jsonl",
+      "cwd": "/workspace/repos/codex-webui",
+      "cliVersion": "0.118.0",
+      "source": "vscode",
+      "agentNickname": null,
+      "agentRole": null,
+      "gitInfo": {
+        "sha": "5151acd89038a29c5705261958f5b730a66d8a78",
+        "branch": "main",
+        "originUrl": "https://github.com/tsukushibito/codex-webui.git"
+      },
+      "name": null,
+      "turns": [
+        {
+          "id": "019d4991-92a7-7490-8de5-379af03eb020",
+          "items": [
+            {
+              "type": "userMessage",
+              "id": "item-1",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Reply with exactly one short sentence: baseline ok.",
+                  "text_elements": []
+                }
+              ]
+            },
+            {
+              "type": "agentMessage",
+              "id": "item-2",
+              "text": "baseline ok.",
+              "phase": "final_answer",
+              "memoryCitation": null
+            }
+          ],
+          "status": "completed",
+          "error": null
+        },
+        {
+          "id": "019d4991-a2b8-7973-8de7-e511105cb39d",
+          "items": [
+            {
+              "type": "userMessage",
+              "id": "item-3",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Use a shell command to print the exact current UTC timestamp with nanoseconds using `date -u +%Y-%m-%dT%H:%M:%S.%NZ`, then summarize it in one short sentence.",
+                  "text_elements": []
+                }
+              ]
+            },
+            {
+              "type": "agentMessage",
+              "id": "item-4",
+              "text": "I’m fetching the exact current UTC timestamp from the shell with the `date` command, then I’ll summarize the result in one short sentence.",
+              "phase": "commentary",
+              "memoryCitation": null
+            }
+          ],
+          "status": "inProgress",
+          "error": null
+        }
+      ]
+    }
+  }
+}

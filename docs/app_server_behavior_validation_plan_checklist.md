@@ -283,12 +283,12 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 
 ## I. 履歴再構築確認
 
-- [ ] stream なしで messages を再構築できる
+- [x] stream なしで messages を再構築できる
 - [ ] stream なしで approvals を再構築できる
 - [ ] pending / resolved を区別できる
-- [ ] latest status 推定の材料が履歴にある
-- [ ] `sequence` は app-owned にすべきと判断できる
-- [ ] stream 未接続の初回ロードでも復元できるか確認した
+- [x] latest status 推定の材料が履歴にある
+- [x] `sequence` は app-owned にすべきと判断できる
+- [x] stream 未接続の初回ロードでも復元できるか確認した
 
 ## J. timestamp 確認
 
@@ -296,7 +296,7 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 - [x] request / resolution に時刻が付くか確認した
 - [x] event に時刻が付くか確認した
 - [x] 履歴再取得時に時刻で安定順序が取りやすいか確認した
-- [ ] 同一 thread / 同一 request 内で時刻が順序判定の補助として信頼できるか確認した
+- [x] 同一 thread / 同一 request 内で時刻が順序判定の補助として信頼できるか確認した
 
 ### Phase 2 一次判断メモ
 
@@ -323,30 +323,41 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 - `p3-transient-failure` では `item/completed` with `commandExecution.status = failed` と `exitCode = 42` を観測したが、turn 自体は `completed`、thread は `idle` に戻った。native の command execution failure は terminal `failed` ではなく、公開 `error.raised` の一次候補として app 側で投影するのが妥当
 - 同ケースの `thread/read` history には failed `commandExecution` item も turn error も materialize されず、残ったのは final `agentMessage` と `turn.status = completed` のみだった。failure 系は stream 由来補完が前提になる
 
+### Phase 4 最終判断メモ
+
+- `p4-stream-disconnect-reload` と `p4-initial-history-only-load` の両方で、messages は history 主体で再構築できた
+- 同 2 ケースで approval request payload、native `request_id`、approval `itemId` は history に materialize されず、approval resource は history-only では再構築できなかった
+- pending approval の latest status は `thread.status = active[waitingOnApproval]` と latest turn `status = inProgress` から history だけで再推定できた
+- `sequence` と `event_id` は native だけでは安定しない。approval event 欠落と event identity 不在のため app-owned 前提に倒すのが妥当
+- `updatedAt` は同一状態の再読込で変化せず、同一 thread / 同一 request 内の順序判定補助としては信頼できない
+- `preview` は latest turn ではなく古い prompt を保持するケースがあり、公開 session summary に流用するなら app 側 overlay を検討すべき
+- `session_id = native thread ID` は採用可、`message_id = native item ID` は不採用、`approval_id = native request ID` は debug 候補にはなるが公開安定 ID としては不採用寄り
+- `session start` は native primitive ではなく App-owned facade action として確定してよい
+
 ## K. 最終判定
 
 ### 必須確定
 
-- [ ] `session_id = native thread ID` 採用可否を確定
-- [ ] `message_id = native item ID` 採用可否を確定
-- [ ] `approval_id = native request ID` 採用可否を確定
-- [ ] `sequence = app-owned` を確定
-- [ ] `session start` を App-owned façade action とするか確定
-- [ ] app-owned 必須情報を列挙した
-- [ ] approval 最低確認情報の取得元を列挙した
-- [ ] approval 解決後メタデータの取得元を列挙した
+- [x] `session_id = native thread ID` 採用可否を確定
+- [x] `message_id = native item ID` 採用可否を確定
+- [x] `approval_id = native request ID` 採用可否を確定
+- [x] `sequence = app-owned` を確定
+- [x] `session start` を App-owned façade action とするか確定
+- [x] app-owned 必須情報を列挙した
+- [x] approval 最低確認情報の取得元を列挙した
+- [x] approval 解決後メタデータの取得元を列挙した
 
 ### 条件付き確定
 
-- [ ] `turn_id` を internal only で保持する価値を確定
-- [ ] `event_id` を native 流用するか app-owned にするか確定
+- [x] `turn_id` を internal only で保持する価値を確定
+- [x] `event_id` を native 流用するか app-owned にするか確定
 
 ### 保留でも先に進める判断
 
-- [ ] `turn_id` は未判定でも debug / internal 補助のみで進められる
-- [ ] `event_id` は未判定でも app-owned で進められる
-- [ ] `approval_id` は未判定でも runtime stable key で進められる
-- [ ] `session start` は未判定でも façade action として進められる
+- [x] `turn_id` は未判定でも debug / internal 補助のみで進められる
+- [x] `event_id` は未判定でも app-owned で進められる
+- [x] `approval_id` は未判定でも runtime stable key で進められる
+- [x] `session start` は未判定でも façade action として進められる
 
 ---
 
@@ -357,94 +368,154 @@ stream を切るケースと、stream を一度も見ていない初回ロード
 ### 必須
 
 - thread ID  
-  - 判定: 採用 / 不採用 / 保留だが先行可  
-  - 取得可否  
-  - 再取得後同一性  
-  - `session_id` 流用可否  
-  - 保留時のデフォルト判断
+  - 判定: 採用
+  - 取得可否: 可
+  - 再取得後同一性: follow-up turn、disconnect reload、initial history-only load で同一
+  - `session_id` 流用可否: 可
+  - 保留時のデフォルト判断: なし
 
 - item ID  
-  - 判定: 採用 / 不採用 / 保留だが先行可  
-  - 取得可否  
-  - `message_id` 流用可否  
-  - delta/completed との対応  
-  - 保留時のデフォルト判断
+  - 判定: 不採用
+  - 取得可否: 可
+  - `message_id` 流用可否: 不可
+  - delta/completed との対応: stream 側 item id と history 側 item id が一致しない
+  - 保留時のデフォルト判断: app-owned message stable key を使う
 
 - request ID  
-  - 判定: 採用 / 不採用 / 保留だが先行可  
-  - 取得可否  
-  - pending/resolved 再取得時の同一性  
-  - `approval_id` 流用可否  
-  - 保留時のデフォルト判断
+  - 判定: 不採用
+  - 取得可否: approval server request 上では可
+  - pending/resolved 再取得時の同一性: stream 上では同一だが history 再取得では消える
+  - `approval_id` 流用可否: 公開安定 ID としては不可
+  - 保留時のデフォルト判断: runtime stable key を使う
 
 ### 条件付き
 
 - turn ID  
-  - 判定: 採用 / 不採用 / 保留だが先行可  
-  - 取得可否  
-  - 同一性  
-  - internal only 利用価値  
-  - 保留時のデフォルト判断
+  - 判定: 採用
+  - 取得可否: 可
+  - 同一性: response / stream / history / reload で安定
+  - internal only 利用価値: 高い
+  - 保留時のデフォルト判断: debug / internal 補助のみで保持する
 
 - event ID  
-  - 判定: 採用 / 不採用 / 保留だが先行可  
-  - 取得可否  
-  - 安定性  
-  - 流用価値  
-  - 保留時のデフォルト判断
+  - 判定: 不採用
+  - 取得可否: 不可
+  - 安定性: 未観測
+  - 流用価値: 無い
+  - 保留時のデフォルト判断: app-owned event stable key を使う
 
 ## 2. native signal / event 対応表
 
-- native signal:
-- internal event:
-- public event:
-- 補足:
-- 判定: 採用 / 不採用 / 保留だが先行可
+- native signal: `item/completed` with `userMessage`
+- internal event: `message.user`
+- public event: `message.user`
+- 補足: history materialization と整合する
+- 判定: 採用
+
+- native signal: `item/agentMessage/delta`
+- internal event: `message.assistant.delta`
+- public event: `message.assistant.delta`
+- 補足: stream 補助専用で、history-only では再生できない
+- 判定: 採用
+
+- native signal: non-empty `item/completed` with `agentMessage` または history materialization
+- internal event: `message.assistant.completed`
+- public event: `message.assistant.completed`
+- 補足: empty `agentMessage` は projection から除外候補
+- 判定: 採用
+
+- native signal: server request `item/commandExecution/requestApproval`
+- internal event: `approval.requested`
+- public event: `approval.requested`
+- 補足: history には残らないため runtime snapshot が必要
+- 判定: 採用
+
+- native signal: `serverRequest/resolved` 単体は不足
+- internal event: `approval.resolved`
+- public event: `approval.resolved`
+- 補足: resolution 種別と `resolved_at` は client reply/raw correlation で補完が必要
+- 判定: 保留だが先行可
+
+- native signal: `item/completed` with `commandExecution.status = failed`
+- internal event: `error.raised`
+- public event: `error.raised`
+- 補足: terminal session failed ではない
+- 判定: 採用
 
 ## 3. create / start semantics 判断
 
-- native thread 作成だけで idle に置けるか:
-- `start without input` 的 primitive の有無:
-- `session start` を App-owned façade action にすべきか:
-- 判定: 採用 / 不採用 / 保留だが先行可
-- 補足:
+- native thread 作成だけで idle に置けるか: 置ける
+- `start without input` 的 primitive の有無: 無い
+- `session start` を App-owned façade action にすべきか: すべき
+- 判定: 採用
+- 補足: `thread/start` は create primitive、activity 開始は `turn/start`
 
 ## 4. status マッピング表
 
-- native 観測:
-- internal/public status:
-- 判定条件:
-- runtime 補完要否:
-- 判定: 採用 / 不採用 / 保留だが先行可
+- native 観測: `thread/status/changed: active`
+- internal/public status: `running`
+- 判定条件: `activeFlags = []`
+- runtime 補完要否: 不要
+- 判定: 採用
+
+- native 観測: `thread/status/changed: idle` after completed turn
+- internal/public status: `waiting_input`
+- 判定条件: completed turn 後に idle へ戻る
+- runtime 補完要否: 不要
+- 判定: 採用
+
+- native 観測: `thread/status/changed: active[waitingOnApproval]`
+- internal/public status: `waiting_approval`
+- 判定条件: `activeFlags` に `waitingOnApproval`
+- runtime 補完要否: 不要
+- 判定: 採用
+
+- native 観測: `turn.status = interrupted` and `thread.status = idle`
+- internal/public status: `stopped`
+- 判定条件: stop 系の raw request 相関が必要
+- runtime 補完要否: 要
+- 判定: 保留だが先行可
+
+- native 観測: `item/completed` with `commandExecution.status = failed`
+- internal/public status: `failed`
+- 判定条件: session terminal ではなく `error.raised` 投影側で扱う
+- runtime 補完要否: 要
+- 判定: 保留だが先行可
+
+- native 観測: approve 後も final state は `idle`
+- internal/public status: `completed`
+- 判定条件: native session terminal status では置かない
+- runtime 補完要否: 要
+- 判定: 不採用
 
 ## 5. approval 最低確認情報の取得元
 
-- `approval_category`:
-- `title / summary`:
-- `description / reason`:
-- `operation_summary`:
-- `requested_at`:
-- 欠ける場合の app 補完要否:
+- `approval_category`: request method `item/commandExecution/requestApproval`
+- `title / summary`: `params.command` を要約に流用
+- `description / reason`: native では欠落。必要なら `command` と `cwd` から app 合成
+- `operation_summary`: `params.command`, `cwd`, `commandActions`, `availableDecisions`
+- `requested_at`: native では欠落。runtime の server request 受信時刻
+- 欠ける場合の app 補完要否: 要
 
 ## 6. approval 解決後メタデータの取得元
 
-- `resolved_at`:
-- 欠ける場合の app 補完要否:
+- `resolved_at`: native では欠落。runtime の client reply / `serverRequest/resolved` 受信時刻
+- 欠ける場合の app 補完要否: 要
 
 ## 7. app-owned 必須項目
 
-- `workspace_id`
-- `sequence`
-- `active_approval_id`
-- session overlay
-- idempotency key
-- 必要なら approval stable key
-- 必要なら event stable key
+- `workspace_id`: multi-session grouping 用に保持推奨
+- `sequence`: 必須
+- `active_approval_id`: 必須
+- session overlay: preview 補正と UI 向け summary のため必要候補
+- idempotency key: request replay / reconnect 耐性のため必要候補
+- 必要なら approval stable key: 必須候補
+- 必要なら event stable key: 必須候補
 
 ## 8. 保留時のデフォルト判断
 
-- `turn_id` は安定性が弱ければ debug / internal 補助のみ
-- `event_id` は安定性が弱ければ app-owned
-- `approval_id` は native に stable ID が無ければ runtime stable key
-- `session start` は native primitive が弱ければ App-owned façade action
-- `sequence` は native に明確な安定連番が無ければ app-owned
+- `turn_id` は debug / internal 補助のみに使う
+- `event_id` は app-owned
+- `approval_id` は runtime stable key
+- `session start` は App-owned façade action
+- `sequence` は app-owned

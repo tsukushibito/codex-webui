@@ -1,0 +1,35 @@
+{
+  "method": "item/commandExecution/requestApproval",
+  "id": 0,
+  "params": {
+    "threadId": "019d4991-9162-7b82-8804-b539df2d37b5",
+    "turnId": "019d4991-a2b8-7973-8de7-e511105cb39d",
+    "itemId": "call_F4qrZaXxwxCgxKezesJaS7bQ",
+    "command": "/bin/bash -lc 'date -u +%Y-%m-%dT%H:%M:%S.%NZ'",
+    "cwd": "/workspace/repos/codex-webui",
+    "commandActions": [
+      {
+        "type": "unknown",
+        "command": "date -u +%Y-%m-%dT%H:%M:%S.%NZ"
+      }
+    ],
+    "proposedExecpolicyAmendment": [
+      "date",
+      "-u",
+      "+%Y-%m-%dT%H:%M:%S.%NZ"
+    ],
+    "availableDecisions": [
+      "accept",
+      {
+        "acceptWithExecpolicyAmendment": {
+          "execpolicy_amendment": [
+            "date",
+            "-u",
+            "+%Y-%m-%dT%H:%M:%S.%NZ"
+          ]
+        }
+      },
+      "cancel"
+    ]
+  }
+}
