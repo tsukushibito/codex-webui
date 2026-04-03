@@ -21,6 +21,7 @@
 - Implement SQLite-backed workspace registry and `workspace_id <-> session_id` correspondence helpers
 - Implement workspace root validation, workspace directory creation, and exclusion-aware directory enumeration helpers
 - Expose internal workspace creation and listing endpoints required for follow-up session lifecycle work
+- Wire the managed `codex app-server` supervisor into runtime startup and shutdown
 - Add targeted automated coverage for the new foundation
 
 ## Exit criteria
@@ -39,13 +40,13 @@
 ## Artifacts / evidence
 
 - Code under `apps/codex-runtime/`
-- Test evidence from `npm test` in `apps/codex-runtime/`
+- Validation evidence from `npm run build` and `npm test` in `apps/codex-runtime/`
 
 ## Status / handoff notes
 
-- Status: `in progress`
-- Notes: This package covers the first implementation slice only. Follow-up slices still need session lifecycle, active-session enforcement, approval handling, SSE, recovery, and broader app-server lifecycle behavior.
+- Status: `complete`
+- Notes: Issue #64 scope is complete in this package. The runtime now boots and stops the managed app-server alongside the Fastify lifecycle, while workspace registry and `workspace_id <-> session_id` foundations remain in place for follow-up session lifecycle work under other issues.
 
 ## Archive conditions
 
-- Archive this package when the scoped runtime foundation is implemented, tests pass, and the handoff notes are updated for the next slice.
+- Archive this package when the scoped runtime foundation is implemented, validations pass, and the Issue/Project tracking has been updated to reflect completion.

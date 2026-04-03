@@ -63,3 +63,4 @@ Each active task package `README.md` must include at least the following section
 ## Archived Task Packages
 
 - [app_server_behavior_validation](./archive/app_server_behavior_validation/README.md)
+- [issue-64-phase-3a-foundation](./archive/issue-64-phase-3a-foundation/README.md)
