@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub Projects Ops"
+  short_description: "Operate codex-webui GitHub Projects workflow"
+  default_prompt: "Use $codex-webui-github-projects to manage roadmap items, fields, and issue flow for this repo."
