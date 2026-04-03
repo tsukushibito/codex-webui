@@ -45,6 +45,13 @@ Do not use this skill when:
 7. If the second evaluator rejection still blocks completion, return to `planner` for replanning or a narrower slice.
 8. Finish the sprint only when `evaluator` returns `approved`.
 
+## Agent State Checks
+
+- Do not treat a TUI status such as `Starting MCP servers ... serena` as sufficient evidence that a subagent is stuck.
+- Before declaring a subagent stalled, check `wait_agent`, any delivered subagent notifications, and any available local logs or other execution evidence.
+- If logs show the subagent is already issuing tool calls or producing side effects, treat the problem as a UI/status-reporting issue rather than an actual startup hang.
+- If a subagent must be terminated, verify whether it already performed work so the next agent can reuse or review that state instead of duplicating it.
+
 ## Role Boundaries
 
 - `planner` is read-only and defines the sprint slice
@@ -52,6 +59,7 @@ Do not use this skill when:
 - `evaluator` is read-only and acts as a hard gate
 - Do not run concurrent write passes on the same sprint slice
 - Do not silently weaken planner acceptance criteria to get an approval
+- Do not let `planner` or `evaluator` mutate the worktree, create commits, push branches, or update GitHub Issues/Projects
 
 ## Required Final Output
 
