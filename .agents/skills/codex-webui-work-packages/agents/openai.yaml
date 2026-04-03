@@ -1,0 +1,4 @@
+interface:
+  display_name: "Work Package Ops"
+  short_description: "Operate local tasks packages for codex-webui"
+  default_prompt: "Use $codex-webui-work-packages to manage local task packages in tasks/ and keep them aligned with linked Issues."

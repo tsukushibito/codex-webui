@@ -9,6 +9,8 @@ description: Manage GitHub Projects for this `codex-webui` repository using the 
 
 Use GitHub Projects as the execution layer for this repository, not as the source of truth. Keep maintained requirements, specifications, and roadmap decisions in `docs/`; keep active work packages in `tasks/`; keep evidence in `artifacts/`.
 
+This skill owns GitHub-side execution tracking. If the user needs to create, update, or archive a local task package under `tasks/`, use `codex-webui-work-packages` for that part and keep this skill focused on Issues, Project items, fields, and workflow state.
+
 ## Build Context
 
 Read these files before changing the Project shape or roadmap items:
@@ -24,6 +26,7 @@ If editing issues tied to a specific area, read the nearest relevant README in t
 
 - Treat `docs/` as the source of truth for scope, decisions, and completion criteria.
 - Use GitHub Projects to track execution state, ownership, sequencing, and review flow.
+- Keep local task-package mechanics in `codex-webui-work-packages`; only store short execution links and summaries in Issues.
 - Avoid duplicating long roadmap text into the Project README or issue bodies unless the duplication materially helps execution.
 - Preserve terminology already used in nearby docs: `Phase`, `Runtime`, `BFF`, `UI`, `Validation`, `Infra`.
 - Prefer updating the existing Project instead of creating a competing Project, unless the user explicitly wants a new one.
@@ -118,6 +121,13 @@ When the user asks to maintain the roadmap Project:
 4. Create or update issues to match the roadmap's current phase breakdown.
 5. Add items to the Project and set `Phase`, `Area`, `Priority`, and `Status`.
 6. Verify the result with `gh project view`, `gh project item-list`, or GraphQL field-value queries.
+
+When an Issue also uses a local task package:
+
+1. Read `tasks/README.md` and check the linked package state.
+2. Keep only a short `Execution` section and package links in the Issue.
+3. Let `codex-webui-work-packages` handle package creation, README updates, and archive moves.
+4. After the package state changes, update the Issue and Project status to match.
 
 ## Guardrails
 
