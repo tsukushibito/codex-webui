@@ -3,14 +3,17 @@ import Fastify from "fastify";
 import { resolveConfig, type RuntimeConfig } from "./config.js";
 import { openRuntimeDatabase, type RuntimeDatabase } from "./db/database.js";
 import { toErrorEnvelope } from "./errors.js";
-import { AppServerSupervisor } from "./domain/app-server/app-server-supervisor.js";
+import {
+  AppServerSupervisor,
+  type AppServerController,
+} from "./domain/app-server/app-server-supervisor.js";
 import { WorkspaceFilesystem } from "./domain/workspaces/workspace-filesystem.js";
 import { WorkspaceRegistry } from "./domain/workspaces/workspace-registry.js";
 import { registerWorkspaceRoutes } from "./routes/workspaces.js";
 
 export interface RuntimeServices {
   workspaceRegistry: WorkspaceRegistry;
-  appServerSupervisor: AppServerSupervisor;
+  appServerSupervisor: AppServerController;
 }
 
 export interface BuildAppOptions {
@@ -50,6 +53,10 @@ export async function buildApp(options: BuildAppOptions = {}) {
   app.decorate("runtimeServices", {
     workspaceRegistry,
     appServerSupervisor,
+  });
+
+  app.addHook("onReady", async () => {
+    await appServerSupervisor.ensureStarted();
   });
 
   app.setErrorHandler((error, _request, reply) => {

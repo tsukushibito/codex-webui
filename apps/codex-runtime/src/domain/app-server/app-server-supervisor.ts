@@ -20,7 +20,13 @@ export interface AppServerSnapshot {
   signal: NodeJS.Signals | null;
 }
 
-export class AppServerSupervisor {
+export interface AppServerController {
+  getSnapshot(): AppServerSnapshot;
+  ensureStarted(): Promise<AppServerSnapshot>;
+  stop(signal?: NodeJS.Signals): Promise<AppServerSnapshot>;
+}
+
+export class AppServerSupervisor implements AppServerController {
   private child: ChildProcess | null = null;
   private startedAt: string | null = null;
   private exitedAt: string | null = null;

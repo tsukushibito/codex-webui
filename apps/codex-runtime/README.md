@@ -4,7 +4,7 @@ This directory contains the first implementation slice of the MVP runtime descri
 
 ## Scope in this slice
 
-- App-server supervisor foundation
+- App-server supervisor lifecycle wired into runtime startup and shutdown
 - SQLite-backed workspace registry
 - `workspace_id <-> session_id` correspondence storage helpers
 - Internal `GET /api/v1/workspaces`, `POST /api/v1/workspaces`, and `GET /api/v1/workspaces/{workspace_id}`
@@ -45,3 +45,5 @@ npm run dev
 - `tests/`: targeted unit and integration coverage
 
 By default the runtime expects an existing workspace root directory. Set `CODEX_WEBUI_WORKSPACE_ROOT` before starting the service if you want to point it at a non-default location.
+
+When the Fastify app becomes ready, it starts the managed `codex app-server` process. Closing the runtime stops the managed process before shutting down the app.
