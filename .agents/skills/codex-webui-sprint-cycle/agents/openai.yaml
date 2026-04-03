@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sprint Cycle"
+  short_description: "Run one bounded codex-webui sprint with planner, worker, and evaluator"
+  default_prompt: "Use $codex-webui-sprint-cycle to plan, implement, and hard-gate one bounded sprint slice for this repo."
