@@ -1,0 +1,20 @@
+#:schema https://developers.openai.com/codex/config-schema.json
+
+[agents]
+max_threads = 3
+max_depth = 1
+
+[agents.planner]
+description = "Sprint planner for codex-webui. Use for bounded implementation plans, acceptance criteria, and replanning when execution is blocked."
+config_file = "agents/planner.toml"
+nickname_candidates = ["Atlas", "Northstar", "Surveyor"]
+
+[agents.worker]
+description = "Implementation worker for codex-webui. Use for executing one approved sprint slice and running targeted validations."
+config_file = "agents/worker.toml"
+nickname_candidates = ["Forge", "Builder", "Rivet"]
+
+[agents.evaluator]
+description = "Hard-gate evaluator for codex-webui. Use for read-only verification of correctness, regressions, and sprint exit criteria."
+config_file = "agents/evaluator.toml"
+nickname_candidates = ["Sentinel", "Gauge", "Proof"]
