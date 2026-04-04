@@ -4,7 +4,14 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { RuntimeError } from "../../errors.js";
 import type { RuntimeDatabase } from "../../db/database.js";
-import { messages, sessions, workspaces } from "../../db/schema.js";
+import { approvals, messages, sessions, workspaces } from "../../db/schema.js";
+import type {
+  ApprovalProjection,
+  ApprovalSummary,
+  ApprovalCategory,
+  ApprovalResolution,
+  ApprovalStatus,
+} from "../approvals/types.js";
 import { WorkspaceRegistry } from "../workspaces/workspace-registry.js";
 import { WorkspaceFilesystem } from "../workspaces/workspace-filesystem.js";
 import {
@@ -59,6 +66,36 @@ function mapMessageProjection(record: typeof messages.$inferSelect): MessageProj
     created_at: record.createdAt,
     source_item_type: record.sourceItemType as MessageSourceItemType,
   };
+}
+
+function parseApprovalContext(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  return JSON.parse(value) as Record<string, unknown>;
+}
+
+function mapApprovalProjection(record: typeof approvals.$inferSelect): ApprovalProjection {
+  return {
+    approval_id: record.approvalId,
+    session_id: record.sessionId,
+    workspace_id: record.workspaceId,
+    status: record.status as ApprovalStatus,
+    resolution: (record.resolution ?? null) as ApprovalResolution | null,
+    approval_category: record.approvalCategory as ApprovalCategory,
+    summary: record.summary,
+    reason: record.reason,
+    operation_summary: record.operationSummary,
+    context: parseApprovalContext(record.context),
+    created_at: record.createdAt,
+    resolved_at: record.resolvedAt,
+    native_request_kind: record.nativeRequestKind,
+  };
+}
+
+function generateApprovalId() {
+  return `apr_${crypto.randomUUID().replaceAll("-", "")}`;
 }
 
 function firstRequiredRow<T>(rows: T[], notFound: () => never) {
@@ -209,6 +246,7 @@ export class SessionService {
 
   async stopSession(sessionId: string): Promise<SessionStopResult> {
     const session = await this.getSession(sessionId);
+    const workspace = await this.workspaceRegistry.getWorkspace(session.workspace_id);
 
     if (session.status === "stopped") {
       return {
@@ -236,6 +274,60 @@ export class SessionService {
     }
 
     const now = toIsoString(this.now());
+    let canceledApproval: ApprovalProjection | null = null;
+
+    if (session.status === "waiting_approval" && session.active_approval_id !== null) {
+      const approval = firstRequiredRow(
+        this.database.db
+          .select()
+          .from(approvals)
+          .where(eq(approvals.approvalId, session.active_approval_id))
+          .limit(1)
+          .all(),
+        () => {
+          throw new RuntimeError(
+            404,
+            "approval_not_found",
+            "approval was not found",
+            {
+              approval_id: session.active_approval_id,
+            },
+          );
+        },
+      );
+
+      if (approval.status === "pending") {
+        this.database.db
+          .update(approvals)
+          .set({
+            status: "canceled",
+            resolution: "canceled",
+            resolvedAt: now,
+          })
+          .where(eq(approvals.approvalId, approval.approvalId))
+          .run();
+
+        const updatedApproval = firstRequiredRow(
+          this.database.db
+            .select()
+            .from(approvals)
+            .where(eq(approvals.approvalId, approval.approvalId))
+            .limit(1)
+            .all(),
+          () => {
+            throw new RuntimeError(
+              404,
+              "approval_not_found",
+              "approval was not found",
+              {
+                approval_id: approval.approvalId,
+              },
+            );
+          },
+        );
+        canceledApproval = mapApprovalProjection(updatedApproval);
+      }
+    }
 
     this.database.db
       .update(sessions)
@@ -244,6 +336,7 @@ export class SessionService {
         updatedAt: now,
         currentTurnId: null,
         activeApprovalId: null,
+        pendingAssistantMessageId: null,
         appSessionOverlayState: "closed",
       })
       .where(eq(sessions.sessionId, sessionId))
@@ -254,6 +347,10 @@ export class SessionService {
       .set({
         activeSessionId: null,
         updatedAt: now,
+        pendingApprovalCount:
+          session.status === "waiting_approval" && canceledApproval !== null
+            ? Math.max(0, workspace.pending_approval_count - 1)
+            : workspace.pending_approval_count,
       })
       .where(
         and(
@@ -265,7 +362,7 @@ export class SessionService {
 
     return {
       session: await this.getSession(sessionId),
-      canceled_approval: null,
+      canceled_approval: canceledApproval,
     };
   }
 
@@ -311,6 +408,186 @@ export class SessionService {
       items: rows.map(mapMessageProjection),
       next_cursor: null,
       has_more: false,
+    };
+  }
+
+  async listApprovals(
+    options: {
+      status?: ApprovalStatus;
+      workspace_id?: string;
+      limit?: number;
+      sort?: "created_at" | "-created_at";
+    } = {},
+  ) {
+    const limit = Math.max(1, Math.min(options.limit ?? 50, 100));
+    const sort = options.sort ?? "-created_at";
+    const conditions = [];
+
+    if (options.status) {
+      conditions.push(eq(approvals.status, options.status));
+    } else {
+      conditions.push(eq(approvals.status, "pending"));
+    }
+
+    if (options.workspace_id) {
+      conditions.push(eq(approvals.workspaceId, options.workspace_id));
+    }
+
+    const orderBy =
+      sort === "created_at"
+        ? [asc(approvals.createdAt), asc(approvals.approvalId)]
+        : [desc(approvals.createdAt), desc(approvals.approvalId)];
+
+    const rows = this.database.db
+      .select()
+      .from(approvals)
+      .where(conditions.length > 1 ? and(...conditions) : conditions[0]!)
+      .orderBy(...orderBy)
+      .limit(limit)
+      .all();
+
+    return {
+      items: rows.map(mapApprovalProjection),
+      next_cursor: null,
+      has_more: false,
+    };
+  }
+
+  async getApproval(approvalId: string) {
+    const row = firstRequiredRow(
+      this.database.db
+        .select()
+        .from(approvals)
+        .where(eq(approvals.approvalId, approvalId))
+        .limit(1)
+        .all(),
+      () => {
+        throw new RuntimeError(404, "approval_not_found", "approval was not found", {
+          approval_id: approvalId,
+        });
+      },
+    );
+
+    return mapApprovalProjection(row);
+  }
+
+  async resolveApproval(
+    approvalId: string,
+    input: {
+      resolution: Extract<ApprovalResolution, "approved" | "denied">;
+    },
+  ) {
+    const approval = firstRequiredRow(
+      this.database.db
+        .select()
+        .from(approvals)
+        .where(eq(approvals.approvalId, approvalId))
+        .limit(1)
+        .all(),
+      () => {
+        throw new RuntimeError(404, "approval_not_found", "approval was not found", {
+          approval_id: approvalId,
+        });
+      },
+    );
+
+    if (approval.status !== "pending") {
+      if (approval.resolution === input.resolution) {
+        return {
+          approval: mapApprovalProjection(approval),
+          session: await this.getSession(approval.sessionId),
+        };
+      }
+
+      throw new RuntimeError(
+        409,
+        "approval_not_pending",
+        "approval is not pending",
+        {
+          approval_id: approvalId,
+          status: approval.status,
+        },
+      );
+    }
+
+    const session = firstRequiredRow(
+      this.database.db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.sessionId, approval.sessionId))
+        .limit(1)
+        .all(),
+      () => {
+        throw new RuntimeError(404, "session_not_found", "session was not found", {
+          session_id: approval.sessionId,
+        });
+      },
+    );
+    const workspace = await this.workspaceRegistry.getWorkspace(approval.workspaceId);
+    const resolvedAt = toIsoString(this.now());
+    const nextSessionStatus = input.resolution === "approved" ? "running" : "waiting_input";
+    const nextTurnId = input.resolution === "approved" ? session.currentTurnId : null;
+    const nextWorkspaceActiveSessionId =
+      input.resolution === "approved" ? approval.sessionId : null;
+
+    await this.nativeSessionGateway.resolveApproval({
+      sessionId: approval.sessionId,
+      approvalId,
+      resolution: input.resolution,
+    });
+
+    this.database.sqlite.transaction(() => {
+      this.database.db
+        .update(approvals)
+        .set({
+          status: input.resolution,
+          resolution: input.resolution,
+          resolvedAt,
+        })
+        .where(eq(approvals.approvalId, approvalId))
+        .run();
+
+      this.database.db
+        .update(sessions)
+        .set({
+          status: nextSessionStatus,
+          updatedAt: resolvedAt,
+          activeApprovalId: null,
+          currentTurnId: nextTurnId,
+          pendingAssistantMessageId:
+            input.resolution === "approved" ? session.pendingAssistantMessageId : null,
+        })
+        .where(eq(sessions.sessionId, approval.sessionId))
+        .run();
+
+      this.database.db
+        .update(workspaces)
+        .set({
+          activeSessionId: nextWorkspaceActiveSessionId,
+          updatedAt: resolvedAt,
+          pendingApprovalCount: Math.max(0, workspace.pending_approval_count - 1),
+        })
+        .where(eq(workspaces.workspaceId, approval.workspaceId))
+        .run();
+    })();
+
+    return {
+      approval: await this.getApproval(approvalId),
+      session: await this.getSession(approval.sessionId),
+    };
+  }
+
+  async getApprovalSummary(): Promise<ApprovalSummary> {
+    const rows = this.database.db.select().from(approvals).all();
+    const pendingApprovalCount = rows.filter((row) => row.status === "pending").length;
+    const updatedAt =
+      rows
+        .map((row) => row.resolvedAt ?? row.createdAt)
+        .sort((left, right) => right.localeCompare(left))[0] ?? toIsoString(this.now());
+
+    return {
+      pending_approval_count: pendingApprovalCount,
+      updated_at: updatedAt,
     };
   }
 
@@ -433,6 +710,98 @@ export class SessionService {
       created_at: userCreatedAt,
       source_item_type: "user_message",
     } satisfies MessageProjection;
+  }
+
+  async ingestApprovalRequest(
+    sessionId: string,
+    input: {
+      turn_id: string;
+      approval_category: ApprovalCategory;
+      summary: string;
+      reason: string;
+      operation_summary?: string;
+      context?: Record<string, unknown>;
+      native_request_kind: string;
+    },
+  ) {
+    const session = firstRequiredRow(
+      this.database.db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.sessionId, sessionId))
+        .limit(1)
+        .all(),
+      () => {
+        throw new RuntimeError(404, "session_not_found", "session was not found", {
+          session_id: sessionId,
+        });
+      },
+    );
+
+    if (
+      session.status !== "running" ||
+      session.currentTurnId !== input.turn_id ||
+      session.activeApprovalId !== null
+    ) {
+      throw new RuntimeError(
+        409,
+        "session_invalid_state",
+        "session is not ready to ingest approval requests",
+        {
+          session_id: sessionId,
+          current_status: session.status,
+          current_turn_id: session.currentTurnId,
+          active_approval_id: session.activeApprovalId,
+          requested_turn_id: input.turn_id,
+        },
+      );
+    }
+
+    const workspace = await this.workspaceRegistry.getWorkspace(session.workspaceId);
+    const approvalId = generateApprovalId();
+    const createdAt = toIsoString(this.now());
+
+    this.database.sqlite.transaction(() => {
+      this.database.db
+        .insert(approvals)
+        .values({
+          approvalId,
+          sessionId,
+          workspaceId: session.workspaceId,
+          status: "pending",
+          resolution: null,
+          approvalCategory: input.approval_category,
+          summary: input.summary,
+          reason: input.reason,
+          operationSummary: input.operation_summary ?? null,
+          context: input.context ? JSON.stringify(input.context) : null,
+          createdAt,
+          resolvedAt: null,
+          nativeRequestKind: input.native_request_kind,
+        })
+        .run();
+
+      this.database.db
+        .update(sessions)
+        .set({
+          status: "waiting_approval",
+          updatedAt: createdAt,
+          activeApprovalId: approvalId,
+        })
+        .where(eq(sessions.sessionId, sessionId))
+        .run();
+
+      this.database.db
+        .update(workspaces)
+        .set({
+          pendingApprovalCount: workspace.pending_approval_count + 1,
+          updatedAt: createdAt,
+        })
+        .where(eq(workspaces.workspaceId, session.workspaceId))
+        .run();
+    })();
+
+    return this.getApproval(approvalId);
   }
 
   async ingestAssistantDelta(

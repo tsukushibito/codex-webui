@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { ZodError } from "zod";
 
+import { parseIngestApprovalRequestInput } from "../domain/approvals/approval-input.js";
 import { RuntimeError } from "../errors.js";
 import {
   parseAcceptMessageInput,
@@ -131,6 +132,32 @@ export async function registerSessionRoutes(
 
     reply.code(202);
     return result;
+  });
+
+  app.post("/api/v1/sessions/:sessionId/approval-requests", async (request, reply) => {
+    const params = request.params as { sessionId: string };
+    let payload;
+
+    try {
+      payload = parseIngestApprovalRequestInput(request.body);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new RuntimeError(
+          422,
+          "approval_request_invalid",
+          "approval request is invalid",
+          {
+            issues: error.issues,
+          },
+        );
+      }
+
+      throw error;
+    }
+
+    const approval = await sessionService.ingestApprovalRequest(params.sessionId, payload);
+    reply.code(202);
+    return approval;
   });
 
   app.post("/api/v1/sessions/:sessionId/stop", async (request) => {

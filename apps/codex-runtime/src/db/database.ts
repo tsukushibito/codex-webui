@@ -60,6 +60,27 @@ ON messages (session_id, message_id);
 
 CREATE UNIQUE INDEX IF NOT EXISTS messages_session_id_client_message_id_idx
 ON messages (session_id, client_message_id);
+
+CREATE TABLE IF NOT EXISTS approvals (
+  approval_id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  workspace_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  resolution TEXT,
+  approval_category TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  operation_summary TEXT,
+  context TEXT,
+  created_at TEXT NOT NULL,
+  resolved_at TEXT,
+  native_request_kind TEXT NOT NULL,
+  FOREIGN KEY (session_id) REFERENCES sessions (session_id) ON DELETE CASCADE,
+  FOREIGN KEY (workspace_id) REFERENCES workspaces (workspace_id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS approvals_session_id_approval_id_idx
+ON approvals (session_id, approval_id);
 `;
 
 export function openRuntimeDatabase(databasePath: string) {

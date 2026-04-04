@@ -77,6 +77,36 @@ export const messages = sqliteTable(
   }),
 );
 
+export const approvals = sqliteTable(
+  "approvals",
+  {
+    approvalId: text("approval_id").primaryKey(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => sessions.sessionId, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.workspaceId, { onDelete: "cascade" }),
+    status: text("status").notNull(),
+    resolution: text("resolution"),
+    approvalCategory: text("approval_category").notNull(),
+    summary: text("summary").notNull(),
+    reason: text("reason").notNull(),
+    operationSummary: text("operation_summary"),
+    context: text("context"),
+    createdAt: text("created_at").notNull(),
+    resolvedAt: text("resolved_at"),
+    nativeRequestKind: text("native_request_kind").notNull(),
+  },
+  (table) => ({
+    sessionCreatedAtIndex: uniqueIndex("approvals_session_id_approval_id_idx").on(
+      table.sessionId,
+      table.approvalId,
+    ),
+  }),
+);
+
 export type WorkspaceRow = typeof workspaces.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;
+export type ApprovalRow = typeof approvals.$inferSelect;
