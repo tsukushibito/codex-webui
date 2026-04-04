@@ -42,35 +42,9 @@ For a repo-local development container and launcher workflow, this repository al
 - [`docker-compose.yml`](./docker-compose.yml)
 - [`scripts/start-tunnel.sh`](./scripts/start-tunnel.sh) for `code tunnel`
 - [`scripts/start-codex-webui.sh`](./scripts/start-codex-webui.sh) for `codex-runtime` + `frontend-bff` + `devtunnel`
+- [`docs/codex_webui_dev_container_onboarding.md`](./docs/codex_webui_dev_container_onboarding.md) for the full container and tunnel workflow
 
-Typical container flow:
-
-```bash
-docker compose up -d --build dev
-docker compose exec dev bash
-```
-
-Inside the container:
-
-```bash
-npm install --prefix apps/codex-runtime
-npm install --prefix apps/frontend-bff
-```
-
-For remote development access through VS Code tunnels:
-
-```bash
-scripts/start-tunnel.sh
-```
-
-For WebUI verification through Microsoft Dev Tunnels, create a persistent tunnel once and add port `3000`, then launch the stack:
-
-```bash
-devtunnel user login
-devtunnel create
-devtunnel port create <tunnel-id> -p 3000 --protocol http
-CODEX_WEBUI_DEVTUNNEL_ID=<tunnel-id> scripts/start-codex-webui.sh
-```
+Use the onboarding document for the full setup and usage flow instead of relying on the root README for step-by-step operational detail.
 
 ## Workflow notes
 
