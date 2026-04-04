@@ -39,9 +39,27 @@ CREATE TABLE IF NOT EXISTS sessions (
   last_message_at TEXT,
   active_approval_id TEXT,
   current_turn_id TEXT,
+  pending_assistant_message_id TEXT,
   app_session_overlay_state TEXT NOT NULL,
   FOREIGN KEY (workspace_id) REFERENCES workspaces (workspace_id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS messages (
+  message_id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  role TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  source_item_type TEXT NOT NULL,
+  client_message_id TEXT,
+  FOREIGN KEY (session_id) REFERENCES sessions (session_id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS messages_session_id_message_id_idx
+ON messages (session_id, message_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS messages_session_id_client_message_id_idx
+ON messages (session_id, client_message_id);
 `;
 
 export function openRuntimeDatabase(databasePath: string) {

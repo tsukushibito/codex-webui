@@ -2,6 +2,10 @@ import type { FastifyInstance } from "fastify";
 import { ZodError } from "zod";
 
 import { RuntimeError } from "../errors.js";
+import {
+  parseAcceptMessageInput,
+  parseAssistantEventInput,
+} from "../domain/sessions/message-input.js";
 import { parseCreateSessionInput } from "../domain/sessions/session-title.js";
 import { SessionService } from "../domain/sessions/session-service.js";
 
@@ -51,9 +55,82 @@ export async function registerSessionRoutes(
     return sessionService.getSession(params.sessionId);
   });
 
+  app.get("/api/v1/sessions/:sessionId/messages", async (request) => {
+    const params = request.params as { sessionId: string };
+    const query = request.query as {
+      limit?: number | string;
+      sort?: "created_at" | "-created_at";
+    };
+    const limit =
+      typeof query.limit === "string"
+        ? Number.parseInt(query.limit, 10)
+        : query.limit;
+
+    return sessionService.listMessages(params.sessionId, {
+      limit: Number.isFinite(limit) ? limit : undefined,
+      sort: query.sort,
+    });
+  });
+
   app.post("/api/v1/sessions/:sessionId/start", async (request) => {
     const params = request.params as { sessionId: string };
     return sessionService.startSession(params.sessionId);
+  });
+
+  app.post("/api/v1/sessions/:sessionId/messages", async (request, reply) => {
+    const params = request.params as { sessionId: string };
+    let payload;
+
+    try {
+      payload = parseAcceptMessageInput(request.body);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new RuntimeError(
+          422,
+          "message_content_invalid",
+          "message request is invalid",
+          {
+            issues: error.issues,
+          },
+        );
+      }
+
+      throw error;
+    }
+
+    const message = await sessionService.acceptMessage(params.sessionId, payload);
+    reply.code(202);
+    return message;
+  });
+
+  app.post("/api/v1/sessions/:sessionId/assistant-events", async (request, reply) => {
+    const params = request.params as { sessionId: string };
+    let payload;
+
+    try {
+      payload = parseAssistantEventInput(request.body);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new RuntimeError(
+          422,
+          "message_content_invalid",
+          "assistant event request is invalid",
+          {
+            issues: error.issues,
+          },
+        );
+      }
+
+      throw error;
+    }
+
+    const result =
+      payload.event_type === "message.assistant.delta"
+        ? await sessionService.ingestAssistantDelta(params.sessionId, payload)
+        : await sessionService.applyAssistantMessageCompletion(params.sessionId, payload);
+
+    reply.code(202);
+    return result;
   });
 
   app.post("/api/v1/sessions/:sessionId/stop", async (request) => {

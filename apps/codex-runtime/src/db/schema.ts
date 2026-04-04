@@ -44,6 +44,7 @@ export const sessions = sqliteTable(
     lastMessageAt: text("last_message_at"),
     activeApprovalId: text("active_approval_id"),
     currentTurnId: text("current_turn_id"),
+    pendingAssistantMessageId: text("pending_assistant_message_id"),
     appSessionOverlayState: text("app_session_overlay_state").notNull(),
   },
   (table) => ({
@@ -51,5 +52,31 @@ export const sessions = sqliteTable(
   }),
 );
 
+export const messages = sqliteTable(
+  "messages",
+  {
+    messageId: text("message_id").primaryKey(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => sessions.sessionId, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    createdAt: text("created_at").notNull(),
+    sourceItemType: text("source_item_type").notNull(),
+    clientMessageId: text("client_message_id"),
+  },
+  (table) => ({
+    sessionCreatedAtIndex: uniqueIndex("messages_session_id_message_id_idx").on(
+      table.sessionId,
+      table.messageId,
+    ),
+    sessionClientMessageIndex: uniqueIndex("messages_session_id_client_message_id_idx").on(
+      table.sessionId,
+      table.clientMessageId,
+    ),
+  }),
+);
+
 export type WorkspaceRow = typeof workspaces.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
+export type MessageRow = typeof messages.$inferSelect;

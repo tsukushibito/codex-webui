@@ -1,10 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
 import type { NativeSessionGateway } from "../src/domain/sessions/native-session-gateway.js";
+import { sessions, workspaces } from "../src/db/schema.js";
 import { createTempDatabase, createTempWorkspaceRoot } from "./helpers.js";
 
 const cleanupPaths: string[] = [];
@@ -12,7 +14,9 @@ const cleanupPaths: string[] = [];
 class StubNativeSessionGateway implements NativeSessionGateway {
   constructor(
     private readonly sessionIds: string[],
+    private readonly turnIds: string[] = [],
     readonly interrupts: Array<{ sessionId: string; turnId: string }> = [],
+    readonly sentMessages: Array<{ sessionId: string; content: string }> = [],
   ) {}
 
   async createSession() {
@@ -24,9 +28,64 @@ class StubNativeSessionGateway implements NativeSessionGateway {
     return { sessionId };
   }
 
+  async sendUserMessage(input: { sessionId: string; content: string }) {
+    this.sentMessages.push(input);
+
+    return {
+      turnId:
+        this.turnIds.shift() ?? `turn_${this.sentMessages.length.toString().padStart(3, "0")}`,
+    };
+  }
+
   async interruptSessionTurn(input: { sessionId: string; turnId: string }) {
     this.interrupts.push(input);
   }
+}
+
+function seedWaitingInputSession(
+  database: Awaited<ReturnType<typeof createTempDatabase>>,
+  options: {
+    workspaceId?: string;
+    sessionId?: string;
+    title?: string;
+    activeSessionId?: string | null;
+  } = {},
+) {
+  const workspaceId = options.workspaceId ?? "ws_alpha";
+  const sessionId = options.sessionId ?? "thread_001";
+  const now = "2026-04-04T12:00:00.000Z";
+
+  database.db
+    .insert(workspaces)
+    .values({
+      workspaceId,
+      workspaceName: "alpha",
+      directoryName: "alpha",
+      createdAt: now,
+      updatedAt: now,
+      activeSessionId: options.activeSessionId ?? sessionId,
+      pendingApprovalCount: 0,
+    })
+    .run();
+
+  database.db
+    .insert(sessions)
+    .values({
+      sessionId,
+      workspaceId,
+      title: options.title ?? "Fix build error",
+      status: "waiting_input",
+      createdAt: now,
+      updatedAt: now,
+      startedAt: now,
+      lastMessageAt: null,
+      activeApprovalId: null,
+      currentTurnId: null,
+      appSessionOverlayState: "open",
+    })
+    .run();
+
+  return { workspaceId, sessionId };
 }
 
 afterEach(async () => {
@@ -334,6 +393,545 @@ describe("session routes", () => {
           status: "created",
         },
       },
+    });
+
+    await app.close();
+  });
+
+  it("accepts a message, keeps the session running, and lists projected user history", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const nativeSessionGateway = new StubNativeSessionGateway([], ["turn_001"]);
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database);
+
+    const sendResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_001",
+        content: "Please explain the diff.",
+      },
+    });
+
+    expect(sendResponse.statusCode).toBe(202);
+    expect(sendResponse.json()).toEqual({
+      message_id: expect.stringMatching(/^msg_user_/),
+      session_id: sessionId,
+      role: "user",
+      content: "Please explain the diff.",
+      created_at: expect.any(String),
+      source_item_type: "user_message",
+    });
+    expect(nativeSessionGateway.sentMessages).toEqual([
+      {
+        sessionId,
+        content: "Please explain the diff.",
+      },
+    ]);
+
+    const sessionResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${sessionId}`,
+    });
+
+    expect(sessionResponse.statusCode).toBe(200);
+    expect(sessionResponse.json()).toMatchObject({
+      session_id: sessionId,
+      status: "running",
+      current_turn_id: "turn_001",
+      last_message_at: expect.any(String),
+    });
+
+    const workspaceResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/workspaces/ws_alpha",
+    });
+
+    expect(workspaceResponse.statusCode).toBe(200);
+    expect(workspaceResponse.json()).toMatchObject({
+      active_session_id: sessionId,
+      active_session_summary: {
+        session_id: sessionId,
+        status: "running",
+      },
+    });
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+    });
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json()).toEqual({
+      items: [
+        {
+          message_id: expect.stringMatching(/^msg_user_/),
+          session_id: sessionId,
+          role: "user",
+          content: "Please explain the diff.",
+          created_at: expect.any(String),
+          source_item_type: "user_message",
+        },
+      ],
+      next_cursor: null,
+      has_more: false,
+    });
+
+    await app.close();
+  });
+
+  it("ingests assistant delta and completed events with a stable assistant message id", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const nativeSessionGateway = new StubNativeSessionGateway([], ["turn_001"]);
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database);
+
+    const sendResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_001",
+        content: "Please explain the diff.",
+      },
+    });
+
+    const deltaResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/assistant-events`,
+      payload: {
+        event_type: "message.assistant.delta",
+        turn_id: "turn_001",
+        delta: "I checked the diff",
+      },
+    });
+
+    expect(deltaResponse.statusCode).toBe(202);
+    expect(deltaResponse.json()).toEqual({
+      message_id: expect.stringMatching(/^msg_assistant_/),
+      session_id: sessionId,
+      event_type: "message.assistant.delta",
+      turn_id: "turn_001",
+      delta: "I checked the diff",
+    });
+
+    const assistantMessageResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/assistant-events`,
+      payload: {
+        event_type: "message.assistant.completed",
+        turn_id: "turn_001",
+        content: "I checked the diff and summarized the changes.",
+      },
+    });
+
+    const assistantMessage = assistantMessageResponse.json();
+
+    expect(assistantMessageResponse.statusCode).toBe(202);
+    expect(assistantMessage).toEqual({
+      message_id: deltaResponse.json().message_id,
+      session_id: sessionId,
+      role: "assistant",
+      content: "I checked the diff and summarized the changes.",
+      created_at: expect.any(String),
+      source_item_type: "agent_message",
+    });
+
+    const sessionResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${sessionId}`,
+    });
+
+    expect(sessionResponse.statusCode).toBe(200);
+    expect(sessionResponse.json()).toMatchObject({
+      session_id: sessionId,
+      status: "waiting_input",
+      current_turn_id: null,
+      last_message_at: assistantMessage.created_at,
+    });
+
+    const workspaceResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/workspaces/ws_alpha",
+    });
+
+    expect(workspaceResponse.statusCode).toBe(200);
+    expect(workspaceResponse.json()).toMatchObject({
+      active_session_id: null,
+      active_session_summary: null,
+    });
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+    });
+
+    const expectedItems = [sendResponse.json(), assistantMessage].sort((left, right) => {
+      if (left.created_at === right.created_at) {
+        return left.message_id.localeCompare(right.message_id);
+      }
+
+      return left.created_at.localeCompare(right.created_at);
+    });
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json()).toEqual({
+      items: expectedItems,
+      next_cursor: null,
+      has_more: false,
+    });
+
+    await app.close();
+  });
+
+  it("rejects assistant events when the session is not running", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway: new StubNativeSessionGateway([]),
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database);
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/assistant-events`,
+      payload: {
+        event_type: "message.assistant.delta",
+        turn_id: "turn_001",
+        delta: "I checked the diff",
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      error: {
+        code: "session_invalid_state",
+        message: "session is not ready to ingest assistant events",
+        details: {
+          session_id: sessionId,
+          current_status: "waiting_input",
+          current_turn_id: null,
+          requested_turn_id: "turn_001",
+        },
+      },
+    });
+
+    await app.close();
+  });
+
+  it("rejects assistant events when the incoming turn does not match the active turn", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway: new StubNativeSessionGateway([], ["turn_001"]),
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database);
+
+    await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_001",
+        content: "Please explain the diff.",
+      },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/assistant-events`,
+      payload: {
+        event_type: "message.assistant.completed",
+        turn_id: "turn_999",
+        content: "I checked the diff and summarized the changes.",
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      error: {
+        code: "session_invalid_state",
+        message: "session is not ready to ingest assistant events",
+        details: {
+          session_id: sessionId,
+          current_status: "running",
+          current_turn_id: "turn_001",
+          requested_turn_id: "turn_999",
+        },
+      },
+    });
+
+    await app.close();
+  });
+
+  it("returns the existing projected user message for idempotent retries", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const nativeSessionGateway = new StubNativeSessionGateway([], ["turn_001"]);
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database);
+
+    const firstResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_001",
+        content: "Please explain the diff.",
+      },
+    });
+    const retryResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_001",
+        content: "Please explain the diff.",
+      },
+    });
+
+    expect(firstResponse.statusCode).toBe(202);
+    expect(retryResponse.statusCode).toBe(202);
+    expect(retryResponse.json()).toEqual(firstResponse.json());
+    expect(nativeSessionGateway.sentMessages).toHaveLength(1);
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+    });
+
+    expect(listResponse.json().items).toHaveLength(1);
+
+    await app.close();
+  });
+
+  it("rejects conflicting retries that reuse a client message id with different content", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const nativeSessionGateway = new StubNativeSessionGateway([], ["turn_001"]);
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database);
+
+    await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_001",
+        content: "Please explain the diff.",
+      },
+    });
+
+    const conflictResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_001",
+        content: "Please summarize the diff.",
+      },
+    });
+
+    expect(conflictResponse.statusCode).toBe(409);
+    expect(conflictResponse.json()).toEqual({
+      error: {
+        code: "message_idempotency_conflict",
+        message: "client message id conflicts with a different message payload",
+        details: {
+          session_id: sessionId,
+          client_message_id: "msgclient_001",
+        },
+      },
+    });
+
+    await app.close();
+  });
+
+  it("lists projected messages with stable created_at sorting and limit handling", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway: new StubNativeSessionGateway([]),
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database, {
+      activeSessionId: null,
+    });
+
+    database.db.insert(sessions).values({
+      sessionId: "thread_002",
+      workspaceId: "ws_alpha",
+      title: "Background session",
+      status: "created",
+      createdAt: "2026-04-04T12:05:00.000Z",
+      updatedAt: "2026-04-04T12:05:00.000Z",
+      startedAt: null,
+      lastMessageAt: null,
+      activeApprovalId: null,
+      currentTurnId: null,
+      appSessionOverlayState: "open",
+    }).run();
+
+    database.sqlite
+      .prepare(
+        `
+          INSERT INTO messages (
+            message_id,
+            session_id,
+            role,
+            content,
+            created_at,
+            source_item_type,
+            client_message_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run("msg_user_001", sessionId, "user", "first", "2026-04-04T12:00:01.000Z", "user_message", "msgclient_001");
+    database.sqlite
+      .prepare(
+        `
+          INSERT INTO messages (
+            message_id,
+            session_id,
+            role,
+            content,
+            created_at,
+            source_item_type,
+            client_message_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run("msg_assistant_001", sessionId, "assistant", "second", "2026-04-04T12:00:02.000Z", "agent_message", null);
+    database.sqlite
+      .prepare(
+        `
+          INSERT INTO messages (
+            message_id,
+            session_id,
+            role,
+            content,
+            created_at,
+            source_item_type,
+            client_message_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run("msg_user_002", sessionId, "user", "third", "2026-04-04T12:00:03.000Z", "user_message", "msgclient_002");
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${sessionId}/messages?sort=-created_at&limit=2`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      items: [
+        {
+          message_id: "msg_user_002",
+          session_id: sessionId,
+          role: "user",
+          content: "third",
+          created_at: "2026-04-04T12:00:03.000Z",
+          source_item_type: "user_message",
+        },
+        {
+          message_id: "msg_assistant_001",
+          session_id: sessionId,
+          role: "assistant",
+          content: "second",
+          created_at: "2026-04-04T12:00:02.000Z",
+          source_item_type: "agent_message",
+        },
+      ],
+      next_cursor: null,
+      has_more: false,
     });
 
     await app.close();
