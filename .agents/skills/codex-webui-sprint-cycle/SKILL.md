@@ -41,8 +41,8 @@ Do not use this skill when:
 
 ## Workflow
 
-1. Spawn `planner` first and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; ask it for one bounded sprint slice with ordered tasks, acceptance criteria, and required validation.
-2. Review the planner output locally. If the sprint slice is still too large or unclear, ask `planner` to tighten it before implementation starts.
+1. Spawn `planner` first and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; ask it to return a plan only with the planner sections, not an implementation summary, patch description, or completion report.
+2. Review the planner output locally. If the sprint slice is still too large or unclear, or if the result is implementation-shaped instead of plan-only, ask `planner` to tighten it before implementation starts.
 3. If `planner` violates the read-only instruction and mutates files anyway, do not ask it to continue editing. Treat the resulting worktree state as the effective `worker` output for this sprint and pass that implementation candidate to `evaluator`.
 4. Otherwise, spawn `worker` to execute only that sprint slice in the active worktree for normal branch/PR work, or in the parent checkout only for an approved direct-to-`main` exception.
 5. When the implementation candidate finishes, spawn `evaluator` and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; pass the planner acceptance criteria and the implementation result.
@@ -64,6 +64,8 @@ Do not use this skill when:
 - `worker` is the only role allowed to edit files
 - `evaluator` is read-only and acts as a hard gate
 - Always tell `planner` and `evaluator` in their spawn prompts that they are read-only and must not edit files or run mutating commands
+- Always tell `planner` to return a sprint plan only, using the planner role sections, and not to claim files changed, tests run, or work completed
+- Do not phrase `planner` requests as direct implementation instructions; ask for a bounded slice, acceptance criteria, validation, and worker handoff only
 - If `planner` mutates files anyway, treat that worktree state as the implementation candidate for `evaluator` rather than continuing to use `planner` as a writer
 - Do not let `worker` implement normal branch/PR work from the parent checkout when an active worktree should exist
 - When invoked by `codex-webui-execution-orchestrator`, do not let the main agent bypass `worker` by implementing the sprint slice directly
