@@ -1,0 +1,16 @@
+.git
+.serena
+.tmp
+.venv
+.worktrees
+node_modules
+**/node_modules
+.next
+**/.next
+coverage
+**/coverage
+dist
+**/dist
+artifacts
+tasks/archive
+apps/*/var

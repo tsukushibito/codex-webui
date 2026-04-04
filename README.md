@@ -31,10 +31,46 @@ Start with these maintained documents when you need project intent or interface 
 
 ## Development entrypoints
 
-This repository does not define a single root-level app runner. Work from the app directory you are changing and use its local README for setup and commands:
+Work from the app directory you are changing and use its local README for setup and commands:
 
 - [`apps/codex-runtime/README.md`](./apps/codex-runtime/README.md)
 - [`apps/frontend-bff/README.md`](./apps/frontend-bff/README.md)
+
+For a repo-local development container and launcher workflow, this repository also provides:
+
+- [`Dockerfile`](./Dockerfile)
+- [`docker-compose.yml`](./docker-compose.yml)
+- [`scripts/start-tunnel.sh`](./scripts/start-tunnel.sh) for `code tunnel`
+- [`scripts/start-codex-webui.sh`](./scripts/start-codex-webui.sh) for `codex-runtime` + `frontend-bff` + `devtunnel`
+
+Typical container flow:
+
+```bash
+docker compose up -d --build dev
+docker compose exec dev bash
+```
+
+Inside the container:
+
+```bash
+npm install --prefix apps/codex-runtime
+npm install --prefix apps/frontend-bff
+```
+
+For remote development access through VS Code tunnels:
+
+```bash
+scripts/start-tunnel.sh
+```
+
+For WebUI verification through Microsoft Dev Tunnels, create a persistent tunnel once and add port `3000`, then launch the stack:
+
+```bash
+devtunnel user login
+devtunnel create
+devtunnel port create <tunnel-id> -p 3000 --protocol http
+CODEX_WEBUI_DEVTUNNEL_ID=<tunnel-id> scripts/start-codex-webui.sh
+```
 
 ## Workflow notes
 
