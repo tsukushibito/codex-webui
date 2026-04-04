@@ -40,14 +40,15 @@ Do not use this skill when:
 
 ## Workflow
 
-1. Spawn `planner` first and ask it for one bounded sprint slice with ordered tasks, acceptance criteria, and required validation.
+1. Spawn `planner` first and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; ask it for one bounded sprint slice with ordered tasks, acceptance criteria, and required validation.
 2. Review the planner output locally. If the sprint slice is still too large or unclear, ask `planner` to tighten it before implementation starts.
-3. Spawn `worker` to execute only that sprint slice.
-4. When `worker` finishes, spawn `evaluator` with the planner acceptance criteria and the worker result.
-5. If `evaluator` returns `changes_required`, send those findings back to `worker` and run another implementation pass.
-6. Allow at most 2 evaluator rejection cycles for the same sprint slice.
-7. If the second evaluator rejection still blocks completion, return to `planner` for replanning or a narrower slice.
-8. Finish the sprint only when `evaluator` returns `approved`.
+3. If `planner` violates the read-only instruction and mutates files anyway, do not ask it to continue editing. Treat the resulting worktree state as the effective `worker` output for this sprint and pass that implementation candidate to `evaluator`.
+4. Otherwise, spawn `worker` to execute only that sprint slice.
+5. When the implementation candidate finishes, spawn `evaluator` and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; pass the planner acceptance criteria and the implementation result.
+6. If `evaluator` returns `changes_required`, send those findings back to `worker` and run another implementation pass.
+7. Allow at most 2 evaluator rejection cycles for the same sprint slice.
+8. If the second evaluator rejection still blocks completion, return to `planner` for replanning or a narrower slice.
+9. Finish the sprint only when `evaluator` returns `approved`.
 
 ## Agent State Checks
 
@@ -61,10 +62,13 @@ Do not use this skill when:
 - `planner` is read-only and defines the sprint slice
 - `worker` is the only role allowed to edit files
 - `evaluator` is read-only and acts as a hard gate
+- Always tell `planner` and `evaluator` in their spawn prompts that they are read-only and must not edit files or run mutating commands
+- If `planner` mutates files anyway, treat that worktree state as the implementation candidate for `evaluator` rather than continuing to use `planner` as a writer
 - When invoked by `codex-webui-execution-orchestrator`, do not let the main agent bypass `worker` by implementing the sprint slice directly
 - Do not run concurrent write passes on the same sprint slice
 - Do not silently weaken planner acceptance criteria to get an approval
 - Do not let `planner` or `evaluator` mutate the worktree, create commits, push branches, or update GitHub Issues/Projects
+- Do not add a mandatory post-`planner` compliance check just to police read-only behavior; prevent the issue with the spawn prompt and handle accidental edits through the fallback above
 - Do not treat evaluator approval alone as sufficient evidence to close an Issue or mark a Project item `Done`
 
 ## Required Final Output
