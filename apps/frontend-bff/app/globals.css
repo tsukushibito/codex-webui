@@ -393,6 +393,42 @@ input {
   gap: 14px;
 }
 
+.approval-layout .hero-card,
+.approval-layout > .error-banner,
+.approval-layout > .status-message {
+  grid-column: 1 / -1;
+}
+
+.approval-list {
+  max-height: 32rem;
+  overflow-y: auto;
+}
+
+.approval-empty-card,
+.approval-detail-card {
+  min-height: 18rem;
+}
+
+.approval-detail-grid,
+.approval-context-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.approval-context {
+  display: grid;
+  gap: 10px;
+}
+
+.approval-context-row {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.66);
+  word-break: break-word;
+}
+
 .text-link {
   color: var(--accent-strong);
   font-weight: 700;
@@ -406,5 +442,9 @@ input {
 
   .hero-body {
     padding: 28px;
+  }
+
+  .approval-detail-grid {
+    grid-template-columns: 1fr 1fr;
   }
 }
