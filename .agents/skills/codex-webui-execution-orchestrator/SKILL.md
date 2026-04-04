@@ -114,6 +114,7 @@ If no drift blocks progress, route to one of these skills:
 - `codex-webui-work-packages` when the active worktree must be created, corrected, or documented, or when package-linked Issue `Execution` metadata must move with the package lifecycle
 - `codex-webui-sprint-cycle` when one bounded sprint slice is ready to execute for the chosen Issue
 - `codex-webui-github-projects` when Project state, broader Issue tracking state, PR merge, parent-checkout sync, worktree cleanup, or final completion tracking must be corrected
+- `codex-webui-execution-handoff` when execution cannot continue in the current session and the correct outcome is a resumable `.tmp/` handoff rather than more implementation or tracking work
 
 Do not recommend multiple competing handoffs in the same result.
 
@@ -174,3 +175,4 @@ If the user also asked to continue until a concrete end-state, keep iterating af
 - `複数Issueの中から今の対象を1つ決めて、次に呼ぶ skill を実行するところまで進めて。`
 - `Use $codex-webui-execution-orchestrator for multi-issue routing and then invoke the correct repo skill for the next slice.`
 - `Use $codex-webui-execution-orchestrator to keep going until Issue #60 is closed.`
+- `Use $codex-webui-execution-orchestrator to decide whether we should continue executing or stop and create an execution handoff.`

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Execution Handoff"
+  short_description: "Prepare a resumable next-session handoff under .tmp/."
+  default_prompt: "Use $codex-webui-execution-handoff to create a concise next-session handoff under .tmp/ for the current work."
