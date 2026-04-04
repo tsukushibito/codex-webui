@@ -1,0 +1,4 @@
+interface:
+  display_name: "Execution Orchestrator"
+  short_description: "Route multi-issue execution to one current target and next skill"
+  default_prompt: "Use $codex-webui-execution-orchestrator to delegate intake, choose one current Issue target, and route to the next repo skill."
