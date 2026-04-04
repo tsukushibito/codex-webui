@@ -50,12 +50,14 @@ Do not use this skill when:
 2. Review the planner output locally. If the sprint slice is still too large or unclear, or if the result is implementation-shaped instead of plan-only, ask `planner` to tighten it before implementation starts.
 3. If `planner` violates the read-only instruction and mutates files anyway, do not ask it to continue editing. Treat the resulting worktree state as the effective `worker` output for this sprint and pass that implementation candidate to `evaluator`.
 4. Otherwise, spawn `worker` to execute only that sprint slice in the active worktree for normal branch/PR work, or in the parent checkout only for an approved direct-to-`main` exception.
-5. When the implementation candidate finishes, spawn `evaluator` and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; pass the planner acceptance criteria and the implementation result.
-6. If `evaluator` returns `changes_required`, send those findings back to `worker` and run another implementation pass.
-7. Allow at most 2 evaluator rejection cycles for the same sprint slice.
-8. If the second evaluator rejection still blocks completion, return to `planner` for replanning or a narrower slice.
-9. Finish the sprint only when `evaluator` returns `approved`.
-10. Return the sprint result to the caller. If the caller is `codex-webui-execution-orchestrator`, let that skill decide whether execution continues with another sprint, package-state work, completion tracking, or a blocked stop.
+5. When `worker` returns, verify locally that it produced a real implementation candidate for this sprint. If the user asked for implementation and the result is design-only, analysis-only, or otherwise leaves the write scope unchanged, do not treat that as sprint progress; tighten the instructions with concrete target files, write scope, and expected API or behavior shape, then send `worker` back to implementation instead of proceeding to `evaluator`.
+6. Treat `files changed: none`, `exact file paths changed: none`, or missing validation evidence for an implementation-requested sprint as a blocked or incomplete worker pass, not as a completed sprint result.
+7. When the implementation candidate finishes, spawn `evaluator` and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; pass the planner acceptance criteria and the implementation result.
+8. If `evaluator` returns `changes_required`, send those findings back to `worker` and run another implementation pass.
+9. Allow at most 2 evaluator rejection cycles for the same sprint slice.
+10. If the second evaluator rejection still blocks completion, return to `planner` for replanning or a narrower slice.
+11. Finish the sprint only when `evaluator` returns `approved`.
+12. Return the sprint result to the caller. If the caller is `codex-webui-execution-orchestrator`, let that skill decide whether execution continues with another sprint, package-state work, completion tracking, or a blocked stop.
 
 ## Post-Sprint Caller Contract
 
@@ -66,6 +68,7 @@ This skill completes one bounded sprint only. After the sprint result is known, 
 - sprint blocked and requires replanning or user input
 
 This skill may describe which case it reached, but it must not choose the next repo skill itself.
+Design-only worker output, no-op worker output, or implementation output without credible validation evidence does not count as a known sprint result for this contract; the sprint is still in progress or blocked until the implementation candidate is real.
 
 ## Agent State Checks
 
@@ -81,9 +84,11 @@ This skill may describe which case it reached, but it must not choose the next r
 - `evaluator` is read-only and acts as a hard gate
 - Always tell `planner` and `evaluator` in their spawn prompts that they are read-only and must not edit files or run mutating commands
 - Always tell `planner` to return a sprint plan only, using the planner role sections, and not to claim files changed, tests run, or work completed
+- Always tell `worker` to either produce code or document edits in the agreed write scope, or return a concrete technical block; do not accept design-only or review-only output from `worker` when the sprint requested implementation
 - Do not phrase `planner` requests as direct implementation instructions; ask for a bounded slice, acceptance criteria, validation, and worker handoff only
 - If `planner` mutates files anyway, treat that worktree state as the implementation candidate for `evaluator` rather than continuing to use `planner` as a writer
 - Do not let `worker` implement normal branch/PR work from the parent checkout when an active worktree should exist
+- If `worker` returns without changing the target write scope for an implementation-requested sprint, do not move on to `evaluator` unless the main agent independently verifies that the intended edits already exist in the worktree and should be evaluated as the effective implementation candidate
 - When invoked by `codex-webui-execution-orchestrator`, do not let the main agent bypass `worker` by implementing the sprint slice directly
 - Do not run concurrent write passes on the same sprint slice
 - Do not silently weaken planner acceptance criteria to get an approval
@@ -103,6 +108,7 @@ Return a merged result that includes:
 - the caller-facing outcome, such as Issue still incomplete, completion-tracking handoff now needed, or blocked
 - any remaining risk that still exists after approval
 
+If `worker` did not edit the target write scope, say that explicitly and treat the sprint as blocked or still in progress rather than complete.
 If the sprint is blocked and requires replanning, say that explicitly instead of pretending the sprint completed.
 
 ## Example Requests
