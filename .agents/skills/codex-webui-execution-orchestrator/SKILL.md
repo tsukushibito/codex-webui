@@ -19,6 +19,7 @@ Responsibilities:
 - report tracking drift before recommending fresh execution
 - select exactly one next existing repo skill
 - invoke that selected repo skill in the same turn when the user asked to proceed with execution
+- own the cross-skill continuation loop when the user asked to keep going until a concrete end-state is reached
 
 This skill does not directly mutate GitHub Projects, Issues, or local task packages.
 
@@ -59,7 +60,9 @@ Follow this order every time.
 4. Check whether tracking drift blocks execution.
 5. Select exactly one next handoff skill.
 6. If the user asked to proceed with work in the current turn, invoke that selected handoff skill in the same turn instead of stopping after the routing brief.
-7. Park the other Issues explicitly.
+7. If the user asked to continue until a concrete end-state, treat steps 2-6 as one iteration, then re-run intake after the invoked handoff skill returns instead of stopping after the first handoff.
+8. Stop only when the requested end-state is reached or execution is hard blocked.
+9. Park the other Issues explicitly.
 
 Do not skip delegated intake in this workflow.
 
@@ -115,6 +118,21 @@ If no drift blocks progress, route to one of these skills:
 Do not recommend multiple competing handoffs in the same result.
 
 When the user asked to proceed with execution, do not stop after naming the next handoff skill. Invoke exactly one selected handoff skill in the same turn.
+Treat this as exactly one handoff per iteration, not necessarily one handoff for the entire user request.
+
+When the user asked to continue until a concrete end-state, return to delegated intake after the invoked handoff skill finishes and route again until one of the following happens:
+
+- the requested end-state is reached, such as an Issue close, PR merge plus cleanup, or Project `Done`
+- execution is hard blocked and requires user input
+- execution is hard blocked on external state that the repo agent cannot change in the current turn
+- no unambiguous next handoff exists without making a product or implementation decision that should be surfaced to the user
+
+After each invoked handoff skill returns, reassess in this order:
+
+- if tracking drift now exists, route drift correction before new implementation
+- if the current target is still implementation-ready but incomplete, route another bounded slice through `codex-webui-sprint-cycle`
+- if the implementation slice is locally complete but package state must be created, reconciled, or archived, route `codex-webui-work-packages`
+- if merge, parent-checkout sync, worktree cleanup, Issue close, or Project completion tracking is now the critical path, route `codex-webui-github-projects`
 
 When the chosen target is implementation-ready and no tracking drift blocks execution, the handoff must be `codex-webui-sprint-cycle`.
 
@@ -135,6 +153,7 @@ Return a short brief with these sections in this order:
 The result should be short and routing-oriented.
 
 If the user asked to proceed with work in the current turn, present the brief and then continue into the selected handoff skill instead of ending after the brief.
+If the user also asked to continue until a concrete end-state, keep iterating after that handoff returns instead of treating the first completed handoff as the end of the request.
 
 ## Guardrails
 
@@ -146,9 +165,12 @@ If the user asked to proceed with work in the current turn, present the brief an
 - Do not recommend parallel execution of multiple Issues as the default path
 - Do not bypass drift correction when execution tracking is inconsistent
 - Do not bypass the selected handoff skill when the user asked to proceed with execution
+- Do not treat one completed handoff or one approved sprint as sufficient to end a continue-until request
+- Do not keep looping past a real hard block; stop and report the blocking condition concretely
 
 ## Example Requests
 
 - `Use $codex-webui-execution-orchestrator to choose the current Issue and next repo skill.`
 - `複数Issueの中から今の対象を1つ決めて、次に呼ぶ skill を実行するところまで進めて。`
 - `Use $codex-webui-execution-orchestrator for multi-issue routing and then invoke the correct repo skill for the next slice.`
+- `Use $codex-webui-execution-orchestrator to keep going until Issue #60 is closed.`

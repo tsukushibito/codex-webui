@@ -15,6 +15,7 @@ Treat evaluator approval as implementation approval, not as permission to close 
 For normal branch/PR work, run implementation from the active worktree rather than from the parent checkout. Only approved direct-to-`main` exceptions may use the parent checkout for implementation.
 
 When `codex-webui-execution-orchestrator` selects an implementation-ready target with no blocking tracking drift, this skill is the required implementation path for that target.
+When this skill was invoked by `codex-webui-execution-orchestrator`, return control to the orchestrator after the sprint result is known; this skill does not decide the next repo handoff.
 
 ## Build Context
 
@@ -54,6 +55,17 @@ Do not use this skill when:
 7. Allow at most 2 evaluator rejection cycles for the same sprint slice.
 8. If the second evaluator rejection still blocks completion, return to `planner` for replanning or a narrower slice.
 9. Finish the sprint only when `evaluator` returns `approved`.
+10. Return the sprint result to the caller. If the caller is `codex-webui-execution-orchestrator`, let that skill decide whether execution continues with another sprint, package-state work, completion tracking, or a blocked stop.
+
+## Post-Sprint Caller Contract
+
+This skill completes one bounded sprint only. After the sprint result is known, the caller should treat the outcome as one of these cases:
+
+- sprint approved, but the current Issue remains incomplete
+- sprint approved, and package lifecycle or completion tracking is now the critical path
+- sprint blocked and requires replanning or user input
+
+This skill may describe which case it reached, but it must not choose the next repo skill itself.
 
 ## Agent State Checks
 
@@ -78,6 +90,7 @@ Do not use this skill when:
 - Do not let `planner` or `evaluator` mutate the worktree, create commits, push branches, or update GitHub Issues/Projects
 - Do not add a mandatory post-`planner` compliance check just to police read-only behavior; prevent the issue with the spawn prompt and handle accidental edits through the fallback above
 - Do not treat evaluator approval alone as sufficient evidence to close an Issue or mark a Project item `Done`
+- Do not self-route to `codex-webui-work-packages` or `codex-webui-github-projects`; the caller owns next-skill selection
 
 ## Required Final Output
 
@@ -87,6 +100,7 @@ Return a merged result that includes:
 - the worker implementation summary
 - the evaluator verdict
 - the validations that were run
+- the caller-facing outcome, such as Issue still incomplete, completion-tracking handoff now needed, or blocked
 - any remaining risk that still exists after approval
 
 If the sprint is blocked and requires replanning, say that explicitly instead of pretending the sprint completed.
