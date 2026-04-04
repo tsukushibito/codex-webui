@@ -1,0 +1,4 @@
+interface:
+  display_name: "Completion Retrospective"
+  short_description: "Review completion readiness before archiving a package or closing an Issue."
+  default_prompt: "Review whether this work is actually ready for archive or Issue close, including any remaining contract gaps."
