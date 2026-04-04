@@ -1,6 +1,6 @@
 ---
 name: codex-webui-work-intake
-description: Decide what to work on next in `codex-webui` by inspecting GitHub Projects before local repo state. Use when the user asks what to do next, which execution slice should start, or to triage Project, Issue, `tasks/`, docs, and implementation state in the correct order.
+description: Decide what to work on next in `codex-webui` by inspecting GitHub Projects before local repo state. Use when the user asks what to do next, which execution slice should start, whether an Issue should be split into SubIssues before execution, or to triage Project, Issue, `tasks/`, docs, and implementation state in the correct order.
 ---
 
 # Codex WebUI Work Intake
@@ -18,6 +18,7 @@ Treat responsibilities as follows:
 - `tasks/` holds the active local work package for the current execution slice
 - active worktree state determines where normal implementation is allowed to happen
 - implementation directories show what is already built and what remains
+- broad parent or phase Issues should be split into SubIssues before execution begins
 
 When the user asks "what should we do next?" or equivalent, do not answer from local files alone if Project state is available.
 
@@ -41,9 +42,10 @@ Follow this order every time.
 2. Inspect open linked Issues, dependencies, and active PRs.
 3. Inspect local `tasks/` and worktree state.
 4. Check for drift across Project, Issue, PR, worktree, and `tasks/`.
-5. Read source-of-truth docs and nearest relevant README for the likely target area.
-6. Inspect local implementation state only after the execution layer is understood.
-7. Recommend exactly one next work item, unless drift must be fixed first.
+5. Check whether the likely target Issue should be split into SubIssues before execution.
+6. Read source-of-truth docs and nearest relevant README for the likely target area.
+7. Inspect local implementation state only after the execution layer is understood.
+8. Recommend exactly one next work item, unless drift must be fixed first or the target must be split first.
 
 ## Project-First Discovery
 
@@ -94,6 +96,14 @@ Use local inspection to answer these questions:
 - Do the maintained docs already define the expected next slice?
 - Does the codebase show that the claimed slice is already complete, partially complete, or not started?
 
+Use the execution-tracking layer, docs, and local state to answer these split-gate questions for the likely target:
+
+- Is this Issue a phase or parent umbrella rather than one bounded execution slice?
+- Does the Issue contain multiple separable deliverables or responsibilities that should be tracked independently?
+- Would realistic execution likely require multiple PRs, worktrees, or task packages?
+- Can the next step be stated as one concrete execution slice without first choosing among multiple sub-slices?
+- Would progress, review, or completion tracking be materially clearer if child Issues existed?
+
 ## Recommendation Rules
 
 If drift exists, recommend fixing the drift first. Examples:
@@ -108,7 +118,17 @@ If drift exists, recommend fixing the drift first. Examples:
 - the Project says `Done` while the linked PR is still open
 - an approved direct-to-`main` exception exists but the commits are not yet pushed to `origin/main`
 
-If there is no drift, recommend one concrete next slice. The recommendation must be specific enough to start execution without another triage pass.
+If no drift blocks progress, decide whether the likely target must be split into SubIssues before execution. Treat this as a gate, not a soft suggestion.
+
+Recommend split-first and hand off to `codex-webui-github-projects` when one or more of these conditions hold:
+
+- the Issue is a parent or phase tracker rather than one bounded slice
+- the Issue mixes multiple distinct responsibilities that would naturally become separate execution slices
+- realistic execution would likely require multiple PRs, worktrees, or task packages
+- the next step is still ambiguous because multiple plausible sub-slices compete to go first
+- progress or completion would be materially clearer if tracked through child Issues
+
+If no drift exists and no split is required, recommend one concrete next slice. The recommendation must be specific enough to start execution without another triage pass.
 
 Do not return a long backlog. Pick one.
 
@@ -128,6 +148,7 @@ If execution-tracking evidence is incomplete, state that in `Tracking alignment`
 This skill does not edit the tracking layers itself.
 
 - Use `codex-webui-github-projects` when Project fields/items, broader Issue tracking state, PR merge, or final completion tracking should be created or updated
+- Use `codex-webui-github-projects` when the likely target must be split into SubIssues before execution can begin
 - Use `codex-webui-work-packages` when a local task package should be created, updated, reconciled, or archived, or when package-linked Issue `Execution` state should move with that package
 - Use `codex-webui-sprint-cycle` only after the next execution slice has been chosen
 
@@ -137,6 +158,7 @@ This skill does not edit the tracking layers itself.
 - Do not create or edit Project items from this skill
 - Do not create, update, or archive `tasks/` packages from this skill
 - Do not recommend a new feature slice before reporting Project / Issue / `tasks/` drift
+- Do not recommend `work-packages` or `sprint-cycle` for a broad target that should be split into SubIssues first
 - Do not duplicate long roadmap content in the answer; link or summarize briefly
 - Do not recommend multiple competing next actions
 
@@ -145,3 +167,4 @@ This skill does not edit the tracking layers itself.
 - `Use $codex-webui-work-intake to decide what to work on next.`
 - `Project と repo を見て次の実行スライスを決めて。`
 - `Use $codex-webui-work-intake to audit Project, Issue, tasks, and local code before recommending the next task.`
+- `Use $codex-webui-work-intake to decide whether this Issue should be split into SubIssues before execution starts.`

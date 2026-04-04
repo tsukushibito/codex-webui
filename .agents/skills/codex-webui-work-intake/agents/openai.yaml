@@ -1,4 +1,4 @@
 interface:
   display_name: "Work Intake"
-  short_description: "Decide what to work on next in codex-webui"
-  default_prompt: "Use $codex-webui-work-intake to inspect Project, Issue, tasks, docs, and local code in that order before recommending the next execution slice."
+  short_description: "Decide the next slice or split a broad Issue first"
+  default_prompt: "Use $codex-webui-work-intake to inspect Project, Issue, tasks, docs, and local code in that order, then decide whether the target should be split into SubIssues before recommending the next execution slice."

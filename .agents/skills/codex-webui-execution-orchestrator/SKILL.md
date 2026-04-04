@@ -1,6 +1,6 @@
 ---
 name: codex-webui-execution-orchestrator
-description: Coordinate multi-Issue execution in `codex-webui` by delegating read-only intake to the custom `intake` agent, choosing one current target, and routing to the next existing repo skill. Use when the main agent should decide which Issue to work on next across multiple active or candidate Issues.
+description: Coordinate multi-Issue execution in `codex-webui` by delegating read-only intake to the custom `intake` agent, choosing one current target, and routing to the next existing repo skill. Use when the main agent should decide which Issue to work on next across multiple active or candidate Issues, including whether a broad target must be split before execution.
 ---
 
 # Codex WebUI Execution Orchestrator
@@ -17,6 +17,7 @@ Responsibilities:
 - choose exactly one current execution target
 - park the remaining Issues explicitly
 - report tracking drift before recommending fresh execution
+- route broad targets to SubIssue breakdown before implementation starts
 - select exactly one next existing repo skill
 - invoke that selected repo skill in the same turn when the user asked to proceed with execution
 - own the cross-skill continuation loop when the user asked to keep going until a concrete end-state is reached
@@ -58,11 +59,12 @@ Follow this order every time.
 2. Delegate intake to the custom read-only `intake` agent defined in `.codex/config.toml`.
 3. Use the intake summary to select one current target.
 4. Check whether tracking drift blocks execution.
-5. Select exactly one next handoff skill.
-6. If the user asked to proceed with work in the current turn, invoke that selected handoff skill in the same turn instead of stopping after the routing brief.
-7. If the user asked to continue until a concrete end-state, treat steps 2-6 as one iteration, then re-run intake after the invoked handoff skill returns instead of stopping after the first handoff.
-8. Stop only when the requested end-state is reached or execution is hard blocked.
-9. Park the other Issues explicitly.
+5. Check whether the current target must be split into SubIssues before execution.
+6. Select exactly one next handoff skill.
+7. If the user asked to proceed with work in the current turn, invoke that selected handoff skill in the same turn instead of stopping after the routing brief.
+8. If the user asked to continue until a concrete end-state, treat steps 2-7 as one iteration, then re-run intake after the invoked handoff skill returns instead of stopping after the first handoff.
+9. Stop only when the requested end-state is reached or execution is hard blocked.
+10. Park the other Issues explicitly.
 
 Do not skip delegated intake in this workflow.
 
@@ -108,12 +110,18 @@ If tracking drift exists, prioritize drift correction before new execution. Exam
 - the Project says `Done` while the linked PR is still open
 - an approved direct-to-`main` exception exists but the commits are not yet pushed to `origin/main`
 
+If no drift blocks progress but the chosen target is still too broad for one execution stream, prioritize splitting it into SubIssues before new implementation. Examples:
+
+- the target is a parent or phase Issue rather than one bounded slice
+- the target mixes multiple distinct deliverables that would naturally require separate PRs or task packages
+- the next step is still ambiguous because multiple candidate sub-slices compete to go first
+
 If no drift blocks progress, route to one of these skills:
 
 - `codex-webui-work-packages` when local task package state must be created, resumed, reconciled, or archived
 - `codex-webui-work-packages` when the active worktree must be created, corrected, or documented, or when package-linked Issue `Execution` metadata must move with the package lifecycle
 - `codex-webui-sprint-cycle` when one bounded sprint slice is ready to execute for the chosen Issue
-- `codex-webui-github-projects` when Project state, broader Issue tracking state, PR merge, parent-checkout sync, worktree cleanup, or final completion tracking must be corrected
+- `codex-webui-github-projects` when Project state, broader Issue tracking state, SubIssue breakdown, PR merge, parent-checkout sync, worktree cleanup, or final completion tracking must be corrected
 - `codex-webui-execution-handoff` when execution cannot continue in the current session and the correct outcome is a resumable `.tmp/` handoff rather than more implementation or tracking work
 
 Do not recommend multiple competing handoffs in the same result.
@@ -131,9 +139,12 @@ When the user asked to continue until a concrete end-state, return to delegated 
 After each invoked handoff skill returns, reassess in this order:
 
 - if tracking drift now exists, route drift correction before new implementation
+- if the current target still needs to be split before execution, route `codex-webui-github-projects`
 - if the current target is still implementation-ready but incomplete, route another bounded slice through `codex-webui-sprint-cycle`
 - if the implementation slice is locally complete but package state must be created, reconciled, or archived, route `codex-webui-work-packages`
 - if merge, parent-checkout sync, worktree cleanup, Issue close, or Project completion tracking is now the critical path, route `codex-webui-github-projects`
+
+When intake says the chosen target must be split before execution, the handoff must be `codex-webui-github-projects`.
 
 When the chosen target is implementation-ready and no tracking drift blocks execution, the handoff must be `codex-webui-sprint-cycle`.
 
@@ -165,6 +176,7 @@ If the user also asked to continue until a concrete end-state, keep iterating af
 - Do not produce a backlog dump or queue report as the final answer
 - Do not recommend parallel execution of multiple Issues as the default path
 - Do not bypass drift correction when execution tracking is inconsistent
+- Do not bypass the split-first gate when the chosen target is still too broad for one execution stream
 - Do not bypass the selected handoff skill when the user asked to proceed with execution
 - Do not treat one completed handoff or one approved sprint as sufficient to end a continue-until request
 - Do not keep looping past a real hard block; stop and report the blocking condition concretely
@@ -176,3 +188,4 @@ If the user also asked to continue until a concrete end-state, keep iterating af
 - `Use $codex-webui-execution-orchestrator for multi-issue routing and then invoke the correct repo skill for the next slice.`
 - `Use $codex-webui-execution-orchestrator to keep going until Issue #60 is closed.`
 - `Use $codex-webui-execution-orchestrator to decide whether we should continue executing or stop and create an execution handoff.`
+- `Use $codex-webui-execution-orchestrator to split a broad target into SubIssues before starting implementation.`
