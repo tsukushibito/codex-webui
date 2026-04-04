@@ -9,13 +9,14 @@ description: Manage GitHub Projects for this `codex-webui` repository using the 
 
 Use GitHub Projects as the execution layer for this repository, not as the source of truth. Keep maintained requirements, specifications, and roadmap decisions in `docs/`; keep active work packages in `tasks/`; keep evidence in `artifacts/`.
 
-This skill owns GitHub-side execution tracking. If the user needs to create, update, or archive a local task package under `tasks/`, use `codex-webui-work-packages` for that part and keep this skill focused on Issues, Project items, fields, and workflow state.
+This skill owns GitHub-side execution tracking. If the user needs to create, update, or archive a local task package under `tasks/`, use `codex-webui-work-packages` for that part and keep this skill focused on Issues, Project items, fields, PR merge/completion flow, and workflow state that is not part of in-flight package maintenance.
 
 ## Build Context
 
 Read these files before changing the Project shape or roadmap items:
 
 - `README.md`
+- `AGENTS.md`
 - `docs/README.md`
 - `tasks/README.md`
 - `docs/codex_webui_mvp_roadmap_v0_1.md`
@@ -134,13 +135,14 @@ When an Issue also uses a local task package:
 
 1. Read `tasks/README.md` and check the linked package state.
 2. Check the Issue `Execution` section for the active branch, active worktree, and active PR when they exist.
-3. Keep only a short `Execution` section and branch/worktree/PR/package links in the Issue.
+3. When this skill updates the Issue `Execution` section during merge/completion transitions, keep it short and limited to branch/worktree/PR/package links.
 4. Let `codex-webui-work-packages` handle package creation, README updates, and archive moves.
-5. For normal branch/PR work, own PR `squash merge`, parent-checkout `main` sync, worktree cleanup, and final completion tracking.
-6. Before closing an Issue or setting Project `Status` to `Done`, verify the work is reachable on `main`: merged PR to `main` for the default workflow, or pushed commits on `origin/main` for an approved direct-to-`main` exception.
-7. If the PR remains open, the branch is not yet on `main`, the active worktree still exists, or the local repo state is dirty, keep the Issue and Project in execution rather than `Done`.
-8. If the current slice is merged and cleaned up but the Issue still has remaining work, clear the active branch, active worktree, and active PR from the Issue `Execution` section and return the Project item to `Todo` until the next slice starts.
-9. Only when the full Issue scope is complete should this skill close the Issue and set Project `Status` to `Done`.
+5. Let `codex-webui-work-packages` own package creation, archive moves, and package-linked `Execution` updates while the slice is in flight.
+6. For normal branch/PR work, own PR `squash merge`, parent-checkout `main` sync, worktree cleanup, and final completion tracking.
+7. Before closing an Issue or setting Project `Status` to `Done`, verify the work is reachable on `main`: merged PR to `main` for the default workflow, or pushed commits on `origin/main` for an approved direct-to-`main` exception.
+8. If the PR remains open, the branch is not yet on `main`, the active worktree still exists, or the local repo state is dirty, keep the Issue and Project in execution rather than `Done`.
+9. If the current slice is merged and cleaned up but the Issue still has remaining work, clear the active branch, active worktree, and active PR from the Issue `Execution` section and return the Project item to `Todo` until the next slice starts.
+10. Only when the full Issue scope is complete should this skill close the Issue and set Project `Status` to `Done`.
 
 Typical parent-checkout commands for the default branch/PR completion flow are:
 
@@ -158,6 +160,7 @@ git status --short --branch
 - Do not silently replace field semantics in an existing Project.
 - Do not duplicate detailed acceptance criteria from `docs/` into many issue bodies unless the user asks for that granularity.
 - Do not move completed evidence into `tasks/`; keep `tasks/` for active work only.
+- Do not take over active package-lifecycle maintenance that belongs to `codex-webui-work-packages`; use this skill for Project state, broader Issue tracking, merge/completion flow, and post-merge cleanup.
 - Do not mark an Issue or Project item as complete while a PR remains open, the execution branch is not yet on `main`, the active worktree still exists, an approved direct-to-`main` exception is unpushed, or the local repo state is dirty.
 - Do not delete old Projects, issues, or items without an explicit user instruction.
 

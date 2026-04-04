@@ -108,9 +108,9 @@ If tracking drift exists, prioritize drift correction before new execution. Exam
 If no drift blocks progress, route to one of these skills:
 
 - `codex-webui-work-packages` when local task package state must be created, resumed, reconciled, or archived
-- `codex-webui-work-packages` when the active worktree must be created, corrected, or documented
+- `codex-webui-work-packages` when the active worktree must be created, corrected, or documented, or when package-linked Issue `Execution` metadata must move with the package lifecycle
 - `codex-webui-sprint-cycle` when one bounded sprint slice is ready to execute for the chosen Issue
-- `codex-webui-github-projects` when Project or Issue tracking state, PR merge, parent-checkout sync, or worktree cleanup must be corrected
+- `codex-webui-github-projects` when Project state, broader Issue tracking state, PR merge, parent-checkout sync, worktree cleanup, or final completion tracking must be corrected
 
 Do not recommend multiple competing handoffs in the same result.
 

@@ -127,8 +127,8 @@ If execution-tracking evidence is incomplete, state that in `Tracking alignment`
 
 This skill does not edit the tracking layers itself.
 
-- Use `codex-webui-github-projects` when Project fields, items, or Issue execution state should be created or updated
-- Use `codex-webui-work-packages` when a local task package should be created, updated, reconciled, or archived
+- Use `codex-webui-github-projects` when Project fields/items, broader Issue tracking state, PR merge, or final completion tracking should be created or updated
+- Use `codex-webui-work-packages` when a local task package should be created, updated, reconciled, or archived, or when package-linked Issue `Execution` state should move with that package
 - Use `codex-webui-sprint-cycle` only after the next execution slice has been chosen
 
 ## Guardrails
