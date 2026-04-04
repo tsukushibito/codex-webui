@@ -135,8 +135,11 @@ After the worktree is created, create or edit the task-package files from that w
 ### Resume work on an existing Issue
 
 1. Leave old archived packages in place
-2. Create a new active package with a new `<work_id>`
-3. Update the Issue `Execution` section so only the new package is marked active
+2. Choose a new `<work_id>` for the new execution slice; do not reactivate an archived package directory
+3. For normal branch/PR work, sync the parent checkout to the current `main` and create a new branch `issue-<number>-<work_id>` with worktree `.worktrees/issue-<number>-<work_id>`
+4. Only when the user explicitly approved a direct-to-`main` exception, use the parent checkout instead and record `Active worktree: .`
+5. Create a new active package with the new `<work_id>` in the active worktree for the new slice
+6. Update the Issue `Execution` section so only the new package is marked active and its branch/worktree entries match the new slice
 
 ## Guardrails
 
