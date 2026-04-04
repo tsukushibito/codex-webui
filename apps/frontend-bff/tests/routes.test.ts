@@ -4,6 +4,7 @@ import {
   approveApproval,
   createSession,
   getApproval,
+  getHome,
   listEvents,
   listWorkspaces,
   stopSession,
@@ -74,6 +75,63 @@ describe("frontend-bff route handlers", () => {
       ],
       next_cursor: null,
       has_more: false,
+    });
+  });
+
+  it("combines workspace summaries and approval summary for the Home response", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            {
+              workspace_id: "ws_alpha",
+              workspace_name: "alpha",
+              directory_name: "alpha",
+              created_at: "2026-03-27T05:12:34Z",
+              updated_at: "2026-03-27T05:21:00Z",
+              active_session_id: "thread_001",
+              active_session_summary: {
+                session_id: "thread_001",
+                status: "running",
+                last_message_at: "2026-03-27T05:21:00Z",
+              },
+              pending_approval_count: 1,
+            },
+          ],
+          next_cursor: null,
+          has_more: false,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          pending_approval_count: 2,
+          updated_at: "2026-03-27T05:22:00Z",
+        }),
+      );
+
+    const response = await getHome(
+      new Request("http://localhost/api/v1/home"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      workspaces: [
+        {
+          workspace_id: "ws_alpha",
+          workspace_name: "alpha",
+          created_at: "2026-03-27T05:12:34Z",
+          updated_at: "2026-03-27T05:21:00Z",
+          active_session_summary: {
+            session_id: "thread_001",
+            status: "running",
+            last_message_at: "2026-03-27T05:21:00Z",
+          },
+          pending_approval_count: 1,
+        },
+      ],
+      pending_approval_count: 2,
+      updated_at: "2026-03-27T05:22:00Z",
     });
   });
 
