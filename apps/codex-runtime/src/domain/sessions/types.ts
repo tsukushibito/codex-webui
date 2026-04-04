@@ -1,3 +1,5 @@
+import type { ApprovalProjection } from "../approvals/types.js";
+
 export type SessionStatus =
   | "created"
   | "running"
@@ -25,7 +27,7 @@ export interface SessionSummary {
 
 export interface SessionStopResult {
   session: SessionSummary;
-  canceled_approval: null;
+  canceled_approval: ApprovalProjection | null;
 }
 
 export type MessageRole = "user" | "assistant";

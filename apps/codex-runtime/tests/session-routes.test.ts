@@ -17,6 +17,11 @@ class StubNativeSessionGateway implements NativeSessionGateway {
     private readonly turnIds: string[] = [],
     readonly interrupts: Array<{ sessionId: string; turnId: string }> = [],
     readonly sentMessages: Array<{ sessionId: string; content: string }> = [],
+    readonly resolvedApprovals: Array<{
+      sessionId: string;
+      approvalId: string;
+      resolution: "approved" | "denied";
+    }> = [],
   ) {}
 
   async createSession() {
@@ -35,6 +40,14 @@ class StubNativeSessionGateway implements NativeSessionGateway {
       turnId:
         this.turnIds.shift() ?? `turn_${this.sentMessages.length.toString().padStart(3, "0")}`,
     };
+  }
+
+  async resolveApproval(input: {
+    sessionId: string;
+    approvalId: string;
+    resolution: "approved" | "denied";
+  }) {
+    this.resolvedApprovals.push(input);
   }
 
   async interruptSessionTurn(input: { sessionId: string; turnId: string }) {
@@ -708,6 +721,577 @@ describe("session routes", () => {
           session_id: sessionId,
           current_status: "running",
           current_turn_id: "turn_001",
+          requested_turn_id: "turn_999",
+        },
+      },
+    });
+
+    await app.close();
+  });
+
+  it("ingests approval requests and exposes approval projections", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const nativeSessionGateway = new StubNativeSessionGateway([], ["turn_001"]);
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database);
+
+    await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_001",
+        content: "Please explain the diff.",
+      },
+    });
+
+    const ingestResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/approval-requests`,
+      payload: {
+        turn_id: "turn_001",
+        approval_category: "external_side_effect",
+        summary: "Run git push",
+        reason: "Codex requests permission to push changes to remote.",
+        operation_summary: "git push origin main",
+        context: {
+          command: "git push origin main",
+        },
+        native_request_kind: "approval_request",
+      },
+    });
+
+    const approval = ingestResponse.json();
+
+    expect(ingestResponse.statusCode).toBe(202);
+    expect(approval).toEqual({
+      approval_id: expect.stringMatching(/^apr_/),
+      session_id: sessionId,
+      workspace_id: "ws_alpha",
+      status: "pending",
+      resolution: null,
+      approval_category: "external_side_effect",
+      summary: "Run git push",
+      reason: "Codex requests permission to push changes to remote.",
+      operation_summary: "git push origin main",
+      context: {
+        command: "git push origin main",
+      },
+      created_at: expect.any(String),
+      resolved_at: null,
+      native_request_kind: "approval_request",
+    });
+
+    const sessionResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${sessionId}`,
+    });
+
+    expect(sessionResponse.statusCode).toBe(200);
+    expect(sessionResponse.json()).toMatchObject({
+      session_id: sessionId,
+      status: "waiting_approval",
+      active_approval_id: approval.approval_id,
+      current_turn_id: "turn_001",
+    });
+
+    const workspaceResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/workspaces/ws_alpha",
+    });
+
+    expect(workspaceResponse.statusCode).toBe(200);
+    expect(workspaceResponse.json()).toMatchObject({
+      active_session_id: sessionId,
+      pending_approval_count: 1,
+      active_session_summary: {
+        session_id: sessionId,
+        status: "waiting_approval",
+      },
+    });
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/approvals",
+    });
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json()).toEqual({
+      items: [approval],
+      next_cursor: null,
+      has_more: false,
+    });
+
+    const detailResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/approvals/${approval.approval_id}`,
+    });
+
+    expect(detailResponse.statusCode).toBe(200);
+    expect(detailResponse.json()).toEqual(approval);
+
+    const summaryResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/approvals/summary",
+    });
+
+    expect(summaryResponse.statusCode).toBe(200);
+    expect(summaryResponse.json()).toEqual({
+      pending_approval_count: 1,
+      updated_at: approval.created_at,
+    });
+
+    await app.close();
+  });
+
+  it("cancels a pending approval when the session is stopped", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const nativeSessionGateway = new StubNativeSessionGateway([], ["turn_001"]);
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database);
+
+    await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_001",
+        content: "Please explain the diff.",
+      },
+    });
+
+    const approvalResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/approval-requests`,
+      payload: {
+        turn_id: "turn_001",
+        approval_category: "external_side_effect",
+        summary: "Run git push",
+        reason: "Codex requests permission to push changes to remote.",
+        native_request_kind: "approval_request",
+      },
+    });
+
+    const approval = approvalResponse.json();
+
+    const stopResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/stop`,
+      payload: {},
+    });
+
+    expect(stopResponse.statusCode).toBe(200);
+    expect(stopResponse.json()).toEqual({
+      session: {
+        session_id: sessionId,
+        workspace_id: "ws_alpha",
+        title: "Fix build error",
+        status: "stopped",
+        created_at: expect.any(String),
+        updated_at: expect.any(String),
+        started_at: expect.any(String),
+        last_message_at: expect.any(String),
+        active_approval_id: null,
+        current_turn_id: null,
+        app_session_overlay_state: "closed",
+      },
+      canceled_approval: {
+        ...approval,
+        status: "canceled",
+        resolution: "canceled",
+        resolved_at: expect.any(String),
+      },
+    });
+
+    const workspaceResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/workspaces/ws_alpha",
+    });
+
+    expect(workspaceResponse.statusCode).toBe(200);
+    expect(workspaceResponse.json()).toMatchObject({
+      active_session_id: null,
+      pending_approval_count: 0,
+      active_session_summary: null,
+    });
+
+    const detailResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/approvals/${approval.approval_id}`,
+    });
+
+    expect(detailResponse.statusCode).toBe(200);
+    expect(detailResponse.json()).toMatchObject({
+      approval_id: approval.approval_id,
+      status: "canceled",
+      resolution: "canceled",
+      resolved_at: expect.any(String),
+    });
+
+    await app.close();
+  });
+
+  it("resolves approvals with approved and keeps the session running", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const nativeSessionGateway = new StubNativeSessionGateway([], ["turn_001"]);
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database);
+
+    await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_001",
+        content: "Please explain the diff.",
+      },
+    });
+
+    const approvalResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/approval-requests`,
+      payload: {
+        turn_id: "turn_001",
+        approval_category: "external_side_effect",
+        summary: "Run git push",
+        reason: "Codex requests permission to push changes to remote.",
+        native_request_kind: "approval_request",
+      },
+    });
+
+    const approval = approvalResponse.json();
+
+    const resolveResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/approvals/${approval.approval_id}/resolve`,
+      payload: {
+        resolution: "approved",
+      },
+    });
+
+    expect(resolveResponse.statusCode).toBe(200);
+    expect(resolveResponse.json()).toEqual({
+      approval: {
+        ...approval,
+        status: "approved",
+        resolution: "approved",
+        resolved_at: expect.any(String),
+      },
+      session: {
+        session_id: sessionId,
+        workspace_id: "ws_alpha",
+        title: "Fix build error",
+        status: "running",
+        created_at: expect.any(String),
+        updated_at: expect.any(String),
+        started_at: expect.any(String),
+        last_message_at: expect.any(String),
+        active_approval_id: null,
+        current_turn_id: "turn_001",
+        app_session_overlay_state: "open",
+      },
+    });
+    expect(nativeSessionGateway.resolvedApprovals).toEqual([
+      {
+        sessionId,
+        approvalId: approval.approval_id,
+        resolution: "approved",
+      },
+    ]);
+
+    const workspaceResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/workspaces/ws_alpha",
+    });
+
+    expect(workspaceResponse.statusCode).toBe(200);
+    expect(workspaceResponse.json()).toMatchObject({
+      active_session_id: sessionId,
+      pending_approval_count: 0,
+      active_session_summary: {
+        session_id: sessionId,
+        status: "running",
+      },
+    });
+
+    await app.close();
+  });
+
+  it("resolves approvals with denied and returns the session to waiting_input", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const nativeSessionGateway = new StubNativeSessionGateway([], ["turn_001"]);
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database);
+
+    await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_001",
+        content: "Please explain the diff.",
+      },
+    });
+
+    const approvalResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/approval-requests`,
+      payload: {
+        turn_id: "turn_001",
+        approval_category: "external_side_effect",
+        summary: "Run git push",
+        reason: "Codex requests permission to push changes to remote.",
+        native_request_kind: "approval_request",
+      },
+    });
+
+    const approval = approvalResponse.json();
+
+    const resolveResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/approvals/${approval.approval_id}/resolve`,
+      payload: {
+        resolution: "denied",
+      },
+    });
+
+    expect(resolveResponse.statusCode).toBe(200);
+    expect(resolveResponse.json()).toEqual({
+      approval: {
+        ...approval,
+        status: "denied",
+        resolution: "denied",
+        resolved_at: expect.any(String),
+      },
+      session: {
+        session_id: sessionId,
+        workspace_id: "ws_alpha",
+        title: "Fix build error",
+        status: "waiting_input",
+        created_at: expect.any(String),
+        updated_at: expect.any(String),
+        started_at: expect.any(String),
+        last_message_at: expect.any(String),
+        active_approval_id: null,
+        current_turn_id: null,
+        app_session_overlay_state: "open",
+      },
+    });
+    expect(nativeSessionGateway.resolvedApprovals).toEqual([
+      {
+        sessionId,
+        approvalId: approval.approval_id,
+        resolution: "denied",
+      },
+    ]);
+
+    const workspaceResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/workspaces/ws_alpha",
+    });
+
+    expect(workspaceResponse.statusCode).toBe(200);
+    expect(workspaceResponse.json()).toMatchObject({
+      active_session_id: null,
+      pending_approval_count: 0,
+      active_session_summary: null,
+    });
+
+    await app.close();
+  });
+
+  it("returns idempotent success for the same approval resolution and rejects later changes", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const nativeSessionGateway = new StubNativeSessionGateway([], ["turn_001"]);
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database);
+
+    await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_001",
+        content: "Please explain the diff.",
+      },
+    });
+
+    const approvalResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/approval-requests`,
+      payload: {
+        turn_id: "turn_001",
+        approval_category: "external_side_effect",
+        summary: "Run git push",
+        reason: "Codex requests permission to push changes to remote.",
+        native_request_kind: "approval_request",
+      },
+    });
+
+    const approval = approvalResponse.json();
+
+    const firstResolve = await app.inject({
+      method: "POST",
+      url: `/api/v1/approvals/${approval.approval_id}/resolve`,
+      payload: {
+        resolution: "approved",
+      },
+    });
+    const idempotentResolve = await app.inject({
+      method: "POST",
+      url: `/api/v1/approvals/${approval.approval_id}/resolve`,
+      payload: {
+        resolution: "approved",
+      },
+    });
+    const conflictingResolve = await app.inject({
+      method: "POST",
+      url: `/api/v1/approvals/${approval.approval_id}/resolve`,
+      payload: {
+        resolution: "denied",
+      },
+    });
+
+    expect(firstResolve.statusCode).toBe(200);
+    expect(idempotentResolve.statusCode).toBe(200);
+    expect(idempotentResolve.json()).toEqual(firstResolve.json());
+    expect(conflictingResolve.statusCode).toBe(409);
+    expect(conflictingResolve.json()).toEqual({
+      error: {
+        code: "approval_not_pending",
+        message: "approval is not pending",
+        details: {
+          approval_id: approval.approval_id,
+          status: "approved",
+        },
+      },
+    });
+
+    await app.close();
+  });
+
+  it("rejects approval request ingestion when the session turn does not match", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const nativeSessionGateway = new StubNativeSessionGateway([], ["turn_001"]);
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database);
+
+    await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_001",
+        content: "Please explain the diff.",
+      },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/approval-requests`,
+      payload: {
+        turn_id: "turn_999",
+        approval_category: "external_side_effect",
+        summary: "Run git push",
+        reason: "Codex requests permission to push changes to remote.",
+        native_request_kind: "approval_request",
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({
+      error: {
+        code: "session_invalid_state",
+        message: "session is not ready to ingest approval requests",
+        details: {
+          session_id: sessionId,
+          current_status: "running",
+          current_turn_id: "turn_001",
+          active_approval_id: null,
           requested_turn_id: "turn_999",
         },
       },

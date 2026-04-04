@@ -16,6 +16,11 @@ export interface NativeSessionGateway {
   sendUserMessage(input: SendNativeSessionMessageInput): Promise<{
     turnId: string;
   }>;
+  resolveApproval(input: {
+    sessionId: string;
+    approvalId: string;
+    resolution: "approved" | "denied";
+  }): Promise<void>;
   interruptSessionTurn(input: { sessionId: string; turnId: string }): Promise<void>;
 }
 
@@ -30,6 +35,14 @@ export class SyntheticNativeSessionGateway implements NativeSessionGateway {
     return {
       turnId: `turn_${crypto.randomUUID().replaceAll("-", "")}`,
     };
+  }
+
+  async resolveApproval(_input: {
+    sessionId: string;
+    approvalId: string;
+    resolution: "approved" | "denied";
+  }) {
+    return;
   }
 
   async interruptSessionTurn(_input: { sessionId: string; turnId: string }) {

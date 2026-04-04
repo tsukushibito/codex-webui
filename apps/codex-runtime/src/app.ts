@@ -14,6 +14,7 @@ import {
 import { SessionService } from "./domain/sessions/session-service.js";
 import { WorkspaceFilesystem } from "./domain/workspaces/workspace-filesystem.js";
 import { WorkspaceRegistry } from "./domain/workspaces/workspace-registry.js";
+import { registerApprovalRoutes } from "./routes/approvals.js";
 import { registerSessionRoutes } from "./routes/sessions.js";
 import { registerWorkspaceRoutes } from "./routes/workspaces.js";
 
@@ -84,6 +85,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
     reply.status(statusCode).send(body);
   });
 
+  await registerApprovalRoutes(app, sessionService);
   await registerWorkspaceRoutes(app, workspaceRegistry);
   await registerSessionRoutes(app, sessionService);
 
