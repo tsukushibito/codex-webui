@@ -94,6 +94,23 @@ export interface RuntimeApprovalSummary {
   updated_at: string;
 }
 
+export interface HomeResponse {
+  workspaces: Array<{
+    workspace_id: string;
+    workspace_name: string;
+    created_at: string;
+    updated_at: string;
+    active_session_summary: {
+      session_id: string;
+      status: string;
+      last_message_at: string | null;
+    } | null;
+    pending_approval_count: number;
+  }>;
+  pending_approval_count: number;
+  updated_at: string;
+}
+
 export interface ListResponse<T> {
   items: T[];
   next_cursor: string | null;

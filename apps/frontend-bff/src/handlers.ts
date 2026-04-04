@@ -16,8 +16,10 @@ import {
 } from "./mappings";
 import { RuntimeClient } from "./runtime-client";
 import type {
+  HomeResponse,
   ListResponse,
   RuntimeApprovalProjection,
+  RuntimeApprovalSummary,
   RuntimeApprovalResolveResult,
   RuntimeMessageProjection,
   RuntimeSessionEventProjection,
@@ -27,6 +29,10 @@ import type {
 } from "./runtime-types";
 
 const runtimeClient = new RuntimeClient();
+
+function latestTimestamp(values: string[]) {
+  return values.reduce((latest, value) => (value > latest ? value : latest));
+}
 
 function forwardSearch(request: Request) {
   return new URL(request.url).search;
@@ -79,6 +85,42 @@ export async function listWorkspaces(request: Request) {
     }
 
     return jsonResponse(result.status, mapWorkspaceList(result.body));
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function getHome(_request: Request) {
+  try {
+    const [workspaceResult, approvalSummaryResult] = await Promise.all([
+      runtimeClient.requestJson<ListResponse<RuntimeWorkspaceSummary>>("/api/v1/workspaces"),
+      runtimeClient.requestJson<RuntimeApprovalSummary>("/api/v1/approvals/summary"),
+    ]);
+
+    if (isErrorEnvelope(workspaceResult.body)) {
+      return passthroughRuntimeError(workspaceResult.status, workspaceResult.body);
+    }
+
+    if (isErrorEnvelope(approvalSummaryResult.body)) {
+      return passthroughRuntimeError(
+        approvalSummaryResult.status,
+        approvalSummaryResult.body,
+      );
+    }
+
+    const workspaces = workspaceResult.body.items.map(mapWorkspace);
+    const updatedAt = latestTimestamp([
+      approvalSummaryResult.body.updated_at,
+      ...workspaces.map((workspace) => workspace.updated_at),
+    ]);
+
+    const response: HomeResponse = {
+      workspaces,
+      pending_approval_count: approvalSummaryResult.body.pending_approval_count,
+      updated_at: updatedAt,
+    };
+
+    return jsonResponse(200, response);
   } catch (error) {
     return toErrorResponse(error);
   }
