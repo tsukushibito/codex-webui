@@ -30,6 +30,10 @@ export interface SessionStopResult {
   canceled_approval: ApprovalProjection | null;
 }
 
+export interface SessionReconcileResult {
+  session: SessionSummary;
+}
+
 export type MessageRole = "user" | "assistant";
 
 export type MessageSourceItemType = "user_message" | "agent_message";

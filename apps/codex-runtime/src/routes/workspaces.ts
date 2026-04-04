@@ -48,4 +48,9 @@ export async function registerWorkspaceRoutes(
     const params = request.params as { workspaceId: string };
     return workspaceRegistry.getWorkspace(params.workspaceId);
   });
+
+  app.post("/api/v1/workspaces/:workspaceId/reconcile", async (request) => {
+    const params = request.params as { workspaceId: string };
+    return workspaceRegistry.reconcileWorkspace(params.workspaceId);
+  });
 }

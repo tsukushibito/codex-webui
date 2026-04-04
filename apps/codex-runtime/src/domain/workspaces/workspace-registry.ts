@@ -4,7 +4,12 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { RuntimeError } from "../../errors.js";
 import type { RuntimeDatabase } from "../../db/database.js";
-import { sessions, workspaceSessionMappings, workspaces } from "../../db/schema.js";
+import {
+  approvals,
+  sessions,
+  workspaceSessionMappings,
+  workspaces,
+} from "../../db/schema.js";
 import type { EligibleWorkspaceDirectory, WorkspaceSummary } from "./types.js";
 import { validateWorkspaceName } from "./workspace-name.js";
 import { WorkspaceFilesystem } from "./workspace-filesystem.js";
@@ -37,6 +42,10 @@ function mapWorkspaceSummary(
 
 function firstRow<T>(rows: T[]) {
   return rows[0];
+}
+
+function isActiveSessionStatus(status: string) {
+  return status === "running" || status === "waiting_approval";
 }
 
 export class WorkspaceRegistry {
@@ -258,6 +267,38 @@ export class WorkspaceRegistry {
     );
 
     return mapping?.workspaceId ?? null;
+  }
+
+  async reconcileWorkspace(workspaceId: string) {
+    await this.getWorkspace(workspaceId);
+
+    const now = toIsoString(this.now());
+    const activeSession = firstRow(
+      this.database.db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.workspaceId, workspaceId))
+        .orderBy(desc(sessions.updatedAt), desc(sessions.sessionId))
+        .all()
+        .filter((row) => isActiveSessionStatus(row.status)),
+    );
+    const pendingApprovalCount = this.database.db
+      .select()
+      .from(approvals)
+      .where(and(eq(approvals.workspaceId, workspaceId), eq(approvals.status, "pending")))
+      .all().length;
+
+    this.database.db
+      .update(workspaces)
+      .set({
+        activeSessionId: activeSession?.sessionId ?? null,
+        pendingApprovalCount,
+        updatedAt: now,
+      })
+      .where(eq(workspaces.workspaceId, workspaceId))
+      .run();
+
+    return this.getWorkspace(workspaceId);
   }
 
   async hasSessionLink(workspaceId: string, sessionId: string) {
