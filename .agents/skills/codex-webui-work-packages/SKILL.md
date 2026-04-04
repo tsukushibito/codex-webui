@@ -41,7 +41,9 @@ If the work package is tied to a specific area, read the nearest relevant `READM
 - For normal branch/PR work, prepare and use a dedicated git worktree under `.worktrees/<branch>` and keep the parent checkout as the control checkout
 - For normal branch/PR work, create or edit repo-tracked task-package files only from the active worktree after it exists; do not start package edits from the parent checkout
 - For normal branch/PR work, if the parent checkout has `.venv/` and the new worktree does not, create a worktree-local symlink `.venv -> ../../.venv` so Python tooling is shared across worktrees
+- For normal branch/PR work, if the parent checkout already has app-local Node.js dependencies such as `apps/frontend-bff/node_modules` or `apps/codex-runtime/node_modules`, prefer worktree-local symlinks to those directories instead of running a fresh `npm install` in every worktree
 - Treat the shared `.venv` symlink as local environment plumbing only: do not replace an existing worktree `.venv`, do not record it in Issue tracking, and do not rely on it as a repo-tracked artifact
+- Treat shared `node_modules` symlinks as local environment plumbing only: only create them when the parent checkout and worktree use the same lockfile state, do not replace an existing real directory, do not record them in Issue tracking, and do not rely on them as repo-tracked artifacts
 - Approved direct-to-`main` exceptions may use the parent checkout and must record `Active worktree: .`
 - Prefer one primary Issue per task package
 - Link the task package and the Issue to each other
@@ -102,11 +104,12 @@ If the user asks you to edit Project fields, close or retitle Issues, or change 
 3. Check whether the Issue already has an active package
 4. For normal branch/PR work, create branch `issue-<number>-<work_id>` and worktree `.worktrees/issue-<number>-<work_id>` from the parent checkout
 5. If the parent checkout has `.venv/` and the worktree does not, create `.worktrees/issue-<number>-<work_id>/.venv` as a symlink to `../../.venv`
-6. After the active worktree exists, switch execution into that worktree and create or update `tasks/issue-<number>-<work_id>/README.md` there
-7. Only when the user explicitly approved a direct-to-`main` exception, use the parent checkout instead and record `Active worktree: .`
-8. Fill the README with the required sections and links
-9. Add or update the linked Issue `Execution` section with the active branch, active worktree, active PR if one exists, and active package link so the Issue reflects the current package lifecycle state
-10. If requested, use `codex-webui-github-projects` to set Project `Status` to `In Progress`
+6. If the parent checkout already has `apps/<app>/node_modules` and the matching worktree app directory does not, create a symlink to the parent checkout copy so Node.js dependencies are shared across worktrees
+7. After the active worktree exists, switch execution into that worktree and create or update `tasks/issue-<number>-<work_id>/README.md` there
+8. Only when the user explicitly approved a direct-to-`main` exception, use the parent checkout instead and record `Active worktree: .`
+9. Fill the README with the required sections and links
+10. Add or update the linked Issue `Execution` section with the active branch, active worktree, active PR if one exists, and active package link so the Issue reflects the current package lifecycle state
+11. If requested, use `codex-webui-github-projects` to set Project `Status` to `In Progress`
 
 Typical parent-checkout commands for the default branch/PR flow are:
 
@@ -114,6 +117,8 @@ Typical parent-checkout commands for the default branch/PR flow are:
 git fetch origin
 git worktree add -b issue-<number>-<work_id> .worktrees/issue-<number>-<work_id> origin/main
 if [ -d .venv ] && [ ! -e .worktrees/issue-<number>-<work_id>/.venv ]; then ln -s ../../.venv .worktrees/issue-<number>-<work_id>/.venv; fi
+if [ -d apps/frontend-bff/node_modules ] && [ ! -e .worktrees/issue-<number>-<work_id>/apps/frontend-bff/node_modules ]; then ln -s ../../../apps/frontend-bff/node_modules .worktrees/issue-<number>-<work_id>/apps/frontend-bff/node_modules; fi
+if [ -d apps/codex-runtime/node_modules ] && [ ! -e .worktrees/issue-<number>-<work_id>/apps/codex-runtime/node_modules ]; then ln -s ../../../apps/codex-runtime/node_modules .worktrees/issue-<number>-<work_id>/apps/codex-runtime/node_modules; fi
 ```
 
 After the worktree is created, create or edit the task-package files from that worktree, not from the parent checkout.
@@ -142,9 +147,10 @@ After the worktree is created, create or edit the task-package files from that w
 2. Choose a new `<work_id>` for the new execution slice; do not reactivate an archived package directory
 3. For normal branch/PR work, sync the parent checkout to the current `main` and create a new branch `issue-<number>-<work_id>` with worktree `.worktrees/issue-<number>-<work_id>`
 4. If the parent checkout has `.venv/` and the worktree does not, create `.worktrees/issue-<number>-<work_id>/.venv` as a symlink to `../../.venv`
-5. Only when the user explicitly approved a direct-to-`main` exception, use the parent checkout instead and record `Active worktree: .`
-6. Create a new active package with the new `<work_id>` in the active worktree for the new slice
-7. Update the Issue `Execution` section so only the new package is marked active and its branch/worktree entries match the new slice
+5. If the parent checkout already has `apps/<app>/node_modules` and the matching worktree app directory does not, create a symlink to the parent checkout copy before running Node.js tooling
+6. Only when the user explicitly approved a direct-to-`main` exception, use the parent checkout instead and record `Active worktree: .`
+7. Create a new active package with the new `<work_id>` in the active worktree for the new slice
+8. Update the Issue `Execution` section so only the new package is marked active and its branch/worktree entries match the new slice
 
 ## Guardrails
 

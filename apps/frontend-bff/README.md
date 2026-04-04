@@ -26,6 +26,14 @@ Install dependencies:
 npm install
 ```
 
+For branch worktrees under `.worktrees/`, prefer installing once in the parent checkout and reusing it with a worktree-local symlink:
+
+```bash
+ln -s ../../../apps/frontend-bff/node_modules .worktrees/<branch>/apps/frontend-bff/node_modules
+```
+
+Only do this when the worktree and parent checkout are on the same lockfile state.
+
 Run the BFF locally:
 
 ```bash
