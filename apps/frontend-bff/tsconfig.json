@@ -36,8 +36,11 @@
   },
   "include": [
     "app/**/*.ts",
+    "app/**/*.tsx",
     "src/**/*.ts",
+    "src/**/*.tsx",
     "tests/**/*.ts",
+    "tests/**/*.tsx",
     "vitest.config.ts",
     ".next/types/**/*.ts"
   ],
