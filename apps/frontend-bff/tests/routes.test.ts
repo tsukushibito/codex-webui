@@ -4,7 +4,9 @@ import {
   approveApproval,
   createSession,
   getApproval,
+  getApprovalStream,
   getHome,
+  getSessionStream,
   listEvents,
   listWorkspaces,
   stopSession,
@@ -17,6 +19,26 @@ function jsonResponse(body: unknown, status = 200) {
       "content-type": "application/json",
     },
   });
+}
+
+function sseResponse(frames: string[]) {
+  const encoder = new TextEncoder();
+
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const frame of frames) {
+          controller.enqueue(encoder.encode(frame));
+        }
+        controller.close();
+      },
+    }),
+    {
+      headers: {
+        "content-type": "text/event-stream; charset=utf-8",
+      },
+    },
+  );
 }
 
 describe("frontend-bff route handlers", () => {
@@ -472,6 +494,88 @@ describe("frontend-bff route handlers", () => {
       next_cursor: null,
       has_more: false,
     });
+  });
+
+  it("relays session stream events using the public envelope", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      sseResponse([
+        ": connected\n\n",
+        `data: ${JSON.stringify({
+          event_id: "evt_001",
+          session_id: "thread_001",
+          event_type: "message.assistant.delta",
+          sequence: 12,
+          occurred_at: "2026-03-27T05:20:10Z",
+          payload: {
+            message_id: "msg_assistant_003",
+            delta: "Updated the config",
+          },
+          native_event_name: "item/delta",
+        })}\n\n`,
+      ]),
+    );
+
+    const response = await getSessionStream(
+      new Request("http://localhost/api/v1/sessions/thread_001/stream"),
+      "thread_001",
+    );
+
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    await expect(response.text()).resolves.toContain(
+      `data: ${JSON.stringify({
+        event_id: "evt_001",
+        session_id: "thread_001",
+        event_type: "message.assistant.delta",
+        sequence: 12,
+        occurred_at: "2026-03-27T05:20:10Z",
+        payload: {
+          message_id: "msg_assistant_003",
+          delta: "Updated the config",
+        },
+      })}`,
+    );
+  });
+
+  it("maps approval stream payloads from summary to title", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      sseResponse([
+        `data: ${JSON.stringify({
+          event_id: "evt_apr_001",
+          session_id: "thread_001",
+          event_type: "approval.requested",
+          occurred_at: "2026-03-27T05:18:00Z",
+          payload: {
+            approval_id: "apr_001",
+            workspace_id: "ws_alpha",
+            summary: "Run git push",
+            approval_category: "external_side_effect",
+          },
+          native_event_name: "request/started",
+        })}\n\n`,
+      ]),
+    );
+
+    const response = await getApprovalStream(
+      new Request("http://localhost/api/v1/approvals/stream"),
+    );
+
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    await expect(response.text()).resolves.toContain(
+      `data: ${JSON.stringify({
+        event_id: "evt_apr_001",
+        session_id: "thread_001",
+        event_type: "approval.requested",
+        occurred_at: "2026-03-27T05:18:00Z",
+        payload: {
+          approval_id: "apr_001",
+          workspace_id: "ws_alpha",
+          title: "Run git push",
+          approval_category: "external_side_effect",
+        },
+      })}`,
+    );
   });
 
   it("returns a public runtime-unavailable error when codex-runtime cannot be reached", async () => {

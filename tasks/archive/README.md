@@ -17,3 +17,4 @@ Archive entries preserve the work instructions that were used at the time, while
 - [issue-65-phase-3b-session-lifecycle](./issue-65-phase-3b-session-lifecycle/README.md)
 - [issue-78-phase-4a2-home-aggregation](./issue-78-phase-4a2-home-aggregation/README.md)
 - [issue-79-phase-4a1-rest-facade](./issue-79-phase-4a1-rest-facade/README.md)
+- [issue-80-phase-4a3-sse-relay](./issue-80-phase-4a3-sse-relay/README.md)

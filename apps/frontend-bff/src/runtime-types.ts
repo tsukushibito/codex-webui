@@ -94,6 +94,15 @@ export interface RuntimeApprovalSummary {
   updated_at: string;
 }
 
+export interface RuntimeApprovalStreamEventProjection {
+  event_id: string;
+  session_id: string;
+  event_type: "approval.requested" | "approval.resolved";
+  occurred_at: string;
+  payload: Record<string, unknown>;
+  native_event_name: string | null;
+}
+
 export interface HomeResponse {
   workspaces: Array<{
     workspace_id: string;
