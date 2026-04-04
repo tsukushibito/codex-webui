@@ -13,7 +13,7 @@ This skill is routing-only. It does not replace the existing single-Issue skills
 
 Responsibilities:
 
-- use delegated intake to inspect Project / Issue / PR / `tasks/` state
+- use delegated intake to inspect Project / Issue / PR / worktree / `tasks/` state
 - choose exactly one current execution target
 - park the remaining Issues explicitly
 - report tracking drift before recommending fresh execution
@@ -73,9 +73,9 @@ Its job is to inspect:
 
 - GitHub Project state
 - open linked Issues, dependencies, and active PRs
-- local `tasks/` package state
+- local `tasks/` package state and active worktree state
 - source-of-truth docs and nearest relevant README for the candidate target
-- local implementation state only after execution tracking is understood
+- local implementation state only after execution tracking is understood, inspecting the tracked active worktree explicitly for normal branch/PR work instead of relying only on parent-checkout scans
 
 The orchestrator should consume the intake result as a concise routing summary, not as a long audit transcript.
 
@@ -98,15 +98,19 @@ If tracking drift exists, prioritize drift correction before new execution. Exam
 - Project says `In Progress` but no active task package exists
 - a local active task package points at an Issue that is not the current execution target
 - local implementation appears complete but tracking still claims active execution
+- the tracked branch and tracked worktree do not match
+- normal branch/PR work is happening from the parent checkout instead of `.worktrees/<branch>`
 - a task package is archived locally but the PR is still open or the branch is not yet on `main`
+- the branch is merged but the active worktree still exists
 - the Project says `Done` while the linked PR is still open
 - an approved direct-to-`main` exception exists but the commits are not yet pushed to `origin/main`
 
 If no drift blocks progress, route to one of these skills:
 
 - `codex-webui-work-packages` when local task package state must be created, resumed, reconciled, or archived
+- `codex-webui-work-packages` when the active worktree must be created, corrected, or documented
 - `codex-webui-sprint-cycle` when one bounded sprint slice is ready to execute for the chosen Issue
-- `codex-webui-github-projects` when Project or Issue tracking state must be corrected
+- `codex-webui-github-projects` when Project or Issue tracking state, PR merge, parent-checkout sync, or worktree cleanup must be corrected
 
 Do not recommend multiple competing handoffs in the same result.
 

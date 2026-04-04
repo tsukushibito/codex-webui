@@ -27,6 +27,8 @@ If editing issues tied to a specific area, read the nearest relevant README in t
 - Treat `docs/` as the source of truth for scope, decisions, and completion criteria.
 - Use GitHub Projects to track execution state, ownership, sequencing, and review flow.
 - Default repo-tracked change flow is a short-lived branch and PR; direct commits to `main` are exceptions only.
+- For normal branch/PR work, use the dedicated worktree under `.worktrees/<branch>` and keep the parent checkout as the control checkout.
+- Approved direct-to-`main` exceptions may use the parent checkout and must record `Active worktree: .`
 - Keep local task-package mechanics in `codex-webui-work-packages`; only store short execution links and summaries in Issues.
 - Avoid duplicating long roadmap text into the Project README or issue bodies unless the duplication materially helps execution.
 - Preserve terminology already used in nearby docs: `Phase`, `Runtime`, `BFF`, `UI`, `Validation`, `Infra`.
@@ -52,7 +54,7 @@ Prefer these custom fields:
 
 Use the built-in `Status` field unless the user explicitly wants a different workflow. Default to `Todo`, `In Progress`, and `Done` if the project is new.
 
-Keep items with open PRs, unmerged execution branches, or unpushed direct-to-`main` exceptions in `In Progress`; do not use `Done` until the work is reachable on `main`.
+Keep items with open PRs, unmerged execution branches, uncleared active worktrees, or unpushed direct-to-`main` exceptions in `In Progress`; do not use `Done` until the work is reachable on `main` and required cleanup is complete.
 
 ## Standard Work Breakdown
 
@@ -79,6 +81,7 @@ gh project field-list <number> --owner tsukushibito --format json
 gh project item-list <number> --owner tsukushibito --format json
 gh issue list --state open --limit 100
 gh pr list --state open --limit 100
+git worktree list
 git status --short --branch
 ```
 
@@ -130,11 +133,24 @@ When the user asks to maintain the roadmap Project:
 When an Issue also uses a local task package:
 
 1. Read `tasks/README.md` and check the linked package state.
-2. Check the Issue `Execution` section for the active branch and active PR when they exist.
-3. Keep only a short `Execution` section and branch/PR/package links in the Issue.
+2. Check the Issue `Execution` section for the active branch, active worktree, and active PR when they exist.
+3. Keep only a short `Execution` section and branch/worktree/PR/package links in the Issue.
 4. Let `codex-webui-work-packages` handle package creation, README updates, and archive moves.
-5. Before closing an Issue or setting Project `Status` to `Done`, verify the work is reachable on `main`: merged PR to `main` for the default workflow, or pushed commits on `origin/main` for an approved direct-to-`main` exception.
-6. If the PR remains open, the branch is not yet on `main`, or the local repo state is dirty, keep the Issue and Project in execution rather than `Done`.
+5. For normal branch/PR work, own PR `squash merge`, parent-checkout `main` sync, worktree cleanup, and final completion tracking.
+6. Before closing an Issue or setting Project `Status` to `Done`, verify the work is reachable on `main`: merged PR to `main` for the default workflow, or pushed commits on `origin/main` for an approved direct-to-`main` exception.
+7. If the PR remains open, the branch is not yet on `main`, the active worktree still exists, or the local repo state is dirty, keep the Issue and Project in execution rather than `Done`.
+8. If the current slice is merged and cleaned up but the Issue still has remaining work, clear the active branch, active worktree, and active PR from the Issue `Execution` section and return the Project item to `Todo` until the next slice starts.
+9. Only when the full Issue scope is complete should this skill close the Issue and set Project `Status` to `Done`.
+
+Typical parent-checkout commands for the default branch/PR completion flow are:
+
+```bash
+gh pr merge <number> --squash --delete-branch=false
+git fetch origin
+git pull --ff-only origin main
+git worktree remove .worktrees/issue-<number>-<work_id>
+git status --short --branch
+```
 
 ## Guardrails
 
@@ -142,7 +158,7 @@ When an Issue also uses a local task package:
 - Do not silently replace field semantics in an existing Project.
 - Do not duplicate detailed acceptance criteria from `docs/` into many issue bodies unless the user asks for that granularity.
 - Do not move completed evidence into `tasks/`; keep `tasks/` for active work only.
-- Do not mark an Issue or Project item as complete while a PR remains open, the execution branch is not yet on `main`, an approved direct-to-`main` exception is unpushed, or the local repo state is dirty.
+- Do not mark an Issue or Project item as complete while a PR remains open, the execution branch is not yet on `main`, the active worktree still exists, an approved direct-to-`main` exception is unpushed, or the local repo state is dirty.
 - Do not delete old Projects, issues, or items without an explicit user instruction.
 
 ## Example Requests

@@ -16,6 +16,7 @@ Treat responsibilities as follows:
 - `docs/` is the source of truth for requirements, specs, validation plans, and roadmap decisions
 - GitHub Projects, Issues, and PRs are the execution-tracking layer
 - `tasks/` holds the active local work package for the current execution slice
+- active worktree state determines where normal implementation is allowed to happen
 - implementation directories show what is already built and what remains
 
 When the user asks "what should we do next?" or equivalent, do not answer from local files alone if Project state is available.
@@ -38,8 +39,8 @@ Follow this order every time.
 
 1. Inspect GitHub Projects first.
 2. Inspect open linked Issues, dependencies, and active PRs.
-3. Inspect local `tasks/` state.
-4. Check for drift across Project, Issue, and `tasks/`.
+3. Inspect local `tasks/` and worktree state.
+4. Check for drift across Project, Issue, PR, worktree, and `tasks/`.
 5. Read source-of-truth docs and nearest relevant README for the likely target area.
 6. Inspect local implementation state only after the execution layer is understood.
 7. Recommend exactly one next work item, unless drift must be fixed first.
@@ -73,16 +74,22 @@ Prefer commands like:
 
 ```bash
 find tasks -maxdepth 2 -type f -name 'README.md'
-rg --files
-rg -n "<term>" docs tasks apps
+git worktree list
+rg --files -g '!.worktrees/**'
+rg -n "<term>" docs tasks apps .agents/skills -g '!.worktrees/**'
 ```
+
+Use the parent-checkout exclusions for default discovery, then inspect the tracked active worktree explicitly when you need implementation-state evidence for a normal branch/PR slice.
 
 Use local inspection to answer these questions:
 
 - Is there an active task package for the item that appears to be `In Progress`?
 - Does local `tasks/` contradict the Project or linked Issue state?
-- Does the Issue `Execution` section point to an active branch and active PR, and do they match actual state?
+- Does the Issue `Execution` section point to an active branch, active worktree, and active PR, and do they match actual state?
+- Is normal branch/PR work happening from a dedicated `.worktrees/<branch>` checkout instead of the parent checkout?
+- When a normal branch/PR slice is active, does the tracked worktree show the expected implementation state?
 - Is a task archived locally while the branch is not yet on `main`?
+- Is the branch merged but the active worktree still present?
 - Is an approved direct-to-`main` exception still only local and not yet pushed to `origin/main`?
 - Do the maintained docs already define the expected next slice?
 - Does the codebase show that the claimed slice is already complete, partially complete, or not started?
@@ -94,7 +101,10 @@ If drift exists, recommend fixing the drift first. Examples:
 - Project says `In Progress` but `tasks/` has no active package
 - `tasks/` has an active package for an Issue not currently being executed
 - local implementation is complete but Project/Issue still claims active execution
+- the active worktree is missing or does not match the tracked branch
+- normal branch/PR work appears to be happening from the parent checkout
 - the task package is archived locally but the PR is still open or the branch is not yet on `main`
+- the PR is merged but the active worktree still exists
 - the Project says `Done` while the linked PR is still open
 - an approved direct-to-`main` exception exists but the commits are not yet pushed to `origin/main`
 

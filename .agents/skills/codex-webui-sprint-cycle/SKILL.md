@@ -12,6 +12,7 @@ Use this skill to run one bounded sprint through the repo-local `planner`, `work
 Treat one sprint as one planner-defined implementation slice. A sprint is complete only when `evaluator` returns `approved`.
 
 Treat evaluator approval as implementation approval, not as permission to close Issues or mark Project work `Done`; those tracking transitions still require the work to be reachable on `main`.
+For normal branch/PR work, run implementation from the active worktree rather than from the parent checkout. Only approved direct-to-`main` exceptions may use the parent checkout for implementation.
 
 When `codex-webui-execution-orchestrator` selects an implementation-ready target with no blocking tracking drift, this skill is the required implementation path for that target.
 
@@ -43,7 +44,7 @@ Do not use this skill when:
 1. Spawn `planner` first and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; ask it for one bounded sprint slice with ordered tasks, acceptance criteria, and required validation.
 2. Review the planner output locally. If the sprint slice is still too large or unclear, ask `planner` to tighten it before implementation starts.
 3. If `planner` violates the read-only instruction and mutates files anyway, do not ask it to continue editing. Treat the resulting worktree state as the effective `worker` output for this sprint and pass that implementation candidate to `evaluator`.
-4. Otherwise, spawn `worker` to execute only that sprint slice.
+4. Otherwise, spawn `worker` to execute only that sprint slice in the active worktree for normal branch/PR work, or in the parent checkout only for an approved direct-to-`main` exception.
 5. When the implementation candidate finishes, spawn `evaluator` and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; pass the planner acceptance criteria and the implementation result.
 6. If `evaluator` returns `changes_required`, send those findings back to `worker` and run another implementation pass.
 7. Allow at most 2 evaluator rejection cycles for the same sprint slice.
@@ -64,6 +65,7 @@ Do not use this skill when:
 - `evaluator` is read-only and acts as a hard gate
 - Always tell `planner` and `evaluator` in their spawn prompts that they are read-only and must not edit files or run mutating commands
 - If `planner` mutates files anyway, treat that worktree state as the implementation candidate for `evaluator` rather than continuing to use `planner` as a writer
+- Do not let `worker` implement normal branch/PR work from the parent checkout when an active worktree should exist
 - When invoked by `codex-webui-execution-orchestrator`, do not let the main agent bypass `worker` by implementing the sprint slice directly
 - Do not run concurrent write passes on the same sprint slice
 - Do not silently weaken planner acceptance criteria to get an approval

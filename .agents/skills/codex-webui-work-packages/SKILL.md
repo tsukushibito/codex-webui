@@ -37,6 +37,8 @@ If the work package is tied to a specific area, read the nearest relevant `READM
 - Each `In Progress` Issue must have exactly one active task package
 - A single Issue may have multiple archived task packages over time, but never more than one active package at once
 - Default repo-tracked change flow is a short-lived branch and PR; direct commits to `main` are exceptions only and should happen only for urgent fixes or explicit user direction
+- For normal branch/PR work, prepare and use a dedicated git worktree under `.worktrees/<branch>` and keep the parent checkout as the control checkout
+- Approved direct-to-`main` exceptions may use the parent checkout and must record `Active worktree: .`
 - Prefer one primary Issue per task package
 - Link the task package and the Issue to each other
 - Keep task-package detail in `tasks/`, not in the Issue body beyond a short execution summary and links
@@ -52,6 +54,7 @@ If the work package is tied to a specific area, read the nearest relevant `READM
 - Archived package path: `tasks/archive/issue-<number>-<work_id>/`
 - `<work_id>` must be short `hyphen-case` and describe the current execution slice
 - Default active branch name: `issue-<number>-<work_id>`
+- Default active worktree path: `.worktrees/issue-<number>-<work_id>`
 - Reopened work should create a new package with a new `<work_id>` rather than reactivating an archived directory
 
 ## Required README Shape
@@ -76,6 +79,7 @@ When the user wants local and GitHub state kept aligned, maintain this minimum I
 
 - An `Execution` section
 - An `Active branch` entry
+- An `Active worktree` entry
 - An `Active PR` entry
 - An `Active task package` entry
 - An `Archived task packages` entry
@@ -90,18 +94,27 @@ If the user asks you to edit GitHub Issues or Project fields, hand off that part
 ### Start work on an Issue
 
 1. Confirm the primary Issue and the source-of-truth docs
-2. Check whether the Issue already has an active package
-3. If not, create `tasks/issue-<number>-<work_id>/README.md`
-4. Use or create branch `issue-<number>-<work_id>` unless the user explicitly approved a direct-to-`main` exception
-5. Fill the README with the required sections and links
-6. Add or update the Issue `Execution` section with the active branch, active PR if one exists, and active package link
-7. If requested, use `codex-webui-github-projects` to set Project `Status` to `In Progress`
+2. Sync the parent checkout to the current `main` before creating a new worktree
+3. Check whether the Issue already has an active package
+4. If not, create `tasks/issue-<number>-<work_id>/README.md`
+5. For normal branch/PR work, create branch `issue-<number>-<work_id>` and worktree `.worktrees/issue-<number>-<work_id>` from the parent checkout
+6. Only when the user explicitly approved a direct-to-`main` exception, use the parent checkout instead and record `Active worktree: .`
+7. Fill the README with the required sections and links
+8. Add or update the Issue `Execution` section with the active branch, active worktree, active PR if one exists, and active package link
+9. If requested, use `codex-webui-github-projects` to set Project `Status` to `In Progress`
+
+Typical parent-checkout commands for the default branch/PR flow are:
+
+```bash
+git fetch origin
+git worktree add -b issue-<number>-<work_id> .worktrees/issue-<number>-<work_id> origin/main
+```
 
 ### Update an active package
 
 1. Refresh the README sections that changed
 2. Keep `Source docs`, `Exit criteria`, and `Artifacts / evidence` current
-3. Keep the linked Issue `Execution` section current for branch, PR, and package links
+3. Keep the linked Issue `Execution` section current for branch, worktree, PR, and package links
 4. Update the linked Issue only with concise execution status, not detailed task notes
 
 ### Finish an execution slice
@@ -109,13 +122,11 @@ If the user asks you to edit GitHub Issues or Project fields, hand off that part
 1. Confirm the package exit criteria were met
 2. Run `codex-webui-completion-retrospective` and update `Status / handoff notes`, using `artifacts/` only if the review needs more than a short summary
 3. Move the package to `tasks/archive/issue-<number>-<work_id>/` once the slice is locally complete
-4. Replace the Issue's active-package link with an archived-package link and keep the active branch and active PR visible until the work reaches `main`
+4. Replace the Issue's active-package link with an archived-package link and keep the active branch, active worktree, and active PR visible until the work reaches `main`
 5. If more work remains on the Issue, leave it open and keep Project `Status` in execution until the current slice reaches `main`
-6. After the current slice reaches `main`, clear the active branch and active PR, then set Project `Status` back to `Todo` until the next slice starts
-7. If the Issue scope is fully complete, verify the work is reachable on `main`
-8. Verify the local repo state is clean and synced with the relevant remote branch before final GitHub completion
-9. If the PR is still open, the branch is not yet on `main`, an approved direct-to-`main` exception is not yet pushed, or the local repo is dirty, stop after the archive/update steps and keep GitHub tracking active
-10. Only after the reachability and clean-state checks pass, close the Issue and set Project `Status` to `Done`
+6. Hand off PR squash merge, parent-checkout `main` sync, worktree cleanup, and final completion tracking to `codex-webui-github-projects`
+7. If the PR is still open, the branch is not yet on `main`, an approved direct-to-`main` exception is not yet pushed, or the required worktree cleanup is not yet complete, stop after the archive/update steps and keep GitHub tracking active
+8. Do not close the Issue or set Project `Status` to `Done` from this skill; final completion belongs to `codex-webui-github-projects`
 
 ### Resume work on an existing Issue
 
@@ -131,7 +142,8 @@ If the user asks you to edit GitHub Issues or Project fields, hand off that part
 - Do not store raw evidence in the package directory unless the user explicitly wants that exception
 - Do not delete archived packages unless the user explicitly asks
 - Do not treat package archive alone as sufficient evidence for Issue close or Project `Done`
-- Do not let Issue close or Project `Done` happen while a PR remains open, the branch is not yet on `main`, an approved direct-to-`main` exception is unpushed, or the local repo is dirty
+- Do not let Issue close or Project `Done` happen while a PR remains open, the branch is not yet on `main`, an approved direct-to-`main` exception is unpushed, the required worktree cleanup is incomplete, or the local repo is dirty
+- Do not perform PR merge or worktree cleanup from this skill; hand that part to `codex-webui-github-projects`
 - Do not silently change GitHub Project fields from this skill; use `codex-webui-github-projects`
 
 ## Example Requests

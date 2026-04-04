@@ -25,10 +25,14 @@ Directory-specific responsibilities, document policies, and workflow details bel
 - Treat `tasks/` as the area for active work packages only; move completed task packages to `tasks/archive/`
 - Treat `artifacts/` as the area for execution outputs such as logs, evidence, and judgment notes
 - Default repo-tracked change flow is a short-lived branch and PR; direct commits to `main` are exceptions only, such as urgent fixes or explicit user direction
+- For normal branch/PR work, create and use a dedicated git worktree under `.worktrees/<branch>`; keep the parent checkout as the control checkout for sync, tracking, and worktree management
+- Approved direct-to-`main` exceptions may use the parent checkout and should record `Active worktree: .`
 - Before archiving a completed task package or closing an Issue, perform a brief completion retrospective that checks for workflow problems, improvement opportunities, and repeated patterns that should become repo skills
 - Do not close an Issue or set a Project item to `Done` until the corresponding work is reachable on `main`
 - Under the default branch workflow, `reachable on main` means the PR is merged to `main`; under an approved direct-to-`main` exception, it means the commits are pushed to `origin/main`
 - Before marking execution complete, verify the local repo state is clean and synced with the relevant remote branch
+- For normal branch/PR work, require worktree cleanup after the slice reaches `main` and before final completion
+- When exploring from the parent checkout, treat `.worktrees/` as outside the normal search and edit surface by default
 - Record concise retrospective results in task-package handoff notes, and use `artifacts/` only when the review needs more than a short summary
 - If the retrospective identifies a durable process improvement, reflect it into the maintained source of truth instead of leaving it only in task notes
 - Use GitHub Projects for execution tracking such as progress, ownership, dependencies, and review state; do not treat Projects as the source of truth for specifications
