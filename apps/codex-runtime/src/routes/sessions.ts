@@ -203,4 +203,9 @@ export async function registerSessionRoutes(
     const params = request.params as { sessionId: string };
     return sessionService.stopSession(params.sessionId);
   });
+
+  app.post("/api/v1/sessions/:sessionId/reconcile", async (request) => {
+    const params = request.params as { sessionId: string };
+    return sessionService.reconcileSession(params.sessionId);
+  });
 }

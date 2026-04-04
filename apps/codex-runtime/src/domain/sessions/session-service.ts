@@ -61,6 +61,16 @@ function mapSessionSummary(record: typeof sessions.$inferSelect): SessionSummary
   };
 }
 
+function mapSessionSummaryWithOverlay(
+  record: typeof sessions.$inferSelect,
+  overlayState: AppSessionOverlayState,
+): SessionSummary {
+  return {
+    ...mapSessionSummary(record),
+    app_session_overlay_state: overlayState,
+  };
+}
+
 function generateMessageId(role: MessageRole) {
   const prefix = role === "user" ? "msg_user" : "msg_assistant";
   return `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
@@ -263,6 +273,142 @@ export class SessionService {
     });
   }
 
+  private getSessionRecord(sessionId: string) {
+    return firstRequiredRow(
+      this.database.db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.sessionId, sessionId))
+        .limit(1)
+        .all(),
+      () => {
+        throw new RuntimeError(404, "session_not_found", "session was not found", {
+          session_id: sessionId,
+        });
+      },
+    );
+  }
+
+  private getPendingApprovalForSession(sessionId: string) {
+    return firstRow(
+      this.database.db
+        .select()
+        .from(approvals)
+        .where(and(eq(approvals.sessionId, sessionId), eq(approvals.status, "pending")))
+        .orderBy(desc(approvals.createdAt), desc(approvals.approvalId))
+        .limit(1)
+        .all(),
+    );
+  }
+
+  private getActiveApprovalRecord(session: typeof sessions.$inferSelect) {
+    if (session.activeApprovalId === null) {
+      return null;
+    }
+
+    return firstRow(
+      this.database.db
+        .select()
+        .from(approvals)
+        .where(eq(approvals.approvalId, session.activeApprovalId))
+        .limit(1)
+        .all(),
+    );
+  }
+
+  private detectApprovalRecoveryMismatch(session: typeof sessions.$inferSelect) {
+    if (session.status !== "waiting_approval") {
+      return null;
+    }
+
+    if (session.activeApprovalId === null) {
+      return {
+        kind: "missing_active_approval_id" as const,
+        approval: null,
+        pendingApproval: this.getPendingApprovalForSession(session.sessionId),
+      };
+    }
+
+    const approval = this.getActiveApprovalRecord(session);
+    if (!approval) {
+      return {
+        kind: "active_approval_missing" as const,
+        approval: null,
+        pendingApproval: this.getPendingApprovalForSession(session.sessionId),
+      };
+    }
+
+    if (approval.status !== "pending") {
+      return {
+        kind: "active_approval_resolved" as const,
+        approval,
+        pendingApproval: this.getPendingApprovalForSession(session.sessionId),
+      };
+    }
+
+    return null;
+  }
+
+  private countPendingApprovals(workspaceId: string) {
+    return this.database.db
+      .select()
+      .from(approvals)
+      .where(and(eq(approvals.workspaceId, workspaceId), eq(approvals.status, "pending")))
+      .all().length;
+  }
+
+  private detectWorkspaceRecoveryMismatch(session: typeof sessions.$inferSelect) {
+    if (session.status !== "running" && session.status !== "waiting_approval") {
+      return false;
+    }
+
+    const workspace = firstRow(
+      this.database.db
+        .select()
+        .from(workspaces)
+        .where(eq(workspaces.workspaceId, session.workspaceId))
+        .limit(1)
+        .all(),
+    );
+
+    if (!workspace) {
+      return false;
+    }
+
+    if (workspace.activeSessionId === session.sessionId) {
+      return false;
+    }
+
+    if (workspace.activeSessionId === null) {
+      return true;
+    }
+
+    const activeSession = firstRow(
+      this.database.db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.sessionId, workspace.activeSessionId))
+        .limit(1)
+        .all(),
+    );
+
+    if (!activeSession) {
+      return true;
+    }
+
+    return activeSession.status !== "running" && activeSession.status !== "waiting_approval";
+  }
+
+  private async materializeSessionSummary(record: typeof sessions.$inferSelect) {
+    const mismatch =
+      this.detectApprovalRecoveryMismatch(record) ??
+      this.detectWorkspaceRecoveryMismatch(record);
+    return mapSessionSummaryWithOverlay(
+      record,
+      mismatch ? "recovery_pending" : (record.appSessionOverlayState as AppSessionOverlayState),
+    );
+  }
+
   async listSessions(workspaceId: string) {
     await this.workspaceRegistry.getWorkspace(workspaceId);
 
@@ -273,26 +419,11 @@ export class SessionService {
       .orderBy(desc(sessions.updatedAt), desc(sessions.sessionId))
       .all();
 
-    return rows.map(mapSessionSummary);
+    return Promise.all(rows.map((row) => this.materializeSessionSummary(row)));
   }
 
   async getSession(sessionId: string) {
-    const row = firstRow(
-      this.database.db
-        .select()
-        .from(sessions)
-        .where(eq(sessions.sessionId, sessionId))
-        .limit(1)
-        .all(),
-    );
-
-    if (!row) {
-      throw new RuntimeError(404, "session_not_found", "session was not found", {
-        session_id: sessionId,
-      });
-    }
-
-    return mapSessionSummary(row);
+    return this.materializeSessionSummary(this.getSessionRecord(sessionId));
   }
 
   async createSession(workspaceId: string, title: string) {
@@ -546,7 +677,11 @@ export class SessionService {
       .where(inArray(sessions.sessionId, sessionIds))
       .all();
 
-    return new Map(rows.map((row) => [row.sessionId, mapSessionSummary(row)]));
+    return new Map(
+      await Promise.all(
+        rows.map(async (row) => [row.sessionId, await this.materializeSessionSummary(row)] as const),
+      ),
+    );
   }
 
   async listMessages(
@@ -616,6 +751,89 @@ export class SessionService {
       items: rows.map(mapSessionEventProjection),
       next_cursor: null,
       has_more: false,
+    };
+  }
+
+  async reconcileSession(sessionId: string) {
+    const session = this.getSessionRecord(sessionId);
+    const mismatch = this.detectApprovalRecoveryMismatch(session);
+
+    if (!mismatch) {
+      return {
+        session: await this.getSession(sessionId),
+      };
+    }
+
+    const pendingApprovalCount = this.countPendingApprovals(session.workspaceId);
+    const updatedAt = toIsoString(this.now());
+    const pendingApproval = mismatch.pendingApproval;
+
+    this.database.sqlite.transaction(() => {
+      if (pendingApproval) {
+        this.database.db
+          .update(sessions)
+          .set({
+            status: "waiting_approval",
+            updatedAt,
+            activeApprovalId: pendingApproval.approvalId,
+            appSessionOverlayState: "open",
+          })
+          .where(eq(sessions.sessionId, sessionId))
+          .run();
+
+        this.database.db
+          .update(workspaces)
+          .set({
+            activeSessionId: sessionId,
+            updatedAt,
+            pendingApprovalCount,
+          })
+          .where(eq(workspaces.workspaceId, session.workspaceId))
+          .run();
+
+        return;
+      }
+
+      const resolvedApproval = mismatch.approval;
+      const nextStatus =
+        resolvedApproval?.resolution === "canceled"
+          ? "stopped"
+          : resolvedApproval?.resolution === "approved"
+            ? session.currentTurnId
+              ? "running"
+              : "waiting_input"
+            : "waiting_input";
+      const nextOverlayState =
+        nextStatus === "stopped" ? "closed" : ("open" as const);
+      const nextActiveSessionId = nextStatus === "running" ? sessionId : null;
+
+      this.database.db
+        .update(sessions)
+        .set({
+          status: nextStatus,
+          updatedAt,
+          activeApprovalId: null,
+          currentTurnId: nextStatus === "waiting_input" || nextStatus === "stopped" ? null : session.currentTurnId,
+          pendingAssistantMessageId:
+            nextStatus === "running" ? session.pendingAssistantMessageId : null,
+          appSessionOverlayState: nextOverlayState,
+        })
+        .where(eq(sessions.sessionId, sessionId))
+        .run();
+
+      this.database.db
+        .update(workspaces)
+        .set({
+          activeSessionId: nextActiveSessionId,
+          updatedAt,
+          pendingApprovalCount,
+        })
+        .where(eq(workspaces.workspaceId, session.workspaceId))
+        .run();
+    })();
+
+    return {
+      session: await this.getSession(sessionId),
     };
   }
 

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
 import type { NativeSessionGateway } from "../src/domain/sessions/native-session-gateway.js";
-import { sessions, workspaces } from "../src/db/schema.js";
+import { approvals, sessions, workspaces } from "../src/db/schema.js";
 import { createTempDatabase, createTempWorkspaceRoot } from "./helpers.js";
 
 const cleanupPaths: string[] = [];
@@ -99,6 +99,173 @@ function seedWaitingInputSession(
     .run();
 
   return { workspaceId, sessionId };
+}
+
+function seedWaitingApprovalMismatchSession(
+  database: Awaited<ReturnType<typeof createTempDatabase>>,
+  options: {
+    workspaceId?: string;
+    sessionId?: string;
+    activeApprovalId?: string | null;
+    approvalStatus?: "pending" | "approved" | "denied" | "canceled";
+    approvalResolution?: "approved" | "denied" | "canceled" | null;
+    insertApproval?: boolean;
+    pendingApprovalId?: string | null;
+  } = {},
+) {
+  const workspaceId = options.workspaceId ?? "ws_alpha";
+  const sessionId = options.sessionId ?? "thread_001";
+  const activeApprovalId =
+    Object.prototype.hasOwnProperty.call(options, "activeApprovalId")
+      ? (options.activeApprovalId ?? null)
+      : "apr_stale";
+  const now = "2026-04-04T12:00:00.000Z";
+
+  database.db
+    .insert(workspaces)
+    .values({
+      workspaceId,
+      workspaceName: "alpha",
+      directoryName: "alpha",
+      createdAt: now,
+      updatedAt: now,
+      activeSessionId: sessionId,
+      pendingApprovalCount: 1,
+    })
+    .run();
+
+  database.db
+    .insert(sessions)
+    .values({
+      sessionId,
+      workspaceId,
+      title: "Fix build error",
+      status: "waiting_approval",
+      createdAt: now,
+      updatedAt: now,
+      startedAt: now,
+      lastMessageAt: now,
+      activeApprovalId,
+      currentTurnId: "turn_001",
+      pendingAssistantMessageId: null,
+      appSessionOverlayState: "open",
+    })
+    .run();
+
+  if (options.insertApproval ?? true) {
+    database.db
+      .insert(approvals)
+      .values({
+        approvalId: activeApprovalId ?? "apr_stale",
+        sessionId,
+        workspaceId,
+        status: options.approvalStatus ?? "denied",
+        resolution: options.approvalResolution ?? "denied",
+        approvalCategory: "external_side_effect",
+        summary: "Run git push",
+        reason: "Codex requests permission to push changes to remote.",
+        operationSummary: null,
+        context: null,
+        createdAt: now,
+        resolvedAt: now,
+        nativeRequestKind: "approval_request",
+      })
+      .run();
+  }
+
+  if (options.pendingApprovalId) {
+    database.db
+      .insert(approvals)
+      .values({
+        approvalId: options.pendingApprovalId,
+        sessionId,
+        workspaceId,
+        status: "pending",
+        resolution: null,
+        approvalCategory: "external_side_effect",
+        summary: "Run git push",
+        reason: "Codex requests permission to push changes to remote.",
+        operationSummary: null,
+        context: null,
+        createdAt: "2026-04-04T12:01:00.000Z",
+        resolvedAt: null,
+        nativeRequestKind: "approval_request",
+      })
+      .run();
+  }
+
+  return { workspaceId, sessionId, activeApprovalId };
+}
+
+function seedWorkspaceActiveSessionMismatch(
+  database: Awaited<ReturnType<typeof createTempDatabase>>,
+  options: {
+    workspaceId?: string;
+    staleSessionId?: string | null;
+    activeSessionId?: string;
+    activeSessionStatus?: "running" | "waiting_approval";
+  } = {},
+) {
+  const workspaceId = options.workspaceId ?? "ws_alpha";
+  const staleSessionId =
+    Object.prototype.hasOwnProperty.call(options, "staleSessionId")
+      ? (options.staleSessionId ?? null)
+      : "thread_stale";
+  const activeSessionId = options.activeSessionId ?? "thread_active";
+  const now = "2026-04-04T12:00:00.000Z";
+
+  database.db
+    .insert(workspaces)
+    .values({
+      workspaceId,
+      workspaceName: "alpha",
+      directoryName: "alpha",
+      createdAt: now,
+      updatedAt: now,
+      activeSessionId: staleSessionId,
+      pendingApprovalCount: 0,
+    })
+    .run();
+
+  if (staleSessionId) {
+    database.db
+      .insert(sessions)
+      .values({
+        sessionId: staleSessionId,
+        workspaceId,
+        title: "Stale session",
+        status: "waiting_input",
+        createdAt: now,
+        updatedAt: now,
+        startedAt: now,
+        lastMessageAt: now,
+        activeApprovalId: null,
+        currentTurnId: null,
+        pendingAssistantMessageId: null,
+        appSessionOverlayState: "open",
+      })
+      .run();
+  }
+
+  database.db
+    .insert(sessions)
+    .values({
+      sessionId: activeSessionId,
+      workspaceId,
+      title: "Active session",
+      status: options.activeSessionStatus ?? "running",
+      createdAt: now,
+      updatedAt: "2026-04-04T12:01:00.000Z",
+      startedAt: now,
+      lastMessageAt: now,
+      activeApprovalId: null,
+      currentTurnId: "turn_001",
+      pendingAssistantMessageId: null,
+      appSessionOverlayState: "open",
+    })
+    .run();
+
+  return { workspaceId, activeSessionId };
 }
 
 async function listSessionEvents(
@@ -1664,6 +1831,226 @@ describe("session routes", () => {
     });
 
     controller.abort();
+    await app.close();
+  });
+
+  it("surfaces resolved approval mismatches as recovery_pending and reconciles them", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway: new StubNativeSessionGateway([]),
+      },
+    });
+
+    const { sessionId, activeApprovalId } = seedWaitingApprovalMismatchSession(database, {
+      approvalStatus: "denied",
+      approvalResolution: "denied",
+    });
+
+    const getResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${sessionId}`,
+    });
+
+    expect(getResponse.statusCode).toBe(200);
+    expect(getResponse.json()).toMatchObject({
+      session_id: sessionId,
+      status: "waiting_approval",
+      active_approval_id: activeApprovalId,
+      app_session_overlay_state: "recovery_pending",
+    });
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/workspaces/ws_alpha/sessions",
+    });
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json().items).toEqual([
+      expect.objectContaining({
+        session_id: sessionId,
+        app_session_overlay_state: "recovery_pending",
+      }),
+    ]);
+
+    const reconcileResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/reconcile`,
+      payload: {},
+    });
+
+    expect(reconcileResponse.statusCode).toBe(200);
+    expect(reconcileResponse.json()).toEqual({
+      session: {
+        session_id: sessionId,
+        workspace_id: "ws_alpha",
+        title: "Fix build error",
+        status: "waiting_input",
+        created_at: expect.any(String),
+        updated_at: expect.any(String),
+        started_at: expect.any(String),
+        last_message_at: expect.any(String),
+        active_approval_id: null,
+        current_turn_id: null,
+        app_session_overlay_state: "open",
+      },
+    });
+
+    const workspaceResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/workspaces/ws_alpha",
+    });
+
+    expect(workspaceResponse.statusCode).toBe(200);
+    expect(workspaceResponse.json()).toMatchObject({
+      active_session_id: null,
+      pending_approval_count: 0,
+      active_session_summary: null,
+    });
+
+    await app.close();
+  });
+
+  it("repairs a missing active approval id by relinking the pending approval", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway: new StubNativeSessionGateway([]),
+      },
+    });
+
+    const { sessionId } = seedWaitingApprovalMismatchSession(database, {
+      activeApprovalId: null,
+      insertApproval: false,
+      pendingApprovalId: "apr_pending_001",
+    });
+
+    const getResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${sessionId}`,
+    });
+
+    expect(getResponse.statusCode).toBe(200);
+    expect(getResponse.json()).toMatchObject({
+      session_id: sessionId,
+      status: "waiting_approval",
+      active_approval_id: null,
+      app_session_overlay_state: "recovery_pending",
+    });
+
+    const reconcileResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/reconcile`,
+      payload: {},
+    });
+
+    expect(reconcileResponse.statusCode).toBe(200);
+    expect(reconcileResponse.json()).toEqual({
+      session: {
+        session_id: sessionId,
+        workspace_id: "ws_alpha",
+        title: "Fix build error",
+        status: "waiting_approval",
+        created_at: expect.any(String),
+        updated_at: expect.any(String),
+        started_at: expect.any(String),
+        last_message_at: expect.any(String),
+        active_approval_id: "apr_pending_001",
+        current_turn_id: "turn_001",
+        app_session_overlay_state: "open",
+      },
+    });
+
+    const workspaceResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/workspaces/ws_alpha",
+    });
+
+    expect(workspaceResponse.statusCode).toBe(200);
+    expect(workspaceResponse.json()).toMatchObject({
+      active_session_id: sessionId,
+      pending_approval_count: 1,
+      active_session_summary: {
+        session_id: sessionId,
+        status: "waiting_approval",
+      },
+    });
+
+    await app.close();
+  });
+
+  it("surfaces workspace active-session drift as recovery_pending and clears it after workspace reconciliation", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway: new StubNativeSessionGateway([]),
+      },
+    });
+
+    const { workspaceId, activeSessionId } = seedWorkspaceActiveSessionMismatch(database);
+
+    const beforeResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${activeSessionId}`,
+    });
+
+    expect(beforeResponse.statusCode).toBe(200);
+    expect(beforeResponse.json()).toMatchObject({
+      session_id: activeSessionId,
+      status: "running",
+      app_session_overlay_state: "recovery_pending",
+    });
+
+    const reconcileResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/workspaces/${workspaceId}/reconcile`,
+      payload: {},
+    });
+
+    expect(reconcileResponse.statusCode).toBe(200);
+
+    const afterResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${activeSessionId}`,
+    });
+
+    expect(afterResponse.statusCode).toBe(200);
+    expect(afterResponse.json()).toMatchObject({
+      session_id: activeSessionId,
+      status: "running",
+      app_session_overlay_state: "open",
+    });
+
     await app.close();
   });
 
