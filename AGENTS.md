@@ -33,6 +33,7 @@ Directory-specific responsibilities, document policies, and workflow details bel
 - Before marking execution complete, verify the local repo state is clean and synced with the relevant remote branch
 - For normal branch/PR work, require worktree cleanup after the slice reaches `main` and before final completion
 - When exploring from the parent checkout, treat `.worktrees/` as outside the normal search and edit surface by default
+- When sub-agents can materially advance the current task, use them proactively for bounded planning, evaluation, or parallel sidecar work instead of defaulting to single-agent execution
 - Record concise retrospective results in task-package handoff notes, and use `artifacts/` only when the review needs more than a short summary
 - If the retrospective identifies a durable process improvement, reflect it into the maintained source of truth instead of leaving it only in task notes
 - Use GitHub Projects for execution tracking such as progress, ownership, dependencies, and review state; do not treat Projects as the source of truth for specifications
