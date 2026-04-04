@@ -9,6 +9,25 @@ export async function registerApprovalRoutes(
   app: FastifyInstance,
   sessionService: SessionService,
 ) {
+  app.get("/api/v1/approvals/stream", async (request, reply) => {
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-cache, no-transform",
+      connection: "keep-alive",
+    });
+    reply.raw.write(": connected\n\n");
+
+    const unsubscribe = sessionService.subscribeApprovalEvents((event) => {
+      reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+    });
+
+    request.raw.on("close", () => {
+      unsubscribe();
+      reply.raw.end();
+    });
+  });
+
   app.get("/api/v1/approvals/summary", async () => {
     return sessionService.getApprovalSummary();
   });
