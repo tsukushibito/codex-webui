@@ -22,6 +22,10 @@ Read these files before running the workflow:
 
 - `README.md`
 - `AGENTS.md`
+- `docs/README.md` when source-of-truth docs define the sprint slice
+- `tasks/README.md` when the sprint is tied to a tracked Issue or active task package
+
+Before planning or implementation for a tracked Issue, read the active task package `README.md` and the source-of-truth docs it links so planner, worker, and evaluator use the same package scope and exit criteria.
 
 If the sprint touches a documented area such as `docs/`, `tasks/`, or `artifacts/`, read the nearest relevant `README.md` in that area before implementation.
 
@@ -41,7 +45,7 @@ Do not use this skill when:
 
 ## Workflow
 
-1. Spawn `planner` first and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; ask it to return a plan only with the planner sections, not an implementation summary, patch description, or completion report.
+1. Read the active task package and linked source-of-truth docs when the sprint is tied to a tracked Issue, then spawn `planner` and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; ask it to return a plan only with the planner sections, not an implementation summary, patch description, or completion report.
 2. Review the planner output locally. If the sprint slice is still too large or unclear, or if the result is implementation-shaped instead of plan-only, ask `planner` to tighten it before implementation starts.
 3. If `planner` violates the read-only instruction and mutates files anyway, do not ask it to continue editing. Treat the resulting worktree state as the effective `worker` output for this sprint and pass that implementation candidate to `evaluator`.
 4. Otherwise, spawn `worker` to execute only that sprint slice in the active worktree for normal branch/PR work, or in the parent checkout only for an approved direct-to-`main` exception.
