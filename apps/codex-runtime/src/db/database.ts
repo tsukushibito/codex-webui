@@ -27,6 +27,21 @@ CREATE TABLE IF NOT EXISTS workspace_session_mappings (
 
 CREATE UNIQUE INDEX IF NOT EXISTS workspace_session_mappings_session_id_idx
 ON workspace_session_mappings (session_id);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  session_id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  started_at TEXT,
+  last_message_at TEXT,
+  active_approval_id TEXT,
+  current_turn_id TEXT,
+  app_session_overlay_state TEXT NOT NULL,
+  FOREIGN KEY (workspace_id) REFERENCES workspaces (workspace_id) ON DELETE CASCADE
+);
 `;
 
 export function openRuntimeDatabase(databasePath: string) {

@@ -7,13 +7,21 @@ import {
   AppServerSupervisor,
   type AppServerController,
 } from "./domain/app-server/app-server-supervisor.js";
+import {
+  SyntheticNativeSessionGateway,
+  type NativeSessionGateway,
+} from "./domain/sessions/native-session-gateway.js";
+import { SessionService } from "./domain/sessions/session-service.js";
 import { WorkspaceFilesystem } from "./domain/workspaces/workspace-filesystem.js";
 import { WorkspaceRegistry } from "./domain/workspaces/workspace-registry.js";
+import { registerSessionRoutes } from "./routes/sessions.js";
 import { registerWorkspaceRoutes } from "./routes/workspaces.js";
 
 export interface RuntimeServices {
   workspaceRegistry: WorkspaceRegistry;
+  sessionService: SessionService;
   appServerSupervisor: AppServerController;
+  nativeSessionGateway: NativeSessionGateway;
 }
 
 export interface BuildAppOptions {
@@ -36,6 +44,16 @@ export async function buildApp(options: BuildAppOptions = {}) {
   const workspaceRegistry =
     options.services?.workspaceRegistry ??
     new WorkspaceRegistry(ownedDatabase, workspaceFilesystem);
+  const nativeSessionGateway =
+    options.services?.nativeSessionGateway ?? new SyntheticNativeSessionGateway();
+  const sessionService =
+    options.services?.sessionService ??
+    new SessionService(
+      ownedDatabase,
+      workspaceRegistry,
+      workspaceFilesystem,
+      nativeSessionGateway,
+    );
   const appServerSupervisor =
     options.services?.appServerSupervisor ??
     new AppServerSupervisor({
@@ -52,7 +70,9 @@ export async function buildApp(options: BuildAppOptions = {}) {
   app.decorate("runtimeConfig", runtimeConfig);
   app.decorate("runtimeServices", {
     workspaceRegistry,
+    sessionService,
     appServerSupervisor,
+    nativeSessionGateway,
   });
 
   app.addHook("onReady", async () => {
@@ -65,6 +85,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   });
 
   await registerWorkspaceRoutes(app, workspaceRegistry);
+  await registerSessionRoutes(app, sessionService);
 
   app.addHook("onClose", async () => {
     await appServerSupervisor.stop();

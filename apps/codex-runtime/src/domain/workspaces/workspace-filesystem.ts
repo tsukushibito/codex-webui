@@ -8,6 +8,14 @@ import type { EligibleWorkspaceDirectory } from "./types.js";
 export class WorkspaceFilesystem {
   constructor(private readonly workspaceRoot: string) {}
 
+  getWorkspaceRoot() {
+    return this.workspaceRoot;
+  }
+
+  getWorkspacePath(directoryName: string) {
+    return path.join(this.workspaceRoot, directoryName);
+  }
+
   async ensureWorkspaceRootExists() {
     let stat;
 
@@ -55,7 +63,7 @@ export class WorkspaceFilesystem {
   }
 
   async workspacePathExists(directoryName: string) {
-    const fullPath = path.join(this.workspaceRoot, directoryName);
+    const fullPath = this.getWorkspacePath(directoryName);
 
     try {
       await fs.lstat(fullPath);
@@ -66,7 +74,7 @@ export class WorkspaceFilesystem {
   }
 
   async removeWorkspaceDirectoryIfEmpty(directoryName: string) {
-    const fullPath = path.join(this.workspaceRoot, directoryName);
+    const fullPath = this.getWorkspacePath(directoryName);
     await fs.rm(fullPath, { recursive: false, force: true });
   }
 

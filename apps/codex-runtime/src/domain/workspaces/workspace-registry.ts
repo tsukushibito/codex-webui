@@ -4,7 +4,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { RuntimeError } from "../../errors.js";
 import type { RuntimeDatabase } from "../../db/database.js";
-import { workspaceSessionMappings, workspaces } from "../../db/schema.js";
+import { sessions, workspaceSessionMappings, workspaces } from "../../db/schema.js";
 import type { EligibleWorkspaceDirectory, WorkspaceSummary } from "./types.js";
 import { validateWorkspaceName } from "./workspace-name.js";
 import { WorkspaceFilesystem } from "./workspace-filesystem.js";
@@ -13,7 +13,10 @@ function toIsoString(date: Date) {
   return date.toISOString();
 }
 
-function mapWorkspaceSummary(record: typeof workspaces.$inferSelect): WorkspaceSummary {
+function mapWorkspaceSummary(
+  record: typeof workspaces.$inferSelect,
+  activeSession: typeof sessions.$inferSelect | null = null,
+): WorkspaceSummary {
   return {
     workspace_id: record.workspaceId,
     workspace_name: record.workspaceName,
@@ -21,7 +24,13 @@ function mapWorkspaceSummary(record: typeof workspaces.$inferSelect): WorkspaceS
     created_at: record.createdAt,
     updated_at: record.updatedAt,
     active_session_id: record.activeSessionId,
-    active_session_summary: null,
+    active_session_summary: activeSession
+      ? {
+          session_id: activeSession.sessionId,
+          status: activeSession.status,
+          last_message_at: activeSession.lastMessageAt,
+        }
+      : null,
     pending_approval_count: record.pendingApprovalCount,
   };
 }
@@ -52,7 +61,27 @@ export class WorkspaceRegistry {
       .orderBy(desc(workspaces.updatedAt), desc(workspaces.workspaceId))
       .all();
 
-    return rows.map(mapWorkspaceSummary);
+    const activeSessionIds = rows
+      .map((row) => row.activeSessionId)
+      .filter((value): value is string => value !== null);
+    const activeSessions =
+      activeSessionIds.length === 0
+        ? new Map<string, typeof sessions.$inferSelect>()
+        : new Map(
+            this.database.db
+              .select()
+              .from(sessions)
+              .where(inArray(sessions.sessionId, activeSessionIds))
+              .all()
+              .map((row) => [row.sessionId, row]),
+          );
+
+    return rows.map((row) =>
+      mapWorkspaceSummary(
+        row,
+        row.activeSessionId ? activeSessions.get(row.activeSessionId) ?? null : null,
+      ),
+    );
   }
 
   async getWorkspace(workspaceId: string) {
@@ -71,7 +100,19 @@ export class WorkspaceRegistry {
       });
     }
 
-    return mapWorkspaceSummary(row);
+    const activeSession =
+      row.activeSessionId === null
+        ? null
+        : firstRow(
+            this.database.db
+              .select()
+              .from(sessions)
+              .where(eq(sessions.sessionId, row.activeSessionId))
+              .limit(1)
+              .all(),
+          ) ?? null;
+
+    return mapWorkspaceSummary(row, activeSession);
   }
 
   async createWorkspace(workspaceName: string) {

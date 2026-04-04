@@ -29,4 +29,27 @@ export const workspaceSessionMappings = sqliteTable(
   }),
 );
 
+export const sessions = sqliteTable(
+  "sessions",
+  {
+    sessionId: text("session_id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.workspaceId, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    status: text("status").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    startedAt: text("started_at"),
+    lastMessageAt: text("last_message_at"),
+    activeApprovalId: text("active_approval_id"),
+    currentTurnId: text("current_turn_id"),
+    appSessionOverlayState: text("app_session_overlay_state").notNull(),
+  },
+  (table) => ({
+    workspaceUpdatedAtIndex: uniqueIndex("sessions_session_id_idx").on(table.sessionId),
+  }),
+);
+
 export type WorkspaceRow = typeof workspaces.$inferSelect;
+export type SessionRow = typeof sessions.$inferSelect;

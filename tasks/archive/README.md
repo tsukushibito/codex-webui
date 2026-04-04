@@ -14,3 +14,4 @@ Archive entries preserve the work instructions that were used at the time, while
 
 - [app_server_behavior_validation](./app_server_behavior_validation/README.md)
 - [issue-64-phase-3a-foundation](./issue-64-phase-3a-foundation/README.md)
+- [issue-65-phase-3b-session-lifecycle](./issue-65-phase-3b-session-lifecycle/README.md)
