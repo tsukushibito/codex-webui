@@ -15,6 +15,7 @@ Responsibilities:
 
 - confirm that the work is actually at a completion boundary
 - review task-package handoff notes, validations, and relevant execution-tracking state
+- review whether branch, PR, Issue, Project, and local repo state still agree on completion
 - identify workflow problems, awkward handoffs, or unnecessary agent drift
 - identify durable process improvements that belong in `AGENTS.md`, repo skills, or maintained docs
 - identify repeated patterns that should become a new repo skill or an update to an existing skill
@@ -32,6 +33,7 @@ Then read the minimum task-local context that matches the completion boundary:
 
 - the active or archived task package `README.md`
 - the linked Issue `Execution` section when relevant
+- the active branch and PR state when relevant
 - the nearest relevant `README.md` for the touched area
 
 If a larger retrospective already exists in `artifacts/`, read only the specific file needed for the current review.
@@ -54,9 +56,9 @@ Do not use this skill when:
 ## Standard Workflow
 
 1. Confirm that the work is at a real completion boundary such as package archive or Issue close.
-2. Read the task package, validations, and linked execution-tracking context.
+2. Read the task package, validations, linked execution-tracking context, and branch/PR/local-repo state when relevant.
 3. Capture what worked well enough to preserve.
-4. Capture workflow problems, awkward handoffs, or repeated confusion.
+4. Capture workflow problems, awkward handoffs, repeated confusion, or drift between local completion and GitHub tracking.
 5. Decide whether each finding belongs in handoff notes only, `artifacts/`, `AGENTS.md`, or a repo skill.
 6. Summarize the retrospective concisely in task-package handoff notes.
 7. If the review is too large for short notes, add a focused memo under `artifacts/` and link it from the notes.
@@ -80,6 +82,7 @@ Keep the default review concise. Use `None` when a section has no findings.
 - Do not run this skill for clearly unfinished work
 - Do not turn every completion into a long postmortem
 - Do not leave durable process improvements only in `tasks/`
+- Do not treat an archived task package, evaluator approval, or local-only changes as sufficient evidence that an Issue is ready to close
 - Do not create an `artifacts/` memo unless short handoff notes are insufficient
 - Do not replace `codex-webui-work-packages` for archive mechanics or `codex-webui-github-projects` for GitHub tracking
 

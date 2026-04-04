@@ -13,7 +13,7 @@ This skill is routing-only. It does not replace the existing single-Issue skills
 
 Responsibilities:
 
-- use delegated intake to inspect Project / Issue / `tasks/` state
+- use delegated intake to inspect Project / Issue / PR / `tasks/` state
 - choose exactly one current execution target
 - park the remaining Issues explicitly
 - report tracking drift before recommending fresh execution
@@ -72,7 +72,7 @@ The delegated intake agent is the first execution step for this skill.
 Its job is to inspect:
 
 - GitHub Project state
-- open linked Issues and dependencies
+- open linked Issues, dependencies, and active PRs
 - local `tasks/` package state
 - source-of-truth docs and nearest relevant README for the candidate target
 - local implementation state only after execution tracking is understood
@@ -98,6 +98,9 @@ If tracking drift exists, prioritize drift correction before new execution. Exam
 - Project says `In Progress` but no active task package exists
 - a local active task package points at an Issue that is not the current execution target
 - local implementation appears complete but tracking still claims active execution
+- a task package is archived locally but the PR is still open or the branch is not yet on `main`
+- the Project says `Done` while the linked PR is still open
+- an approved direct-to-`main` exception exists but the commits are not yet pushed to `origin/main`
 
 If no drift blocks progress, route to one of these skills:
 

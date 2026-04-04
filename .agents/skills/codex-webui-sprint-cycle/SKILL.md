@@ -11,6 +11,8 @@ Use this skill to run one bounded sprint through the repo-local `planner`, `work
 
 Treat one sprint as one planner-defined implementation slice. A sprint is complete only when `evaluator` returns `approved`.
 
+Treat evaluator approval as implementation approval, not as permission to close Issues or mark Project work `Done`; those tracking transitions still require the work to be reachable on `main`.
+
 When `codex-webui-execution-orchestrator` selects an implementation-ready target with no blocking tracking drift, this skill is the required implementation path for that target.
 
 ## Build Context
@@ -63,6 +65,7 @@ Do not use this skill when:
 - Do not run concurrent write passes on the same sprint slice
 - Do not silently weaken planner acceptance criteria to get an approval
 - Do not let `planner` or `evaluator` mutate the worktree, create commits, push branches, or update GitHub Issues/Projects
+- Do not treat evaluator approval alone as sufficient evidence to close an Issue or mark a Project item `Done`
 
 ## Required Final Output
 

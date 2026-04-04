@@ -26,6 +26,7 @@ If editing issues tied to a specific area, read the nearest relevant README in t
 
 - Treat `docs/` as the source of truth for scope, decisions, and completion criteria.
 - Use GitHub Projects to track execution state, ownership, sequencing, and review flow.
+- Default repo-tracked change flow is a short-lived branch and PR; direct commits to `main` are exceptions only.
 - Keep local task-package mechanics in `codex-webui-work-packages`; only store short execution links and summaries in Issues.
 - Avoid duplicating long roadmap text into the Project README or issue bodies unless the duplication materially helps execution.
 - Preserve terminology already used in nearby docs: `Phase`, `Runtime`, `BFF`, `UI`, `Validation`, `Infra`.
@@ -51,6 +52,8 @@ Prefer these custom fields:
 
 Use the built-in `Status` field unless the user explicitly wants a different workflow. Default to `Todo`, `In Progress`, and `Done` if the project is new.
 
+Keep items with open PRs, unmerged execution branches, or unpushed direct-to-`main` exceptions in `In Progress`; do not use `Done` until the work is reachable on `main`.
+
 ## Standard Work Breakdown
 
 Start from roadmap phases, then split only as needed.
@@ -75,6 +78,8 @@ gh project view <number> --owner tsukushibito
 gh project field-list <number> --owner tsukushibito --format json
 gh project item-list <number> --owner tsukushibito --format json
 gh issue list --state open --limit 100
+gh pr list --state open --limit 100
+git status --short --branch
 ```
 
 ### Create or reshape a Project
@@ -125,9 +130,11 @@ When the user asks to maintain the roadmap Project:
 When an Issue also uses a local task package:
 
 1. Read `tasks/README.md` and check the linked package state.
-2. Keep only a short `Execution` section and package links in the Issue.
-3. Let `codex-webui-work-packages` handle package creation, README updates, and archive moves.
-4. After the package state changes, update the Issue and Project status to match.
+2. Check the Issue `Execution` section for the active branch and active PR when they exist.
+3. Keep only a short `Execution` section and branch/PR/package links in the Issue.
+4. Let `codex-webui-work-packages` handle package creation, README updates, and archive moves.
+5. Before closing an Issue or setting Project `Status` to `Done`, verify the work is reachable on `main`: merged PR to `main` for the default workflow, or pushed commits on `origin/main` for an approved direct-to-`main` exception.
+6. If the PR remains open, the branch is not yet on `main`, or the local repo state is dirty, keep the Issue and Project in execution rather than `Done`.
 
 ## Guardrails
 
@@ -135,6 +142,7 @@ When an Issue also uses a local task package:
 - Do not silently replace field semantics in an existing Project.
 - Do not duplicate detailed acceptance criteria from `docs/` into many issue bodies unless the user asks for that granularity.
 - Do not move completed evidence into `tasks/`; keep `tasks/` for active work only.
+- Do not mark an Issue or Project item as complete while a PR remains open, the execution branch is not yet on `main`, an approved direct-to-`main` exception is unpushed, or the local repo state is dirty.
 - Do not delete old Projects, issues, or items without an explicit user instruction.
 
 ## Example Requests

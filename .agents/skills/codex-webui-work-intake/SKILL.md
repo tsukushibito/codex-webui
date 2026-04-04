@@ -14,7 +14,7 @@ This skill is intake-only. It does not mutate GitHub Projects, Issues, or local 
 Treat responsibilities as follows:
 
 - `docs/` is the source of truth for requirements, specs, validation plans, and roadmap decisions
-- GitHub Projects and Issues are the execution-tracking layer
+- GitHub Projects, Issues, and PRs are the execution-tracking layer
 - `tasks/` holds the active local work package for the current execution slice
 - implementation directories show what is already built and what remains
 
@@ -37,7 +37,7 @@ If a likely next slice belongs to a specific area, read the nearest relevant `RE
 Follow this order every time.
 
 1. Inspect GitHub Projects first.
-2. Inspect open linked Issues and dependencies.
+2. Inspect open linked Issues, dependencies, and active PRs.
 3. Inspect local `tasks/` state.
 4. Check for drift across Project, Issue, and `tasks/`.
 5. Read source-of-truth docs and nearest relevant README for the likely target area.
@@ -54,6 +54,7 @@ gh project view <number> --owner tsukushibito
 gh project field-list <number> --owner tsukushibito --format json
 gh project item-list <number> --owner tsukushibito --format json
 gh issue list --state open --limit 100
+gh pr list --state open --limit 100
 ```
 
 When reading Project state, prioritize:
@@ -80,6 +81,9 @@ Use local inspection to answer these questions:
 
 - Is there an active task package for the item that appears to be `In Progress`?
 - Does local `tasks/` contradict the Project or linked Issue state?
+- Does the Issue `Execution` section point to an active branch and active PR, and do they match actual state?
+- Is a task archived locally while the branch is not yet on `main`?
+- Is an approved direct-to-`main` exception still only local and not yet pushed to `origin/main`?
 - Do the maintained docs already define the expected next slice?
 - Does the codebase show that the claimed slice is already complete, partially complete, or not started?
 
@@ -90,6 +94,9 @@ If drift exists, recommend fixing the drift first. Examples:
 - Project says `In Progress` but `tasks/` has no active package
 - `tasks/` has an active package for an Issue not currently being executed
 - local implementation is complete but Project/Issue still claims active execution
+- the task package is archived locally but the PR is still open or the branch is not yet on `main`
+- the Project says `Done` while the linked PR is still open
+- an approved direct-to-`main` exception exists but the commits are not yet pushed to `origin/main`
 
 If there is no drift, recommend one concrete next slice. The recommendation must be specific enough to start execution without another triage pass.
 
