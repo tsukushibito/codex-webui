@@ -2,6 +2,7 @@ import type {
   ListResponse,
   RuntimeApprovalProjection,
   RuntimeApprovalResolveResult,
+  RuntimeApprovalStreamEventProjection,
   RuntimeMessageProjection,
   RuntimeSessionEventProjection,
   RuntimeSessionSummary,
@@ -132,6 +133,27 @@ export function mapApprovalDetail(approval: RuntimeApprovalProjection) {
     ...mapApprovalSummary(approval),
     operation_summary: approval.operation_summary,
     context: approval.context,
+  };
+}
+
+export function mapApprovalStreamEvent(event: RuntimeApprovalStreamEventProjection) {
+  const payload: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(event.payload)) {
+    if (key === "summary" && typeof value === "string") {
+      payload.title = value;
+      continue;
+    }
+
+    payload[key] = value;
+  }
+
+  return {
+    event_id: event.event_id,
+    session_id: event.session_id,
+    event_type: event.event_type,
+    occurred_at: event.occurred_at,
+    payload,
   };
 }
 

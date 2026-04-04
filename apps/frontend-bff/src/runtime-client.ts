@@ -78,4 +78,30 @@ export class RuntimeClient {
       body: payload as T,
     };
   }
+
+  async requestStream(path: string) {
+    let response: Response;
+    try {
+      response = await fetch(`${this.runtimeBaseUrl}${path}`, {
+        headers: {
+          accept: "text/event-stream",
+        },
+        cache: "no-store",
+      });
+    } catch (error) {
+      throw new BffError(
+        503,
+        "session_runtime_error",
+        "backend dependency temporarily unavailable",
+        {
+          cause:
+            error instanceof Error
+              ? error.message
+              : "failed to connect to codex-runtime",
+        },
+      );
+    }
+
+    return response;
+  }
 }

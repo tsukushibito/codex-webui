@@ -5,6 +5,8 @@ import {
   mapApprovalDetail,
   mapApprovalList,
   mapApprovalResolveResult,
+  mapApprovalStreamEvent,
+  mapEvent,
   mapEventList,
   mapMessage,
   mapMessageList,
@@ -20,6 +22,7 @@ import type {
   ListResponse,
   RuntimeApprovalProjection,
   RuntimeApprovalSummary,
+  RuntimeApprovalStreamEventProjection,
   RuntimeApprovalResolveResult,
   RuntimeMessageProjection,
   RuntimeSessionEventProjection,
@@ -61,6 +64,115 @@ async function fetchWorkspaceActiveSessionId(workspaceId: string) {
 
 function jsonResponse(status: number, body: unknown) {
   return NextResponse.json(body, { status });
+}
+
+async function parseRuntimeErrorResponse(response: Response) {
+  try {
+    const payload = await response.json();
+    if (isErrorEnvelope(payload)) {
+      return jsonResponse(response.status, payload);
+    }
+  } catch {
+    // fall through
+  }
+
+  return toErrorResponse(
+    new Error("codex-runtime returned an invalid stream error response"),
+  );
+}
+
+function encodeSseData(data: unknown) {
+  return `data: ${JSON.stringify(data)}\n\n`;
+}
+
+function mapSseChunk<TInput, TOutput>(
+  chunk: string,
+  mapper: (value: TInput) => TOutput,
+) {
+  const trimmed = chunk.trimEnd();
+  if (trimmed.length === 0) {
+    return "";
+  }
+
+  if (trimmed.startsWith(":")) {
+    return `${trimmed}\n\n`;
+  }
+
+  const dataLines = trimmed
+    .split("\n")
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice("data:".length).trimStart());
+
+  if (dataLines.length === 0) {
+    return `${trimmed}\n\n`;
+  }
+
+  return encodeSseData(mapper(JSON.parse(dataLines.join("\n")) as TInput));
+}
+
+function createSseRelayStream<TInput, TOutput>(
+  source: ReadableStream<Uint8Array>,
+  mapper: (value: TInput) => TOutput,
+) {
+  const reader = source.getReader();
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buffer = "";
+
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const { done, value } = await reader.read();
+      if (done) {
+        if (buffer.length > 0) {
+          const mappedChunk = mapSseChunk(buffer, mapper);
+          if (mappedChunk.length > 0) {
+            controller.enqueue(encoder.encode(mappedChunk));
+          }
+        }
+        controller.close();
+        return;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+
+      let boundaryIndex = buffer.indexOf("\n\n");
+      while (boundaryIndex >= 0) {
+        const chunk = buffer.slice(0, boundaryIndex);
+        buffer = buffer.slice(boundaryIndex + 2);
+        const mappedChunk = mapSseChunk(chunk, mapper);
+        if (mappedChunk.length > 0) {
+          controller.enqueue(encoder.encode(mappedChunk));
+        }
+        boundaryIndex = buffer.indexOf("\n\n");
+      }
+    },
+    async cancel() {
+      await reader.cancel();
+    },
+  });
+}
+
+async function relaySse<TInput, TOutput>(
+  path: string,
+  mapper: (value: TInput) => TOutput,
+) {
+  const response = await runtimeClient.requestStream(path);
+  if (!response.ok) {
+    return parseRuntimeErrorResponse(response);
+  }
+
+  if (!response.body) {
+    return toErrorResponse(new Error("codex-runtime stream response had no body"));
+  }
+
+  return new Response(createSseRelayStream(response.body, mapper), {
+    status: 200,
+    headers: {
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-cache, no-transform",
+      connection: "keep-alive",
+    },
+  });
 }
 
 function passthroughRuntimeError(
@@ -404,6 +516,28 @@ export async function approveApproval(_request: Request, approvalId: string) {
 export async function denyApproval(_request: Request, approvalId: string) {
   try {
     return await resolveApproval(approvalId, "denied");
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function getSessionStream(_request: Request, sessionId: string) {
+  try {
+    return await relaySse<RuntimeSessionEventProjection, ReturnType<typeof mapEvent>>(
+      `/api/v1/sessions/${sessionId}/stream`,
+      mapEvent,
+    );
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function getApprovalStream(_request: Request) {
+  try {
+    return await relaySse<
+      RuntimeApprovalStreamEventProjection,
+      ReturnType<typeof mapApprovalStreamEvent>
+    >("/api/v1/approvals/stream", mapApprovalStreamEvent);
   } catch (error) {
     return toErrorResponse(error);
   }
