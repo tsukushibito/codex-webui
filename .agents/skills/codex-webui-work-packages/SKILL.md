@@ -18,6 +18,8 @@ Treat responsibilities as follows:
 
 This skill owns the local `tasks/` workflow. If the user also needs GitHub Issue or Project edits, use `codex-webui-github-projects` for that part.
 
+When `codex-webui-execution-orchestrator` selects task-package creation, resumption, reconciliation, or archive work as the next step, this skill is the required path for that package-state change.
+
 ## Build Context
 
 Read these files before changing work packages:
@@ -37,6 +39,7 @@ If the work package is tied to a specific area, read the nearest relevant `READM
 - Prefer one primary Issue per task package
 - Link the task package and the Issue to each other
 - Keep task-package detail in `tasks/`, not in the Issue body beyond a short execution summary and links
+- Before archiving a completed package or closing its Issue, run `codex-webui-completion-retrospective`
 - Archive completed work packages under `tasks/archive/` before marking the execution slice done on the Issue
 - Do not move evidence into `tasks/`; keep logs and outputs in `artifacts/`
 
@@ -96,7 +99,7 @@ If the user asks you to edit GitHub Issues or Project fields, hand off that part
 ### Finish an execution slice
 
 1. Confirm the package exit criteria were met
-2. Update `Status / handoff notes` and `Artifacts / evidence`
+2. Run `codex-webui-completion-retrospective` and update `Status / handoff notes`, using `artifacts/` only if the review needs more than a short summary
 3. Move the package to `tasks/archive/issue-<number>-<work_id>/`
 4. Replace the Issue's active-package link with an archived-package link
 5. If the Issue scope is fully complete, close it and set Project `Status` to `Done`
@@ -111,6 +114,7 @@ If the user asks you to edit GitHub Issues or Project fields, hand off that part
 ## Guardrails
 
 - Do not create a second active package for the same Issue
+- When invoked by `codex-webui-execution-orchestrator`, do not let the main agent bypass this skill by mutating `tasks/` directly outside the package workflow
 - Do not use `tasks/` as a second source of truth for requirements or architecture decisions
 - Do not store raw evidence in the package directory unless the user explicitly wants that exception
 - Do not delete archived packages unless the user explicitly asks

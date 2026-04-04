@@ -11,6 +11,8 @@ Use this skill to run one bounded sprint through the repo-local `planner`, `work
 
 Treat one sprint as one planner-defined implementation slice. A sprint is complete only when `evaluator` returns `approved`.
 
+When `codex-webui-execution-orchestrator` selects an implementation-ready target with no blocking tracking drift, this skill is the required implementation path for that target.
+
 ## Build Context
 
 Read these files before running the workflow:
@@ -57,6 +59,7 @@ Do not use this skill when:
 - `planner` is read-only and defines the sprint slice
 - `worker` is the only role allowed to edit files
 - `evaluator` is read-only and acts as a hard gate
+- When invoked by `codex-webui-execution-orchestrator`, do not let the main agent bypass `worker` by implementing the sprint slice directly
 - Do not run concurrent write passes on the same sprint slice
 - Do not silently weaken planner acceptance criteria to get an approval
 - Do not let `planner` or `evaluator` mutate the worktree, create commits, push branches, or update GitHub Issues/Projects

@@ -9,7 +9,7 @@ description: Coordinate multi-Issue execution in `codex-webui` by delegating rea
 
 Use this skill when the main agent needs to coordinate multiple Issues for this repository.
 
-This skill is routing-only. It does not replace the existing single-Issue skills.
+This skill is routing-only. It does not replace the existing single-Issue skills, and it must not directly implement the chosen Issue itself.
 
 Responsibilities:
 
@@ -17,7 +17,8 @@ Responsibilities:
 - choose exactly one current execution target
 - park the remaining Issues explicitly
 - report tracking drift before recommending fresh execution
-- route to the next existing repo skill
+- select exactly one next existing repo skill
+- invoke that selected repo skill in the same turn when the user asked to proceed with execution
 
 This skill does not directly mutate GitHub Projects, Issues, or local task packages.
 
@@ -56,10 +57,13 @@ Follow this order every time.
 2. Delegate intake to the custom read-only `intake` agent defined in `.codex/config.toml`.
 3. Use the intake summary to select one current target.
 4. Check whether tracking drift blocks execution.
-5. Recommend exactly one next handoff skill.
-6. Park the other Issues explicitly.
+5. Select exactly one next handoff skill.
+6. If the user asked to proceed with work in the current turn, invoke that selected handoff skill in the same turn instead of stopping after the routing brief.
+7. Park the other Issues explicitly.
 
 Do not skip delegated intake in this workflow.
+
+If the user explicitly asked only for routing, target selection, or a next-skill recommendation, the workflow may stop after the routing brief.
 
 ## Delegated Intake
 
@@ -74,6 +78,16 @@ Its job is to inspect:
 - local implementation state only after execution tracking is understood
 
 The orchestrator should consume the intake result as a concise routing summary, not as a long audit transcript.
+
+Delegated intake is strictly read-only.
+
+It must not:
+
+- create, update, archive, or move local task packages
+- edit GitHub Issues, Project items, or Project fields
+- implement code or documents for the chosen Issue
+
+If intake detects tracking drift, it reports that drift back to the orchestrator for routing; it does not correct the drift itself.
 
 ## Routing Rules
 
@@ -93,6 +107,14 @@ If no drift blocks progress, route to one of these skills:
 
 Do not recommend multiple competing handoffs in the same result.
 
+When the user asked to proceed with execution, do not stop after naming the next handoff skill. Invoke exactly one selected handoff skill in the same turn.
+
+When the chosen target is implementation-ready and no tracking drift blocks execution, the handoff must be `codex-webui-sprint-cycle`.
+
+When the chosen target still needs task-package creation, resumption, reconciliation, or archive work, the handoff must be `codex-webui-work-packages`.
+
+Do not bypass the selected handoff skill by letting the main agent implement directly after routing.
+
 ## Required Output Shape
 
 Return a short brief with these sections in this order:
@@ -105,17 +127,21 @@ Return a short brief with these sections in this order:
 
 The result should be short and routing-oriented.
 
+If the user asked to proceed with work in the current turn, present the brief and then continue into the selected handoff skill instead of ending after the brief.
+
 ## Guardrails
 
 - Do not replace `codex-webui-work-intake`; keep it usable as a standalone intake skill
 - Do not implement the chosen Issue from this skill
 - Do not update GitHub Projects, Issues, or `tasks/` directly from this skill
+- Do not let delegated intake mutate GitHub state, local task-package state, or implementation files
 - Do not produce a backlog dump or queue report as the final answer
 - Do not recommend parallel execution of multiple Issues as the default path
 - Do not bypass drift correction when execution tracking is inconsistent
+- Do not bypass the selected handoff skill when the user asked to proceed with execution
 
 ## Example Requests
 
 - `Use $codex-webui-execution-orchestrator to choose the current Issue and next repo skill.`
-- `複数Issueの中から今の対象を1つ決めて、次に呼ぶ skill まで決めて。`
-- `Use $codex-webui-execution-orchestrator for multi-issue routing before starting the next slice.`
+- `複数Issueの中から今の対象を1つ決めて、次に呼ぶ skill を実行するところまで進めて。`
+- `Use $codex-webui-execution-orchestrator for multi-issue routing and then invoke the correct repo skill for the next slice.`
