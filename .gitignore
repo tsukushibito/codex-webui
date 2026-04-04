@@ -1,7 +1,9 @@
 .venv/
+.venv
 .tmp/
 .worktrees/
 node_modules/
+.next/
 dist/
 coverage/
 .DS_Store
