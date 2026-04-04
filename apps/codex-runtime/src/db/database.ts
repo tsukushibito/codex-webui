@@ -81,6 +81,23 @@ CREATE TABLE IF NOT EXISTS approvals (
 
 CREATE UNIQUE INDEX IF NOT EXISTS approvals_session_id_approval_id_idx
 ON approvals (session_id, approval_id);
+
+CREATE TABLE IF NOT EXISTS session_events (
+  event_id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  sequence INTEGER NOT NULL,
+  occurred_at TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  native_event_name TEXT,
+  FOREIGN KEY (session_id) REFERENCES sessions (session_id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS session_events_session_id_event_id_idx
+ON session_events (session_id, event_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS session_events_session_id_sequence_idx
+ON session_events (session_id, sequence);
 `;
 
 export function openRuntimeDatabase(databasePath: string) {

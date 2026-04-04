@@ -42,3 +42,30 @@ export interface MessageProjection {
   created_at: string;
   source_item_type: MessageSourceItemType;
 }
+
+export type SessionEventType =
+  | "session.status_changed"
+  | "message.user"
+  | "message.assistant.delta"
+  | "message.assistant.completed"
+  | "approval.requested"
+  | "approval.resolved";
+
+export interface SessionEventProjection {
+  event_id: string;
+  session_id: string;
+  event_type: SessionEventType;
+  sequence: number;
+  occurred_at: string;
+  payload: Record<string, unknown>;
+  native_event_name: string | null;
+}
+
+export interface ApprovalStreamEventProjection {
+  event_id: string;
+  session_id: string;
+  event_type: Extract<SessionEventType, "approval.requested" | "approval.resolved">;
+  occurred_at: string;
+  payload: Record<string, unknown>;
+  native_event_name: string | null;
+}

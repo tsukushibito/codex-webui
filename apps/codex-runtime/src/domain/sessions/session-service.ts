@@ -4,7 +4,13 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { RuntimeError } from "../../errors.js";
 import type { RuntimeDatabase } from "../../db/database.js";
-import { approvals, messages, sessions, workspaces } from "../../db/schema.js";
+import {
+  approvals,
+  messages,
+  sessionEvents,
+  sessions,
+  workspaces,
+} from "../../db/schema.js";
 import type {
   ApprovalProjection,
   ApprovalSummary,
@@ -19,10 +25,13 @@ import {
   resolveWorkspaceSessionCwd,
 } from "./native-session-gateway.js";
 import type {
+  ApprovalStreamEventProjection,
   AppSessionOverlayState,
   MessageProjection,
   MessageRole,
   MessageSourceItemType,
+  SessionEventProjection,
+  SessionEventType,
   SessionStatus,
   SessionStopResult,
   SessionSummary,
@@ -98,6 +107,28 @@ function generateApprovalId() {
   return `apr_${crypto.randomUUID().replaceAll("-", "")}`;
 }
 
+function generateEventId() {
+  return `evt_${crypto.randomUUID().replaceAll("-", "")}`;
+}
+
+function parseEventPayload(value: string) {
+  return JSON.parse(value) as Record<string, unknown>;
+}
+
+function mapSessionEventProjection(
+  record: typeof sessionEvents.$inferSelect,
+): SessionEventProjection {
+  return {
+    event_id: record.eventId,
+    session_id: record.sessionId,
+    event_type: record.eventType as SessionEventType,
+    sequence: record.sequence,
+    occurred_at: record.occurredAt,
+    payload: parseEventPayload(record.payload),
+    native_event_name: record.nativeEventName,
+  };
+}
+
 function firstRequiredRow<T>(rows: T[], notFound: () => never) {
   const row = firstRow(rows);
   if (!row) {
@@ -108,6 +139,15 @@ function firstRequiredRow<T>(rows: T[], notFound: () => never) {
 }
 
 export class SessionService {
+  private readonly sessionEventListeners = new Map<
+    string,
+    Set<(event: SessionEventProjection) => void>
+  >();
+
+  private readonly approvalEventListeners = new Set<
+    (event: ApprovalStreamEventProjection) => void
+  >();
+
   constructor(
     private readonly database: RuntimeDatabase,
     private readonly workspaceRegistry: WorkspaceRegistry,
@@ -115,6 +155,113 @@ export class SessionService {
     private readonly nativeSessionGateway: NativeSessionGateway,
     private readonly now: () => Date = () => new Date(),
   ) {}
+
+  subscribeSessionEvents(
+    sessionId: string,
+    listener: (event: SessionEventProjection) => void,
+  ) {
+    const listeners = this.sessionEventListeners.get(sessionId) ?? new Set();
+    listeners.add(listener);
+    this.sessionEventListeners.set(sessionId, listeners);
+
+    return () => {
+      listeners.delete(listener);
+
+      if (listeners.size === 0) {
+        this.sessionEventListeners.delete(sessionId);
+      }
+    };
+  }
+
+  subscribeApprovalEvents(listener: (event: ApprovalStreamEventProjection) => void) {
+    this.approvalEventListeners.add(listener);
+
+    return () => {
+      this.approvalEventListeners.delete(listener);
+    };
+  }
+
+  private appendSessionEvent(input: {
+    sessionId: string;
+    eventType: SessionEventType;
+    occurredAt: string;
+    payload: Record<string, unknown>;
+    nativeEventName?: string | null;
+  }) {
+    const latestEvent = firstRow(
+      this.database.db
+        .select()
+        .from(sessionEvents)
+        .where(eq(sessionEvents.sessionId, input.sessionId))
+        .orderBy(desc(sessionEvents.sequence), desc(sessionEvents.eventId))
+        .limit(1)
+        .all(),
+    );
+    const nextSequence = (latestEvent?.sequence ?? 0) + 1;
+
+    const eventId = generateEventId();
+
+    this.database.db
+      .insert(sessionEvents)
+      .values({
+        eventId,
+        sessionId: input.sessionId,
+        eventType: input.eventType,
+        sequence: nextSequence,
+        occurredAt: input.occurredAt,
+        payload: JSON.stringify(input.payload),
+        nativeEventName: input.nativeEventName ?? null,
+      })
+      .run();
+
+    const event = mapSessionEventProjection({
+      eventId,
+      sessionId: input.sessionId,
+      eventType: input.eventType,
+      sequence: nextSequence,
+      occurredAt: input.occurredAt,
+      payload: JSON.stringify(input.payload),
+      nativeEventName: input.nativeEventName ?? null,
+    });
+
+    const sessionListeners = this.sessionEventListeners.get(input.sessionId);
+    sessionListeners?.forEach((listener) => listener(event));
+
+    if (
+      event.event_type === "approval.requested" ||
+      event.event_type === "approval.resolved"
+    ) {
+      const approvalEvent: ApprovalStreamEventProjection = {
+        event_id: event.event_id,
+        session_id: event.session_id,
+        event_type: event.event_type,
+        occurred_at: event.occurred_at,
+        payload: event.payload,
+        native_event_name: event.native_event_name,
+      };
+
+      this.approvalEventListeners.forEach((listener) => listener(approvalEvent));
+    }
+  }
+
+  private appendSessionStatusChangedEvent(input: {
+    sessionId: string;
+    occurredAt: string;
+    fromStatus: SessionStatus;
+    toStatus: SessionStatus;
+    nativeEventName?: string | null;
+  }) {
+    this.appendSessionEvent({
+      sessionId: input.sessionId,
+      eventType: "session.status_changed",
+      occurredAt: input.occurredAt,
+      payload: {
+        from_status: input.fromStatus,
+        to_status: input.toStatus,
+      },
+      nativeEventName: input.nativeEventName,
+    });
+  }
 
   async listSessions(workspaceId: string) {
     await this.workspaceRegistry.getWorkspace(workspaceId);
@@ -276,42 +423,13 @@ export class SessionService {
     const now = toIsoString(this.now());
     let canceledApproval: ApprovalProjection | null = null;
 
-    if (session.status === "waiting_approval" && session.active_approval_id !== null) {
-      const approval = firstRequiredRow(
-        this.database.db
-          .select()
-          .from(approvals)
-          .where(eq(approvals.approvalId, session.active_approval_id))
-          .limit(1)
-          .all(),
-        () => {
-          throw new RuntimeError(
-            404,
-            "approval_not_found",
-            "approval was not found",
-            {
-              approval_id: session.active_approval_id,
-            },
-          );
-        },
-      );
-
-      if (approval.status === "pending") {
-        this.database.db
-          .update(approvals)
-          .set({
-            status: "canceled",
-            resolution: "canceled",
-            resolvedAt: now,
-          })
-          .where(eq(approvals.approvalId, approval.approvalId))
-          .run();
-
-        const updatedApproval = firstRequiredRow(
+    this.database.sqlite.transaction(() => {
+      if (session.status === "waiting_approval" && session.active_approval_id !== null) {
+        const approval = firstRequiredRow(
           this.database.db
             .select()
             .from(approvals)
-            .where(eq(approvals.approvalId, approval.approvalId))
+            .where(eq(approvals.approvalId, session.active_approval_id))
             .limit(1)
             .all(),
           () => {
@@ -320,45 +438,96 @@ export class SessionService {
               "approval_not_found",
               "approval was not found",
               {
-                approval_id: approval.approvalId,
+                approval_id: session.active_approval_id,
               },
             );
           },
         );
-        canceledApproval = mapApprovalProjection(updatedApproval);
+
+        if (approval.status === "pending") {
+          this.database.db
+            .update(approvals)
+            .set({
+              status: "canceled",
+              resolution: "canceled",
+              resolvedAt: now,
+            })
+            .where(eq(approvals.approvalId, approval.approvalId))
+            .run();
+
+          const updatedApproval = firstRequiredRow(
+            this.database.db
+              .select()
+              .from(approvals)
+              .where(eq(approvals.approvalId, approval.approvalId))
+              .limit(1)
+              .all(),
+            () => {
+              throw new RuntimeError(
+                404,
+                "approval_not_found",
+                "approval was not found",
+                {
+                  approval_id: approval.approvalId,
+                },
+              );
+            },
+          );
+          canceledApproval = mapApprovalProjection(updatedApproval);
+
+          this.appendSessionEvent({
+            sessionId,
+            eventType: "approval.resolved",
+            occurredAt: now,
+            payload: {
+              approval_id: approval.approvalId,
+              workspace_id: approval.workspaceId,
+              approval_category: approval.approvalCategory,
+              summary: approval.summary,
+              resolution: "canceled",
+            },
+          });
+        }
       }
-    }
 
-    this.database.db
-      .update(sessions)
-      .set({
-        status: "stopped",
-        updatedAt: now,
-        currentTurnId: null,
-        activeApprovalId: null,
-        pendingAssistantMessageId: null,
-        appSessionOverlayState: "closed",
-      })
-      .where(eq(sessions.sessionId, sessionId))
-      .run();
+      this.database.db
+        .update(sessions)
+        .set({
+          status: "stopped",
+          updatedAt: now,
+          currentTurnId: null,
+          activeApprovalId: null,
+          pendingAssistantMessageId: null,
+          appSessionOverlayState: "closed",
+        })
+        .where(eq(sessions.sessionId, sessionId))
+        .run();
 
-    this.database.db
-      .update(workspaces)
-      .set({
-        activeSessionId: null,
-        updatedAt: now,
-        pendingApprovalCount:
-          session.status === "waiting_approval" && canceledApproval !== null
-            ? Math.max(0, workspace.pending_approval_count - 1)
-            : workspace.pending_approval_count,
-      })
-      .where(
-        and(
-          eq(workspaces.workspaceId, session.workspace_id),
-          eq(workspaces.activeSessionId, sessionId),
-        ),
-      )
-      .run();
+      this.database.db
+        .update(workspaces)
+        .set({
+          activeSessionId: null,
+          updatedAt: now,
+          pendingApprovalCount:
+            session.status === "waiting_approval" && canceledApproval !== null
+              ? Math.max(0, workspace.pending_approval_count - 1)
+              : workspace.pending_approval_count,
+        })
+        .where(
+          and(
+            eq(workspaces.workspaceId, session.workspace_id),
+            eq(workspaces.activeSessionId, sessionId),
+          ),
+        )
+        .run();
+
+      this.appendSessionStatusChangedEvent({
+        sessionId,
+        occurredAt: now,
+        fromStatus: session.status,
+        toStatus: "stopped",
+      });
+    })();
 
     return {
       session: await this.getSession(sessionId),
@@ -406,6 +575,45 @@ export class SessionService {
 
     return {
       items: rows.map(mapMessageProjection),
+      next_cursor: null,
+      has_more: false,
+    };
+  }
+
+  async listSessionEvents(
+    sessionId: string,
+    options: {
+      limit?: number;
+      sort?: "occurred_at" | "-occurred_at";
+    } = {},
+  ) {
+    await this.getSession(sessionId);
+
+    const limit = Math.max(1, Math.min(options.limit ?? 100, 100));
+    const sort = options.sort ?? "occurred_at";
+    const orderBy =
+      sort === "-occurred_at"
+        ? [
+            desc(sessionEvents.occurredAt),
+            desc(sessionEvents.sequence),
+            desc(sessionEvents.eventId),
+          ]
+        : [
+            asc(sessionEvents.occurredAt),
+            asc(sessionEvents.sequence),
+            asc(sessionEvents.eventId),
+          ];
+
+    const rows = this.database.db
+      .select()
+      .from(sessionEvents)
+      .where(eq(sessionEvents.sessionId, sessionId))
+      .orderBy(...orderBy)
+      .limit(limit)
+      .all();
+
+    return {
+      items: rows.map(mapSessionEventProjection),
       next_cursor: null,
       has_more: false,
     };
@@ -569,6 +777,26 @@ export class SessionService {
         })
         .where(eq(workspaces.workspaceId, approval.workspaceId))
         .run();
+
+      this.appendSessionEvent({
+        sessionId: approval.sessionId,
+        eventType: "approval.resolved",
+        occurredAt: resolvedAt,
+        payload: {
+          approval_id: approvalId,
+          workspace_id: approval.workspaceId,
+          approval_category: approval.approvalCategory,
+          summary: approval.summary,
+          resolution: input.resolution,
+        },
+      });
+
+      this.appendSessionStatusChangedEvent({
+        sessionId: approval.sessionId,
+        occurredAt: resolvedAt,
+        fromStatus: session.status as SessionStatus,
+        toStatus: nextSessionStatus,
+      });
     })();
 
     return {
@@ -679,6 +907,16 @@ export class SessionService {
         })
         .run();
 
+      this.appendSessionEvent({
+        sessionId,
+        eventType: "message.user",
+        occurredAt: userCreatedAt,
+        payload: {
+          message_id: userMessageId,
+          content: input.content,
+        },
+      });
+
       this.database.db
         .update(sessions)
         .set({
@@ -700,6 +938,13 @@ export class SessionService {
         })
         .where(eq(workspaces.workspaceId, session.workspace_id))
         .run();
+
+      this.appendSessionStatusChangedEvent({
+        sessionId,
+        occurredAt: userCreatedAt,
+        fromStatus: session.status,
+        toStatus: "running",
+      });
     })();
 
     return {
@@ -799,6 +1044,26 @@ export class SessionService {
         })
         .where(eq(workspaces.workspaceId, session.workspaceId))
         .run();
+
+      this.appendSessionEvent({
+        sessionId,
+        eventType: "approval.requested",
+        occurredAt: createdAt,
+        payload: {
+          approval_id: approvalId,
+          workspace_id: session.workspaceId,
+          approval_category: input.approval_category,
+          summary: input.summary,
+        },
+        nativeEventName: "request/started",
+      });
+
+      this.appendSessionStatusChangedEvent({
+        sessionId,
+        occurredAt: createdAt,
+        fromStatus: session.status as SessionStatus,
+        toStatus: "waiting_approval",
+      });
     })();
 
     return this.getApproval(approvalId);
@@ -843,14 +1108,28 @@ export class SessionService {
       session.pendingAssistantMessageId ?? generateMessageId("assistant");
     const updatedAt = toIsoString(this.now());
 
-    this.database.db
-      .update(sessions)
-      .set({
-        updatedAt,
-        pendingAssistantMessageId: assistantMessageId,
-      })
-      .where(eq(sessions.sessionId, sessionId))
-      .run();
+    this.database.sqlite.transaction(() => {
+      this.database.db
+        .update(sessions)
+        .set({
+          updatedAt,
+          pendingAssistantMessageId: assistantMessageId,
+        })
+        .where(eq(sessions.sessionId, sessionId))
+        .run();
+
+      this.appendSessionEvent({
+        sessionId,
+        eventType: "message.assistant.delta",
+        occurredAt: updatedAt,
+        payload: {
+          message_id: assistantMessageId,
+          turn_id: input.turn_id,
+          delta: input.delta,
+        },
+        nativeEventName: "item/agent_message/delta",
+      });
+    })();
 
     return {
       message_id: assistantMessageId,
@@ -914,6 +1193,18 @@ export class SessionService {
         })
         .run();
 
+      this.appendSessionEvent({
+        sessionId,
+        eventType: "message.assistant.completed",
+        occurredAt: assistantCreatedAt,
+        payload: {
+          message_id: assistantMessageId,
+          turn_id: input.turn_id,
+          content: input.content,
+        },
+        nativeEventName: "item/agent_message/completed",
+      });
+
       this.database.db
         .update(sessions)
         .set({
@@ -940,6 +1231,13 @@ export class SessionService {
           ),
         )
         .run();
+
+      this.appendSessionStatusChangedEvent({
+        sessionId,
+        occurredAt: assistantCreatedAt,
+        fromStatus: session.status as SessionStatus,
+        toStatus: "waiting_input",
+      });
     })();
 
     return {

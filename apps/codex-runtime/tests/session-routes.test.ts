@@ -101,6 +101,60 @@ function seedWaitingInputSession(
   return { workspaceId, sessionId };
 }
 
+async function listSessionEvents(
+  app: Awaited<ReturnType<typeof buildApp>>,
+  sessionId: string,
+  query = "",
+) {
+  const response = await app.inject({
+    method: "GET",
+    url: `/api/v1/sessions/${sessionId}/events${query}`,
+  });
+
+  expect(response.statusCode).toBe(200);
+  return response.json();
+}
+
+function resolveBaseUrl(app: Awaited<ReturnType<typeof buildApp>>) {
+  const address = app.server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("app server address is not available");
+  }
+
+  return `http://127.0.0.1:${address.port.toString()}`;
+}
+
+function createSseReader(response: Response) {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("response body is not readable");
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  return async function nextEvent() {
+    while (true) {
+      const separatorIndex = buffer.indexOf("\n\n");
+      if (separatorIndex >= 0) {
+        const chunk = buffer.slice(0, separatorIndex);
+        buffer = buffer.slice(separatorIndex + 2);
+
+        if (chunk.startsWith("data: ")) {
+          return JSON.parse(chunk.slice(6)) as Record<string, unknown>;
+        }
+      }
+
+      const { done, value } = await reader.read();
+      if (done) {
+        throw new Error("sse stream ended before the next data event was received");
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+    }
+  };
+}
+
 afterEach(async () => {
   await Promise.all(
     cleanupPaths.splice(0).map((entryPath) =>
@@ -623,6 +677,174 @@ describe("session routes", () => {
       has_more: false,
     });
 
+    const eventsResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${sessionId}/events`,
+    });
+
+    expect(eventsResponse.statusCode).toBe(200);
+    expect(eventsResponse.json()).toEqual({
+      items: [
+        {
+          event_id: expect.stringMatching(/^evt_/),
+          session_id: sessionId,
+          event_type: "message.user",
+          sequence: 1,
+          occurred_at: sendResponse.json().created_at,
+          payload: {
+            message_id: sendResponse.json().message_id,
+            content: "Please explain the diff.",
+          },
+          native_event_name: null,
+        },
+        {
+          event_id: expect.stringMatching(/^evt_/),
+          session_id: sessionId,
+          event_type: "session.status_changed",
+          sequence: 2,
+          occurred_at: sendResponse.json().created_at,
+          payload: {
+            from_status: "waiting_input",
+            to_status: "running",
+          },
+          native_event_name: null,
+        },
+        {
+          event_id: expect.stringMatching(/^evt_/),
+          session_id: sessionId,
+          event_type: "message.assistant.delta",
+          sequence: 3,
+          occurred_at: expect.any(String),
+          payload: {
+            message_id: deltaResponse.json().message_id,
+            turn_id: "turn_001",
+            delta: "I checked the diff",
+          },
+          native_event_name: "item/agent_message/delta",
+        },
+        {
+          event_id: expect.stringMatching(/^evt_/),
+          session_id: sessionId,
+          event_type: "message.assistant.completed",
+          sequence: 4,
+          occurred_at: assistantMessage.created_at,
+          payload: {
+            message_id: deltaResponse.json().message_id,
+            turn_id: "turn_001",
+            content: "I checked the diff and summarized the changes.",
+          },
+          native_event_name: "item/agent_message/completed",
+        },
+        {
+          event_id: expect.stringMatching(/^evt_/),
+          session_id: sessionId,
+          event_type: "session.status_changed",
+          sequence: 5,
+          occurred_at: assistantMessage.created_at,
+          payload: {
+            from_status: "running",
+            to_status: "waiting_input",
+          },
+          native_event_name: null,
+        },
+      ],
+      next_cursor: null,
+      has_more: false,
+    });
+
+    const reversedEventsResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${sessionId}/events?sort=-occurred_at&limit=2`,
+    });
+
+    expect(reversedEventsResponse.statusCode).toBe(200);
+    expect(reversedEventsResponse.json()).toEqual({
+      items: [
+        {
+          event_id: expect.any(String),
+          session_id: sessionId,
+          event_type: "session.status_changed",
+          sequence: 5,
+          occurred_at: assistantMessage.created_at,
+          payload: {
+            from_status: "running",
+            to_status: "waiting_input",
+          },
+          native_event_name: null,
+        },
+        {
+          event_id: expect.any(String),
+          session_id: sessionId,
+          event_type: "message.assistant.completed",
+          sequence: 4,
+          occurred_at: assistantMessage.created_at,
+          payload: {
+            message_id: deltaResponse.json().message_id,
+            turn_id: "turn_001",
+            content: "I checked the diff and summarized the changes.",
+          },
+          native_event_name: "item/agent_message/completed",
+        },
+      ],
+      next_cursor: null,
+      has_more: false,
+    });
+
+    await app.close();
+  });
+
+  it("opens the session stream route and publishes canonical session events", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const nativeSessionGateway = new StubNativeSessionGateway([], ["turn_001"]);
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database);
+    await app.listen({ port: 0, host: "127.0.0.1" });
+
+    const controller = new AbortController();
+    const response = await fetch(`${resolveBaseUrl(app)}/api/v1/sessions/${sessionId}/stream`, {
+      signal: controller.signal,
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+
+    const nextEvent = createSseReader(response);
+
+    const sendResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_stream_001",
+        content: "Please explain the diff.",
+      },
+    });
+
+    expect(sendResponse.statusCode).toBe(202);
+    await expect(nextEvent()).resolves.toMatchObject({
+      session_id: sessionId,
+      event_type: "message.user",
+      payload: {
+        message_id: sendResponse.json().message_id,
+        content: "Please explain the diff.",
+      },
+    });
+
+    controller.abort();
     await app.close();
   });
 
@@ -855,6 +1077,39 @@ describe("session routes", () => {
       updated_at: approval.created_at,
     });
 
+    expect(await listSessionEvents(app, sessionId, "?sort=-occurred_at&limit=2")).toEqual({
+      items: [
+        {
+          event_id: expect.any(String),
+          session_id: sessionId,
+          event_type: "session.status_changed",
+          sequence: 4,
+          occurred_at: approval.created_at,
+          payload: {
+            from_status: "running",
+            to_status: "waiting_approval",
+          },
+          native_event_name: null,
+        },
+        {
+          event_id: expect.any(String),
+          session_id: sessionId,
+          event_type: "approval.requested",
+          sequence: 3,
+          occurred_at: approval.created_at,
+          payload: {
+            approval_id: approval.approval_id,
+            workspace_id: "ws_alpha",
+            approval_category: "external_side_effect",
+            summary: "Run git push",
+          },
+          native_event_name: "request/started",
+        },
+      ],
+      next_cursor: null,
+      has_more: false,
+    });
+
     await app.close();
   });
 
@@ -954,6 +1209,40 @@ describe("session routes", () => {
       status: "canceled",
       resolution: "canceled",
       resolved_at: expect.any(String),
+    });
+
+    expect(await listSessionEvents(app, sessionId, "?sort=-occurred_at&limit=2")).toEqual({
+      items: [
+        {
+          event_id: expect.any(String),
+          session_id: sessionId,
+          event_type: "session.status_changed",
+          sequence: 6,
+          occurred_at: stopResponse.json().session.updated_at,
+          payload: {
+            from_status: "waiting_approval",
+            to_status: "stopped",
+          },
+          native_event_name: null,
+        },
+        {
+          event_id: expect.any(String),
+          session_id: sessionId,
+          event_type: "approval.resolved",
+          sequence: 5,
+          occurred_at: stopResponse.json().session.updated_at,
+          payload: {
+            approval_id: approval.approval_id,
+            workspace_id: "ws_alpha",
+            approval_category: "external_side_effect",
+            summary: "Run git push",
+            resolution: "canceled",
+          },
+          native_event_name: null,
+        },
+      ],
+      next_cursor: null,
+      has_more: false,
     });
 
     await app.close();
@@ -1056,6 +1345,40 @@ describe("session routes", () => {
       },
     });
 
+    expect(await listSessionEvents(app, sessionId, "?sort=-occurred_at&limit=2")).toEqual({
+      items: [
+        {
+          event_id: expect.any(String),
+          session_id: sessionId,
+          event_type: "session.status_changed",
+          sequence: 6,
+          occurred_at: resolveResponse.json().session.updated_at,
+          payload: {
+            from_status: "waiting_approval",
+            to_status: "running",
+          },
+          native_event_name: null,
+        },
+        {
+          event_id: expect.any(String),
+          session_id: sessionId,
+          event_type: "approval.resolved",
+          sequence: 5,
+          occurred_at: resolveResponse.json().session.updated_at,
+          payload: {
+            approval_id: approval.approval_id,
+            workspace_id: "ws_alpha",
+            approval_category: "external_side_effect",
+            summary: "Run git push",
+            resolution: "approved",
+          },
+          native_event_name: null,
+        },
+      ],
+      next_cursor: null,
+      has_more: false,
+    });
+
     await app.close();
   });
 
@@ -1153,6 +1476,40 @@ describe("session routes", () => {
       active_session_summary: null,
     });
 
+    expect(await listSessionEvents(app, sessionId, "?sort=-occurred_at&limit=2")).toEqual({
+      items: [
+        {
+          event_id: expect.any(String),
+          session_id: sessionId,
+          event_type: "session.status_changed",
+          sequence: 6,
+          occurred_at: resolveResponse.json().session.updated_at,
+          payload: {
+            from_status: "waiting_approval",
+            to_status: "waiting_input",
+          },
+          native_event_name: null,
+        },
+        {
+          event_id: expect.any(String),
+          session_id: sessionId,
+          event_type: "approval.resolved",
+          sequence: 5,
+          occurred_at: resolveResponse.json().session.updated_at,
+          payload: {
+            approval_id: approval.approval_id,
+            workspace_id: "ws_alpha",
+            approval_category: "external_side_effect",
+            summary: "Run git push",
+            resolution: "denied",
+          },
+          native_event_name: null,
+        },
+      ],
+      next_cursor: null,
+      has_more: false,
+    });
+
     await app.close();
   });
 
@@ -1237,6 +1594,76 @@ describe("session routes", () => {
       },
     });
 
+    await app.close();
+  });
+
+  it("opens the approvals stream route and publishes approval events", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const nativeSessionGateway = new StubNativeSessionGateway([], ["turn_001"]);
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database);
+    await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_approval_stream_001",
+        content: "Please explain the diff.",
+      },
+    });
+
+    await app.listen({ port: 0, host: "127.0.0.1" });
+
+    const controller = new AbortController();
+    const response = await fetch(`${resolveBaseUrl(app)}/api/v1/approvals/stream`, {
+      signal: controller.signal,
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+
+    const nextEvent = createSseReader(response);
+
+    const approvalResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/approval-requests`,
+      payload: {
+        turn_id: "turn_001",
+        approval_category: "external_side_effect",
+        summary: "Run git push",
+        reason: "Codex requests permission to push changes to remote.",
+        native_request_kind: "approval_request",
+      },
+    });
+
+    expect(approvalResponse.statusCode).toBe(202);
+    await expect(nextEvent()).resolves.toMatchObject({
+      session_id: sessionId,
+      event_type: "approval.requested",
+      payload: {
+        approval_id: approvalResponse.json().approval_id,
+        workspace_id: "ws_alpha",
+        approval_category: "external_side_effect",
+        summary: "Run git push",
+      },
+      native_event_name: "request/started",
+    });
+
+    controller.abort();
     await app.close();
   });
 

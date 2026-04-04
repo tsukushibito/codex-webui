@@ -73,6 +73,45 @@ export async function registerSessionRoutes(
     });
   });
 
+  app.get("/api/v1/sessions/:sessionId/events", async (request) => {
+    const params = request.params as { sessionId: string };
+    const query = request.query as {
+      limit?: number | string;
+      sort?: "occurred_at" | "-occurred_at";
+    };
+    const limit =
+      typeof query.limit === "string"
+        ? Number.parseInt(query.limit, 10)
+        : query.limit;
+
+    return sessionService.listSessionEvents(params.sessionId, {
+      limit: Number.isFinite(limit) ? limit : undefined,
+      sort: query.sort,
+    });
+  });
+
+  app.get("/api/v1/sessions/:sessionId/stream", async (request, reply) => {
+    const params = request.params as { sessionId: string };
+    await sessionService.getSession(params.sessionId);
+
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-cache, no-transform",
+      connection: "keep-alive",
+    });
+    reply.raw.write(": connected\n\n");
+
+    const unsubscribe = sessionService.subscribeSessionEvents(params.sessionId, (event) => {
+      reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+    });
+
+    request.raw.on("close", () => {
+      unsubscribe();
+      reply.raw.end();
+    });
+  });
+
   app.post("/api/v1/sessions/:sessionId/start", async (request) => {
     const params = request.params as { sessionId: string };
     return sessionService.startSession(params.sessionId);
