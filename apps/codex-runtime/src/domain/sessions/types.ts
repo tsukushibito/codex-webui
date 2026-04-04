@@ -27,3 +27,16 @@ export interface SessionStopResult {
   session: SessionSummary;
   canceled_approval: null;
 }
+
+export type MessageRole = "user" | "assistant";
+
+export type MessageSourceItemType = "user_message" | "agent_message";
+
+export interface MessageProjection {
+  message_id: string;
+  session_id: string;
+  role: MessageRole;
+  content: string;
+  created_at: string;
+  source_item_type: MessageSourceItemType;
+}
