@@ -143,6 +143,7 @@ When an Issue also uses a local task package:
 8. If the PR remains open, the branch is not yet on `main`, the active worktree still exists, or the local repo state is dirty, keep the Issue and Project in execution rather than `Done`.
 9. If the current slice is merged and cleaned up but the Issue still has remaining work, clear the active branch, active worktree, and active PR from the Issue `Execution` section and return the Project item to `Todo` until the next slice starts.
 10. Only when the full Issue scope is complete should this skill close the Issue and set Project `Status` to `Done`.
+11. If review or post-merge verification finds additional in-scope correctness work after an Issue was already closed, reopen that Issue or create a linked follow-up Issue before execution starts; do not leave the repair slice untracked while code work proceeds.
 
 Typical parent-checkout commands for the default branch/PR completion flow are:
 
@@ -162,6 +163,7 @@ git status --short --branch
 - Do not move completed evidence into `tasks/`; keep `tasks/` for active work only.
 - Do not take over active package-lifecycle maintenance that belongs to `codex-webui-work-packages`; use this skill for Project state, broader Issue tracking, merge/completion flow, and post-merge cleanup.
 - Do not mark an Issue or Project item as complete while a PR remains open, the execution branch is not yet on `main`, the active worktree still exists, an approved direct-to-`main` exception is unpushed, or the local repo state is dirty.
+- Do not leave post-close bug-fix work untracked; when a closed Issue still needs in-scope repair, reopen it or create a follow-up Issue before implementation.
 - Do not delete old Projects, issues, or items without an explicit user instruction.
 
 ## Example Requests
