@@ -6,7 +6,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
 import type { NativeSessionGateway } from "../src/domain/sessions/native-session-gateway.js";
-import { approvals, sessions, workspaces } from "../src/db/schema.js";
+import { SessionService } from "../src/domain/sessions/session-service.js";
+import { WorkspaceFilesystem } from "../src/domain/workspaces/workspace-filesystem.js";
+import { WorkspaceRegistry } from "../src/domain/workspaces/workspace-registry.js";
+import { approvals, messages, sessions, workspaces } from "../src/db/schema.js";
 import { createTempDatabase, createTempWorkspaceRoot } from "./helpers.js";
 
 const cleanupPaths: string[] = [];
@@ -17,6 +20,7 @@ class StubNativeSessionGateway implements NativeSessionGateway {
     private readonly turnIds: string[] = [],
     readonly interrupts: Array<{ sessionId: string; turnId: string }> = [],
     readonly sentMessages: Array<{ sessionId: string; content: string }> = [],
+    readonly canceledApprovals: Array<{ sessionId: string; approvalId: string }> = [],
     readonly resolvedApprovals: Array<{
       sessionId: string;
       approvalId: string;
@@ -48,6 +52,10 @@ class StubNativeSessionGateway implements NativeSessionGateway {
     resolution: "approved" | "denied";
   }) {
     this.resolvedApprovals.push(input);
+  }
+
+  async cancelPendingApproval(input: { sessionId: string; approvalId: string }) {
+    this.canceledApprovals.push(input);
   }
 
   async interruptSessionTurn(input: { sessionId: string; turnId: string }) {
@@ -471,6 +479,25 @@ describe("session routes", () => {
       session_id: "thread_001",
       status: "running",
       started_at: expect.any(String),
+    });
+
+    expect(await listSessionEvents(app, "thread_001")).toEqual({
+      items: [
+        {
+          event_id: expect.any(String),
+          session_id: "thread_001",
+          event_type: "session.status_changed",
+          sequence: 1,
+          occurred_at: startFirst.json().updated_at,
+          payload: {
+            from_status: "created",
+            to_status: "running",
+          },
+          native_event_name: null,
+        },
+      ],
+      next_cursor: null,
+      has_more: false,
     });
 
     const workspaceAfterStart = await app.inject({
@@ -1377,6 +1404,12 @@ describe("session routes", () => {
       resolution: "canceled",
       resolved_at: expect.any(String),
     });
+    expect(nativeSessionGateway.canceledApprovals).toEqual([
+      {
+        sessionId,
+        approvalId: approval.approval_id,
+      },
+    ]);
 
     expect(await listSessionEvents(app, sessionId, "?sort=-occurred_at&limit=2")).toEqual({
       items: [
@@ -1411,6 +1444,111 @@ describe("session routes", () => {
       next_cursor: null,
       has_more: false,
     });
+
+    await app.close();
+  });
+
+  it("surfaces recovery_pending when canonical message persistence fails after native send", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const workspaceFilesystem = new WorkspaceFilesystem(workspaceRoot);
+    const workspaceRegistry = new WorkspaceRegistry(database, workspaceFilesystem);
+    const nativeSessionGateway = new StubNativeSessionGateway([], ["turn_001"]);
+    const sessionService = new SessionService(
+      database,
+      workspaceRegistry,
+      workspaceFilesystem,
+      nativeSessionGateway,
+    );
+    const sessionServiceProbe = sessionService as unknown as Record<string, unknown>;
+    const originalAppendSessionEvent = (
+      sessionServiceProbe.appendSessionEvent as (input: {
+        sessionId: string;
+        eventType: string;
+        occurredAt: string;
+        payload: Record<string, unknown>;
+        nativeEventName?: string | null;
+      }) => void
+    ).bind(sessionService);
+    let failMessageEventAppend = true;
+    sessionServiceProbe.appendSessionEvent = (input: {
+      sessionId: string;
+      eventType: string;
+      occurredAt: string;
+      payload: Record<string, unknown>;
+      nativeEventName?: string | null;
+    }) => {
+      if (failMessageEventAppend && input.eventType === "message.user") {
+        failMessageEventAppend = false;
+        throw new Error("simulated message event persistence failure");
+      }
+
+      return originalAppendSessionEvent(input);
+    };
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        workspaceRegistry,
+        sessionService,
+        nativeSessionGateway,
+      },
+    });
+
+    const { sessionId } = seedWaitingInputSession(database);
+
+    const sendResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_failure_001",
+        content: "Please explain the diff.",
+      },
+    });
+
+    expect(sendResponse.statusCode).toBe(500);
+    expect(sendResponse.json()).toEqual({
+      error: {
+        code: "internal_server_error",
+        message: "unexpected runtime failure",
+        details: {},
+      },
+    });
+    expect(nativeSessionGateway.sentMessages).toEqual([
+      {
+        sessionId,
+        content: "Please explain the diff.",
+      },
+    ]);
+
+    const sessionResponse = await app.inject({
+      method: "GET",
+      url: `/api/v1/sessions/${sessionId}`,
+    });
+
+    expect(sessionResponse.statusCode).toBe(200);
+    expect(sessionResponse.json()).toMatchObject({
+      session_id: sessionId,
+      status: "running",
+      current_turn_id: "turn_001",
+      app_session_overlay_state: "recovery_pending",
+    });
+
+    const persistedMessages = database.db
+      .select()
+      .from(messages)
+      .where(eq(messages.sessionId, sessionId))
+      .all();
+
+    expect(persistedMessages).toEqual([]);
 
     await app.close();
   });

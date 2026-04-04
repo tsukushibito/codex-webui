@@ -16,6 +16,10 @@ export interface NativeSessionGateway {
   sendUserMessage(input: SendNativeSessionMessageInput): Promise<{
     turnId: string;
   }>;
+  cancelPendingApproval(input: {
+    sessionId: string;
+    approvalId: string;
+  }): Promise<void>;
   resolveApproval(input: {
     sessionId: string;
     approvalId: string;
@@ -42,6 +46,10 @@ export class SyntheticNativeSessionGateway implements NativeSessionGateway {
     approvalId: string;
     resolution: "approved" | "denied";
   }) {
+    return;
+  }
+
+  async cancelPendingApproval(_input: { sessionId: string; approvalId: string }) {
     return;
   }
 

@@ -273,6 +273,37 @@ export class SessionService {
     });
   }
 
+  private markSessionRecoveryPending(input: {
+    sessionId: string;
+    workspaceId: string;
+    updatedAt: string;
+    currentTurnId: string;
+  }) {
+    this.database.sqlite.transaction(() => {
+      this.database.db
+        .update(sessions)
+        .set({
+          status: "running",
+          updatedAt: input.updatedAt,
+          lastMessageAt: input.updatedAt,
+          currentTurnId: input.currentTurnId,
+          pendingAssistantMessageId: null,
+          appSessionOverlayState: "recovery_pending",
+        })
+        .where(eq(sessions.sessionId, input.sessionId))
+        .run();
+
+      this.database.db
+        .update(workspaces)
+        .set({
+          activeSessionId: input.sessionId,
+          updatedAt: input.updatedAt,
+        })
+        .where(eq(workspaces.workspaceId, input.workspaceId))
+        .run();
+    })();
+  }
+
   private getSessionRecord(sessionId: string) {
     return firstRequiredRow(
       this.database.db
@@ -499,25 +530,34 @@ export class SessionService {
 
     const now = toIsoString(this.now());
 
-    this.database.db
-      .update(sessions)
-      .set({
-        status: "running",
-        updatedAt: now,
-        startedAt: session.started_at ?? now,
-        appSessionOverlayState: "open",
-      })
-      .where(eq(sessions.sessionId, sessionId))
-      .run();
+    this.database.sqlite.transaction(() => {
+      this.database.db
+        .update(sessions)
+        .set({
+          status: "running",
+          updatedAt: now,
+          startedAt: session.started_at ?? now,
+          appSessionOverlayState: "open",
+        })
+        .where(eq(sessions.sessionId, sessionId))
+        .run();
 
-    this.database.db
-      .update(workspaces)
-      .set({
-        activeSessionId: sessionId,
-        updatedAt: now,
-      })
-      .where(eq(workspaces.workspaceId, session.workspace_id))
-      .run();
+      this.database.db
+        .update(workspaces)
+        .set({
+          activeSessionId: sessionId,
+          updatedAt: now,
+        })
+        .where(eq(workspaces.workspaceId, session.workspace_id))
+        .run();
+
+      this.appendSessionStatusChangedEvent({
+        sessionId,
+        occurredAt: now,
+        fromStatus: session.status,
+        toStatus: "running",
+      });
+    })();
 
     return this.getSession(sessionId);
   }
@@ -551,16 +591,55 @@ export class SessionService {
       });
     }
 
+    let activeApprovalRecord: typeof approvals.$inferSelect | null = null;
+    if (session.status === "waiting_approval" && session.active_approval_id !== null) {
+      activeApprovalRecord = firstRequiredRow(
+        this.database.db
+          .select()
+          .from(approvals)
+          .where(eq(approvals.approvalId, session.active_approval_id))
+          .limit(1)
+          .all(),
+        () => {
+          throw new RuntimeError(
+            404,
+            "approval_not_found",
+            "approval was not found",
+            {
+              approval_id: session.active_approval_id,
+            },
+          );
+        },
+      );
+
+      if (activeApprovalRecord.status === "pending") {
+        await this.nativeSessionGateway.cancelPendingApproval({
+          sessionId,
+          approvalId: activeApprovalRecord.approvalId,
+        });
+      }
+    }
+
     const now = toIsoString(this.now());
     let canceledApproval: ApprovalProjection | null = null;
 
     this.database.sqlite.transaction(() => {
-      if (session.status === "waiting_approval" && session.active_approval_id !== null) {
-        const approval = firstRequiredRow(
+      if (activeApprovalRecord?.status === "pending") {
+        this.database.db
+          .update(approvals)
+          .set({
+            status: "canceled",
+            resolution: "canceled",
+            resolvedAt: now,
+          })
+          .where(eq(approvals.approvalId, activeApprovalRecord.approvalId))
+          .run();
+
+        const updatedApproval = firstRequiredRow(
           this.database.db
             .select()
             .from(approvals)
-            .where(eq(approvals.approvalId, session.active_approval_id))
+            .where(eq(approvals.approvalId, activeApprovalRecord.approvalId))
             .limit(1)
             .all(),
           () => {
@@ -569,56 +648,25 @@ export class SessionService {
               "approval_not_found",
               "approval was not found",
               {
-                approval_id: session.active_approval_id,
+                approval_id: activeApprovalRecord.approvalId,
               },
             );
           },
         );
+        canceledApproval = mapApprovalProjection(updatedApproval);
 
-        if (approval.status === "pending") {
-          this.database.db
-            .update(approvals)
-            .set({
-              status: "canceled",
-              resolution: "canceled",
-              resolvedAt: now,
-            })
-            .where(eq(approvals.approvalId, approval.approvalId))
-            .run();
-
-          const updatedApproval = firstRequiredRow(
-            this.database.db
-              .select()
-              .from(approvals)
-              .where(eq(approvals.approvalId, approval.approvalId))
-              .limit(1)
-              .all(),
-            () => {
-              throw new RuntimeError(
-                404,
-                "approval_not_found",
-                "approval was not found",
-                {
-                  approval_id: approval.approvalId,
-                },
-              );
-            },
-          );
-          canceledApproval = mapApprovalProjection(updatedApproval);
-
-          this.appendSessionEvent({
-            sessionId,
-            eventType: "approval.resolved",
-            occurredAt: now,
-            payload: {
-              approval_id: approval.approvalId,
-              workspace_id: approval.workspaceId,
-              approval_category: approval.approvalCategory,
-              summary: approval.summary,
-              resolution: "canceled",
-            },
-          });
-        }
+        this.appendSessionEvent({
+          sessionId,
+          eventType: "approval.resolved",
+          occurredAt: now,
+          payload: {
+            approval_id: activeApprovalRecord.approvalId,
+            workspace_id: activeApprovalRecord.workspaceId,
+            approval_category: activeApprovalRecord.approvalCategory,
+            summary: activeApprovalRecord.summary,
+            resolution: "canceled",
+          },
+        });
       }
 
       this.database.db
@@ -1111,59 +1159,74 @@ export class SessionService {
     const userMessageId = generateMessageId("user");
     const userCreatedAt = toIsoString(this.now());
 
-    this.database.sqlite.transaction(() => {
-      this.database.db
-        .insert(messages)
-        .values({
-          messageId: userMessageId,
+    try {
+      this.database.sqlite.transaction(() => {
+        this.database.db
+          .insert(messages)
+          .values({
+            messageId: userMessageId,
+            sessionId,
+            role: "user",
+            content: input.content,
+            createdAt: userCreatedAt,
+            sourceItemType: "user_message",
+            clientMessageId: input.client_message_id,
+          })
+          .run();
+
+        this.appendSessionEvent({
           sessionId,
-          role: "user",
-          content: input.content,
-          createdAt: userCreatedAt,
-          sourceItemType: "user_message",
-          clientMessageId: input.client_message_id,
-        })
-        .run();
+          eventType: "message.user",
+          occurredAt: userCreatedAt,
+          payload: {
+            message_id: userMessageId,
+            content: input.content,
+          },
+        });
 
-      this.appendSessionEvent({
-        sessionId,
-        eventType: "message.user",
-        occurredAt: userCreatedAt,
-        payload: {
-          message_id: userMessageId,
-          content: input.content,
-        },
-      });
+        this.database.db
+          .update(sessions)
+          .set({
+            status: "running",
+            updatedAt: userCreatedAt,
+            lastMessageAt: userCreatedAt,
+            currentTurnId: nativeTurn.turnId,
+            pendingAssistantMessageId: null,
+            appSessionOverlayState: "open",
+          })
+          .where(eq(sessions.sessionId, sessionId))
+          .run();
 
-      this.database.db
-        .update(sessions)
-        .set({
-          status: "running",
+        this.database.db
+          .update(workspaces)
+          .set({
+            activeSessionId: sessionId,
+            updatedAt: userCreatedAt,
+          })
+          .where(eq(workspaces.workspaceId, session.workspace_id))
+          .run();
+
+        this.appendSessionStatusChangedEvent({
+          sessionId,
+          occurredAt: userCreatedAt,
+          fromStatus: session.status,
+          toStatus: "running",
+        });
+      })();
+    } catch (error) {
+      try {
+        this.markSessionRecoveryPending({
+          sessionId,
+          workspaceId: session.workspace_id,
           updatedAt: userCreatedAt,
-          lastMessageAt: userCreatedAt,
           currentTurnId: nativeTurn.turnId,
-          pendingAssistantMessageId: null,
-          appSessionOverlayState: "open",
-        })
-        .where(eq(sessions.sessionId, sessionId))
-        .run();
+        });
+      } catch {
+        // Keep the original post-native persistence failure as the primary error.
+      }
 
-      this.database.db
-        .update(workspaces)
-        .set({
-          activeSessionId: sessionId,
-          updatedAt: userCreatedAt,
-        })
-        .where(eq(workspaces.workspaceId, session.workspace_id))
-        .run();
-
-      this.appendSessionStatusChangedEvent({
-        sessionId,
-        occurredAt: userCreatedAt,
-        fromStatus: session.status,
-        toStatus: "running",
-      });
-    })();
+      throw error;
+    }
 
     return {
       message_id: userMessageId,
