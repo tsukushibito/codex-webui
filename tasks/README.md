@@ -74,5 +74,6 @@ Each active task package `README.md` must include at least the following section
 - [app_server_behavior_validation](./archive/app_server_behavior_validation/README.md)
 - [issue-64-phase-3a-foundation](./archive/issue-64-phase-3a-foundation/README.md)
 - [issue-65-phase-3b-session-lifecycle](./archive/issue-65-phase-3b-session-lifecycle/README.md)
+- [issue-90-post-start-sendability](./archive/issue-90-post-start-sendability/README.md)
 - [issue-91-contract-validation](./archive/issue-91-contract-validation/README.md)
 - [issue-80-phase-4a3-sse-relay](./archive/issue-80-phase-4a3-sse-relay/README.md)

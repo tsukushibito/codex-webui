@@ -425,15 +425,15 @@ describe("session routes", () => {
     await app.close();
   });
 
-  it("starts and stops sessions while enforcing one active session per workspace", async () => {
+  it("starts sessions, converges them to waiting_input, and enforces the active constraint on message execution", async () => {
     const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
     const database = await createTempDatabase("workspace-db");
     cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
 
-    const nativeSessionGateway = new StubNativeSessionGateway([
-      "thread_001",
-      "thread_002",
-    ]);
+    const nativeSessionGateway = new StubNativeSessionGateway(
+      ["thread_001", "thread_002"],
+      ["turn_001"],
+    );
     const app = await buildApp({
       config: {
         workspaceRoot,
@@ -477,7 +477,7 @@ describe("session routes", () => {
     expect(startFirst.statusCode).toBe(200);
     expect(startFirst.json()).toMatchObject({
       session_id: "thread_001",
-      status: "running",
+      status: "waiting_input",
       started_at: expect.any(String),
     });
 
@@ -495,6 +495,18 @@ describe("session routes", () => {
           },
           native_event_name: null,
         },
+        {
+          event_id: expect.any(String),
+          session_id: "thread_001",
+          event_type: "session.status_changed",
+          sequence: 2,
+          occurred_at: startFirst.json().updated_at,
+          payload: {
+            from_status: "running",
+            to_status: "waiting_input",
+          },
+          native_event_name: null,
+        },
       ],
       next_cursor: null,
       has_more: false,
@@ -507,22 +519,44 @@ describe("session routes", () => {
 
     expect(workspaceAfterStart.statusCode).toBe(200);
     expect(workspaceAfterStart.json()).toMatchObject({
-      active_session_id: "thread_001",
-      active_session_summary: {
-        session_id: "thread_001",
-        status: "running",
-        last_message_at: null,
-      },
+      active_session_id: null,
+      active_session_summary: null,
     });
 
-    const conflictingStart = await app.inject({
+    const startSecondIdle = await app.inject({
       method: "POST",
       url: "/api/v1/sessions/thread_002/start",
       payload: {},
     });
 
-    expect(conflictingStart.statusCode).toBe(409);
-    expect(conflictingStart.json()).toEqual({
+    expect(startSecondIdle.statusCode).toBe(200);
+    expect(startSecondIdle.json()).toMatchObject({
+      session_id: "thread_002",
+      status: "waiting_input",
+    });
+
+    const firstMessage = await app.inject({
+      method: "POST",
+      url: "/api/v1/sessions/thread_001/messages",
+      payload: {
+        client_message_id: "msgclient_start_first",
+        content: "Please explain the diff.",
+      },
+    });
+
+    expect(firstMessage.statusCode).toBe(202);
+
+    const conflictingSend = await app.inject({
+      method: "POST",
+      url: "/api/v1/sessions/thread_002/messages",
+      payload: {
+        client_message_id: "msgclient_start_second",
+        content: "Check the active-session constraint.",
+      },
+    });
+
+    expect(conflictingSend.statusCode).toBe(409);
+    expect(conflictingSend.json()).toEqual({
       error: {
         code: "session_conflict_active_exists",
         message: "another active session already exists in this workspace",
@@ -549,7 +583,7 @@ describe("session routes", () => {
         created_at: expect.any(String),
         updated_at: expect.any(String),
         started_at: expect.any(String),
-        last_message_at: null,
+        last_message_at: expect.any(String),
         active_approval_id: null,
         current_turn_id: null,
         app_session_overlay_state: "closed",
@@ -577,7 +611,76 @@ describe("session routes", () => {
     expect(startSecond.statusCode).toBe(200);
     expect(startSecond.json()).toMatchObject({
       session_id: "thread_002",
-      status: "running",
+      status: "waiting_input",
+    });
+
+    await app.close();
+  });
+
+  it("accepts the first message immediately after session start", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const nativeSessionGateway = new StubNativeSessionGateway(["thread_001"], ["turn_001"]);
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    const workspaceResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/workspaces",
+      payload: {
+        workspace_name: "alpha",
+      },
+    });
+    const workspace = workspaceResponse.json();
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/workspaces/${workspace.workspace_id}/sessions`,
+      payload: {
+        title: "Fix build error",
+      },
+    });
+
+    expect(createResponse.statusCode).toBe(201);
+
+    const startResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/sessions/thread_001/start",
+      payload: {},
+    });
+
+    expect(startResponse.statusCode).toBe(200);
+    expect(startResponse.json()).toMatchObject({
+      session_id: "thread_001",
+      status: "waiting_input",
+    });
+
+    const sendResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/sessions/thread_001/messages",
+      payload: {
+        client_message_id: "msgclient_after_start",
+        content: "Please explain the diff.",
+      },
+    });
+
+    expect(sendResponse.statusCode).toBe(202);
+    expect(sendResponse.json()).toMatchObject({
+      session_id: "thread_001",
+      role: "user",
+      content: "Please explain the diff.",
     });
 
     await app.close();

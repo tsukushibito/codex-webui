@@ -529,6 +529,7 @@ export class SessionService {
     }
 
     const now = toIsoString(this.now());
+    const readyAt = toIsoString(this.now());
 
     this.database.sqlite.transaction(() => {
       this.database.db
@@ -556,6 +557,32 @@ export class SessionService {
         occurredAt: now,
         fromStatus: session.status,
         toStatus: "running",
+      });
+
+      this.database.db
+        .update(sessions)
+        .set({
+          status: "waiting_input",
+          updatedAt: readyAt,
+          appSessionOverlayState: "open",
+        })
+        .where(eq(sessions.sessionId, sessionId))
+        .run();
+
+      this.database.db
+        .update(workspaces)
+        .set({
+          activeSessionId: null,
+          updatedAt: readyAt,
+        })
+        .where(eq(workspaces.workspaceId, session.workspace_id))
+        .run();
+
+      this.appendSessionStatusChangedEvent({
+        sessionId,
+        occurredAt: readyAt,
+        fromStatus: "running",
+        toStatus: "waiting_input",
       });
     })();
 
