@@ -73,6 +73,12 @@ scripts/doctor.sh
 
 This checks the expected CLI/toolchain installation, including `code`, `codex`, `devtunnel`, Node.js, Python, Rust, and Vulkan tooling.
 
+When you run a Vulkan workload directly inside the container, prefer the helper wrapper so an NVIDIA ICD manifest can be synthesized when the graphics libraries are mounted but the manifest is missing:
+
+```bash
+scripts/with-vulkan-driver.sh <your-vulkan-command>
+```
+
 ## 4. Remote development access with Code Tunnel
 
 Use `code tunnel` when you want to connect to the container for development work.
@@ -176,3 +182,11 @@ devtunnel port create <tunnel-id> -p 3000 --protocol http
 ### 8.4 The runtime fails because the workspace root does not exist
 
 The launcher creates the default workspace root for you. If you override `CODEX_WEBUI_WORKSPACE_ROOT`, make sure the target path is valid and writable inside the container.
+
+### 8.5 `vulkaninfo` only shows `llvmpipe`
+
+If `nvidia-smi` works but `vulkaninfo --summary` still falls back to `llvmpipe`, the container runtime is exposing compute/NVML but not the NVIDIA graphics stack or Vulkan ICD.
+
+This repository now ships `scripts/with-vulkan-driver.sh`, which can repair the manifest side when the NVIDIA graphics libraries are already mounted into the container.
+
+If the helper still cannot surface an NVIDIA Vulkan device, the host runtime is not providing the required graphics libraries. Native Linux Docker Engine with NVIDIA Container Toolkit is the recommended path for containerized Vulkan validation. Docker Desktop on Windows with the WSL2 backend is reliable for GPU compute, but may not expose the full graphics/Vulkan stack needed for Vulkan app development inside containers.

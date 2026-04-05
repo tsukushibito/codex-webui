@@ -47,6 +47,38 @@ debug_dump_file() {
   sed -n "1,${DOCTOR_DEBUG_LINES}p" "${path}"
 }
 
+has_nvidia_gpu() {
+  command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1
+}
+
+has_nvidia_graphics_libraries() {
+  ldconfig -p 2>/dev/null | grep -Eq 'libGLX_nvidia\.so\.0|libEGL_nvidia\.so\.0'
+}
+
+has_nvidia_vulkan_manifest() {
+  find /etc/vulkan /usr/share/vulkan -maxdepth 3 -type f -iname '*nvidia*.json' 2>/dev/null | grep -q .
+}
+
+print_gpu_diagnostic() {
+  if ! has_nvidia_gpu; then
+    return 0
+  fi
+
+  echo "[info] NVIDIA GPU is visible to nvidia-smi."
+
+  if ! has_nvidia_graphics_libraries; then
+    echo "[info] NVIDIA graphics driver libraries are not mounted in the container."
+  fi
+
+  if ! has_nvidia_vulkan_manifest; then
+    echo "[info] NVIDIA Vulkan ICD manifest was not found under /etc/vulkan or /usr/share/vulkan."
+  fi
+
+  if [[ -e /dev/dxg ]] && ! compgen -G '/dev/nvidia*' >/dev/null; then
+    echo "[info] /dev/dxg is present without /dev/nvidia*; this looks like a WSL GPU-P runtime."
+  fi
+}
+
 check_contains() {
   local label="$1"
   local actual="$2"
@@ -113,7 +145,7 @@ echo
 echo "== vulkan validation layer check =="
 vulkaninfo_log="$(mktemp)"
 tmp_files+=("${vulkaninfo_log}")
-vulkaninfo >"${vulkaninfo_log}" 2>&1 || true
+"${SCRIPT_DIR}/with-vulkan-driver.sh" vulkaninfo >"${vulkaninfo_log}" 2>&1 || true
 
 if grep -q "VK_LAYER_KHRONOS_validation" "${vulkaninfo_log}"; then
   echo "[ok] VK_LAYER_KHRONOS_validation detected"
@@ -128,13 +160,14 @@ if [[ "${DOCTOR_REQUIRE_GPU}" == "true" ]]; then
   echo "== gpu check =="
   vulkaninfo_summary_log="$(mktemp)"
   tmp_files+=("${vulkaninfo_summary_log}")
-  vulkaninfo --summary >"${vulkaninfo_summary_log}" 2>&1 || true
+  "${SCRIPT_DIR}/with-vulkan-driver.sh" vulkaninfo --summary >"${vulkaninfo_summary_log}" 2>&1 || true
 
   if grep -qi "nvidia" "${vulkaninfo_summary_log}"; then
     echo "[ok] NVIDIA GPU detected from vulkaninfo --summary"
   else
     echo "[ng] GPU required but NVIDIA GPU not detected from vulkaninfo --summary"
     failures=$((failures + 1))
+    print_gpu_diagnostic
     debug_dump_file "vulkaninfo --summary output" "${vulkaninfo_summary_log}"
   fi
 fi
@@ -142,7 +175,7 @@ fi
 if [[ "${DOCTOR_RUN_WINIT_SMOKE}" == "true" ]]; then
   echo
   echo "== winit smoke =="
-  if "${SCRIPT_DIR}/run-winit-smoke.sh"; then
+  if "${SCRIPT_DIR}/with-vulkan-driver.sh" "${SCRIPT_DIR}/run-winit-smoke.sh"; then
     echo "[ok] winit smoke run finished"
   else
     echo "[ng] winit smoke run failed"

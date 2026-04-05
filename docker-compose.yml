@@ -20,6 +20,7 @@ services:
     init: true
     stdin_open: true
     tty: true
+    runtime: nvidia
     group_add:
       - "0"
     gpus: all
