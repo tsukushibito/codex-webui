@@ -16,6 +16,7 @@ import type {
   PublicSessionEvent,
   PublicSessionSummary,
 } from "./chat-types";
+import { applySessionStatus } from "./session-status";
 import { ChatView } from "./chat-view";
 
 function createClientMessageId() {
@@ -184,21 +185,21 @@ export function ChatPageClient() {
         if (typeof toStatus === "string") {
           setSelectedSession((currentSession) =>
             currentSession
-              ? {
-                  ...currentSession,
-                  status: toStatus as PublicSessionSummary["status"],
-                  updated_at: event.occurred_at,
-                }
+              ? applySessionStatus(
+                  currentSession,
+                  toStatus as PublicSessionSummary["status"],
+                  event.occurred_at,
+                )
               : currentSession,
           );
           setSessions((currentSessions) =>
             currentSessions.map((session) =>
               session.session_id === selectedSessionId
-                ? {
-                    ...session,
-                    status: toStatus as PublicSessionSummary["status"],
-                    updated_at: event.occurred_at,
-                  }
+                ? applySessionStatus(
+                    session,
+                    toStatus as PublicSessionSummary["status"],
+                    event.occurred_at,
+                  )
                 : session,
             ),
           );
@@ -386,13 +387,19 @@ export function ChatPageClient() {
       setStatusMessage("Message accepted. Waiting for stream updates.");
       setSelectedSession((currentSession) =>
         currentSession
-          ? {
-              ...currentSession,
-              status: "running",
-              updated_at: message.created_at,
+          ? applySessionStatus(currentSession, "running", message.created_at, {
               last_message_at: message.created_at,
-            }
+            })
           : currentSession,
+      );
+      setSessions((currentSessions) =>
+        currentSessions.map((session) =>
+          session.session_id === selectedSessionId
+            ? applySessionStatus(session, "running", message.created_at, {
+                last_message_at: message.created_at,
+              })
+            : session,
+        ),
       );
     } catch (error) {
       setErrorMessage(
