@@ -56,7 +56,7 @@ Do not use this skill when:
 Follow this order every time.
 
 1. Read top-level repo guidance and roadmap docs.
-2. Delegate intake to the custom read-only `intake` agent defined in `.codex/config.toml`.
+2. Delegate intake to the custom read-only `intake` agent defined in `.codex/config.toml`, explicitly instructing it to use `$codex-webui-work-intake` for the intake pass.
 3. Use the intake summary to select one current target.
 4. Check whether tracking drift blocks execution.
 5. Check whether the current target must be split into SubIssues before execution.
@@ -73,6 +73,8 @@ If the user explicitly asked only for routing, target selection, or a next-skill
 ## Delegated Intake
 
 The delegated intake agent is the first execution step for this skill.
+
+The orchestrator must explicitly tell the delegated agent to use `$codex-webui-work-intake` before doing any intake work. Do not rely on the agent to infer that skill on its own.
 
 Its job is to inspect:
 
@@ -93,6 +95,19 @@ It must not:
 - implement code or documents for the chosen Issue
 
 If intake detects tracking drift, it reports that drift back to the orchestrator for routing; it does not correct the drift itself.
+
+## Required Intake Prompt Content
+
+Every delegated intake message must include all of the following, in plain terms:
+
+- an explicit instruction to use `$codex-webui-work-intake`
+- an explicit statement that the task is read-only
+- an explicit prohibition on editing files, GitHub state, task packages, or running implementation/server commands
+- the current routing goal, such as selecting one current target or reassessing after a handoff
+
+Minimum acceptable pattern:
+
+> Use `$codex-webui-work-intake` for this intake pass. This is read-only routing work. Do not edit files, mutate GitHub/Project/task state, or start servers. Inspect Project, issues, tasks, worktree, and relevant docs, then return a concise routing summary with one recommended current target.
 
 ## Routing Rules
 
@@ -170,6 +185,7 @@ If the user also asked to continue until a concrete end-state, keep iterating af
 ## Guardrails
 
 - Do not replace `codex-webui-work-intake`; keep it usable as a standalone intake skill
+- Do not delegate intake without explicitly naming `$codex-webui-work-intake` in the intake prompt
 - Do not implement the chosen Issue from this skill
 - Do not update GitHub Projects, Issues, or `tasks/` directly from this skill
 - Do not let delegated intake mutate GitHub state, local task-package state, or implementation files
