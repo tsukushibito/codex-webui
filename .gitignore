@@ -9,3 +9,5 @@ node_modules/
 dist/
 coverage/
 .DS_Store
+apps/frontend-bff/playwright-report/
+apps/frontend-bff/test-results/
