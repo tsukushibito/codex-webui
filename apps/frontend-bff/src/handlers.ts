@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { logLiveChatDebug } from "./debug";
 import { isErrorEnvelope, toErrorResponse } from "./errors";
 import {
   mapApprovalDetail,
@@ -86,6 +87,7 @@ function encodeSseData(data: unknown) {
 }
 
 function mapSseChunk<TInput, TOutput>(
+  path: string,
   chunk: string,
   mapper: (value: TInput) => TOutput,
 ) {
@@ -107,10 +109,25 @@ function mapSseChunk<TInput, TOutput>(
     return `${trimmed}\n\n`;
   }
 
-  return encodeSseData(mapper(JSON.parse(dataLines.join("\n")) as TInput));
+  const mappedValue = mapper(JSON.parse(dataLines.join("\n")) as TInput);
+  if (typeof mappedValue === "object" && mappedValue !== null) {
+    const event = mappedValue as Record<string, unknown>;
+    logLiveChatDebug("sse-relay", "relaying sse event", {
+      path,
+      event_type: typeof event.event_type === "string" ? event.event_type : null,
+      session_id: typeof event.session_id === "string" ? event.session_id : null,
+      sequence:
+        typeof event.sequence === "number"
+          ? event.sequence
+          : null,
+    });
+  }
+
+  return encodeSseData(mappedValue);
 }
 
 function createSseRelayStream<TInput, TOutput>(
+  path: string,
   source: ReadableStream<Uint8Array>,
   mapper: (value: TInput) => TOutput,
 ) {
@@ -124,11 +141,14 @@ function createSseRelayStream<TInput, TOutput>(
       const { done, value } = await reader.read();
       if (done) {
         if (buffer.length > 0) {
-          const mappedChunk = mapSseChunk(buffer, mapper);
+          const mappedChunk = mapSseChunk(path, buffer, mapper);
           if (mappedChunk.length > 0) {
             controller.enqueue(encoder.encode(mappedChunk));
           }
         }
+        logLiveChatDebug("sse-relay", "runtime stream closed", {
+          path,
+        });
         controller.close();
         return;
       }
@@ -139,7 +159,7 @@ function createSseRelayStream<TInput, TOutput>(
       while (boundaryIndex >= 0) {
         const chunk = buffer.slice(0, boundaryIndex);
         buffer = buffer.slice(boundaryIndex + 2);
-        const mappedChunk = mapSseChunk(chunk, mapper);
+        const mappedChunk = mapSseChunk(path, chunk, mapper);
         if (mappedChunk.length > 0) {
           controller.enqueue(encoder.encode(mappedChunk));
         }
@@ -147,6 +167,9 @@ function createSseRelayStream<TInput, TOutput>(
       }
     },
     async cancel() {
+      logLiveChatDebug("sse-relay", "browser stream canceled", {
+        path,
+      });
       await reader.cancel();
     },
   });
@@ -156,16 +179,26 @@ async function relaySse<TInput, TOutput>(
   path: string,
   mapper: (value: TInput) => TOutput,
 ) {
+  logLiveChatDebug("sse-relay", "opening runtime stream", {
+    path,
+  });
   const response = await runtimeClient.requestStream(path);
   if (!response.ok) {
+    logLiveChatDebug("sse-relay", "runtime stream returned non-ok status", {
+      path,
+      status: response.status,
+    });
     return parseRuntimeErrorResponse(response);
   }
 
   if (!response.body) {
+    logLiveChatDebug("sse-relay", "runtime stream had no body", {
+      path,
+    });
     return toErrorResponse(new Error("codex-runtime stream response had no body"));
   }
 
-  return new Response(createSseRelayStream(response.body, mapper), {
+  return new Response(createSseRelayStream(path, response.body, mapper), {
     status: 200,
     headers: {
       "content-type": "text/event-stream; charset=utf-8",

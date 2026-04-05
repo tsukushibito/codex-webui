@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import {
@@ -11,6 +11,12 @@ import {
   startSessionFromChat,
   stopSessionFromChat,
 } from "./chat-data";
+import {
+  createMissedStreamRecoveryController,
+  createSendRecoveryBaseline,
+  type ChatSessionSnapshot,
+} from "./chat-send-recovery";
+import { logLiveChatDebug } from "./debug";
 import type {
   PublicMessage,
   PublicSessionEvent,
@@ -95,6 +101,22 @@ export function ChatPageClient() {
   >("idle");
   const [streamVersion, setStreamVersion] = useState(0);
   const reconnectTimerRef = useRef<number | null>(null);
+  const latestSnapshotRef = useRef<ChatSessionSnapshot>({
+    session: null,
+    messages: [],
+    events: [],
+  });
+  const missedStreamRecoveryRef = useRef(
+    createMissedStreamRecoveryController(),
+  );
+
+  useEffect(() => {
+    latestSnapshotRef.current = {
+      session: selectedSession,
+      messages,
+      events,
+    };
+  }, [selectedSession, messages, events]);
 
   async function refreshSessions(preferredSessionId?: string | null) {
     if (!workspaceId) {
@@ -134,6 +156,9 @@ export function ChatPageClient() {
   async function refreshSelectedSession(sessionId: string) {
     setIsLoadingSession(true);
     setErrorMessage(null);
+    logLiveChatDebug("chat-refresh", "refreshing selected session bundle", {
+      session_id: sessionId,
+    });
 
     try {
       const bundle = await loadChatSessionBundle(sessionId);
@@ -142,10 +167,28 @@ export function ChatPageClient() {
       setEvents(bundle.events);
       setDraftAssistantMessages({});
       setSessions((currentSessions) => upsertSession(currentSessions, bundle.session));
+      latestSnapshotRef.current = {
+        session: bundle.session,
+        messages: bundle.messages,
+        events: bundle.events,
+      };
+      logLiveChatDebug("chat-refresh", "loaded selected session bundle", {
+        session_id: bundle.session.session_id,
+        status: bundle.session.status,
+        message_count: bundle.messages.length,
+        event_count: bundle.events.length,
+        active_approval_id: bundle.session.active_approval_id,
+      });
+      return bundle;
     } catch (error) {
+      logLiveChatDebug("chat-refresh", "failed to load selected session bundle", {
+        session_id: sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       setErrorMessage(
         error instanceof Error ? error.message : "Failed to load the selected session.",
       );
+      return null;
     } finally {
       setIsLoadingSession(false);
     }
@@ -156,6 +199,8 @@ export function ChatPageClient() {
   }, [workspaceId, initialSessionId]);
 
   useEffect(() => {
+    missedStreamRecoveryRef.current.cancel();
+
     if (!selectedSessionId) {
       setSelectedSession(null);
       setMessages([]);
@@ -169,15 +214,31 @@ export function ChatPageClient() {
   }, [selectedSessionId]);
 
   useEffect(() => {
+    return () => {
+      missedStreamRecoveryRef.current.cancel();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!selectedSessionId) {
       return;
     }
 
     const stream = new EventSource(`/api/v1/sessions/${selectedSessionId}/stream`);
     setConnectionState("live");
+    stream.onopen = () => {
+      logLiveChatDebug("chat-stream", "event source opened", {
+        session_id: selectedSessionId,
+      });
+    };
 
     stream.onmessage = (messageEvent) => {
       const event = JSON.parse(messageEvent.data) as PublicSessionEvent;
+      logLiveChatDebug("chat-stream", "received session stream event", {
+        session_id: event.session_id,
+        event_type: event.event_type,
+        sequence: event.sequence,
+      });
       setEvents((currentEvents) => upsertEvent(currentEvents, event));
 
       if (event.event_type === "session.status_changed") {
@@ -289,6 +350,9 @@ export function ChatPageClient() {
     };
 
     stream.onerror = () => {
+      logLiveChatDebug("chat-stream", "event source error; entering recovery", {
+        session_id: selectedSessionId,
+      });
       stream.close();
       setConnectionState("reconnecting");
       void refreshSelectedSession(selectedSessionId).finally(() => {
@@ -377,11 +441,17 @@ export function ChatPageClient() {
     setStatusMessage(null);
 
     try {
+      const recoveryBaseline = createSendRecoveryBaseline(latestSnapshotRef.current);
       const message = await sendSessionMessage(
         selectedSessionId,
         trimmedMessage,
         createClientMessageId(),
       );
+      logLiveChatDebug("chat-send", "message accepted by public API", {
+        session_id: selectedSessionId,
+        message_id: message.message_id,
+        created_at: message.created_at,
+      });
       setMessages((currentMessages) => upsertMessage(currentMessages, message));
       setMessageDraft("");
       setStatusMessage("Message accepted. Waiting for stream updates.");
@@ -401,7 +471,43 @@ export function ChatPageClient() {
             : session,
         ),
       );
+      latestSnapshotRef.current = {
+        session: selectedSession
+          ? applySessionStatus(selectedSession, "running", message.created_at, {
+              last_message_at: message.created_at,
+            })
+          : selectedSession,
+        messages: upsertMessage(latestSnapshotRef.current.messages, message),
+        events: latestSnapshotRef.current.events,
+      };
+      missedStreamRecoveryRef.current.start(
+        {
+          getSnapshot: () => latestSnapshotRef.current,
+          refreshSession: async () => {
+            logLiveChatDebug("chat-recovery", "running missed-stream recovery refresh", {
+              session_id: selectedSessionId,
+            });
+            const bundle = await refreshSelectedSession(selectedSessionId);
+            logLiveChatDebug("chat-recovery", "missed-stream recovery refresh completed", {
+              session_id: selectedSessionId,
+              recovered_status: bundle?.session.status ?? null,
+              recovered_message_count: bundle?.messages.length ?? null,
+              recovered_event_count: bundle?.events.length ?? null,
+              recovered_active_approval_id: bundle?.session.active_approval_id ?? null,
+            });
+            return bundle
+              ? {
+                  session: bundle.session,
+                  messages: bundle.messages,
+                  events: bundle.events,
+                }
+              : null;
+          },
+        },
+        recoveryBaseline,
+      );
     } catch (error) {
+      missedStreamRecoveryRef.current.cancel();
       setErrorMessage(
         error instanceof Error ? error.message : "Failed to send the message.",
       );

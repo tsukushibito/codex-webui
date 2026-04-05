@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { RuntimeError } from "../../errors.js";
+import { logLiveChatDebug } from "../../debug.js";
 import type { RuntimeDatabase } from "../../db/database.js";
 import {
   approvals,
@@ -232,6 +233,13 @@ export class SessionService {
       occurredAt: input.occurredAt,
       payload: JSON.stringify(input.payload),
       nativeEventName: input.nativeEventName ?? null,
+    });
+
+    logLiveChatDebug("session-events", "appended session event", {
+      session_id: event.session_id,
+      event_type: event.event_type,
+      sequence: event.sequence,
+      native_event_name: event.native_event_name ?? null,
     });
 
     const sessionListeners = this.sessionEventListeners.get(input.sessionId);
@@ -1509,6 +1517,7 @@ export class SessionService {
           message_id: assistantMessageId,
           turn_id: input.turn_id,
           content: input.content,
+          created_at: assistantCreatedAt,
         },
         nativeEventName: "item/agent_message/completed",
       });
@@ -1556,5 +1565,79 @@ export class SessionService {
       created_at: assistantCreatedAt,
       source_item_type: "agent_message",
     } satisfies MessageProjection;
+  }
+
+  async completeTurnWithoutAssistantMessage(
+    sessionId: string,
+    input: {
+      turn_id: string;
+    },
+  ) {
+    const session = firstRequiredRow(
+      this.database.db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.sessionId, sessionId))
+        .limit(1)
+        .all(),
+      () => {
+        throw new RuntimeError(404, "session_not_found", "session was not found", {
+          session_id: sessionId,
+        });
+      },
+    );
+
+    if (session.status !== "running" || session.currentTurnId !== input.turn_id) {
+      throw new RuntimeError(
+        409,
+        "session_invalid_state",
+        "session is not ready to complete the current turn",
+        {
+          session_id: sessionId,
+          current_status: session.status,
+          current_turn_id: session.currentTurnId,
+          requested_turn_id: input.turn_id,
+        },
+      );
+    }
+
+    const completedAt = toIsoString(this.now());
+
+    this.database.sqlite.transaction(() => {
+      this.database.db
+        .update(sessions)
+        .set({
+          status: "waiting_input",
+          updatedAt: completedAt,
+          currentTurnId: null,
+          pendingAssistantMessageId: null,
+          appSessionOverlayState: "open",
+        })
+        .where(eq(sessions.sessionId, sessionId))
+        .run();
+
+      this.database.db
+        .update(workspaces)
+        .set({
+          activeSessionId: null,
+          updatedAt: completedAt,
+        })
+        .where(
+          and(
+            eq(workspaces.workspaceId, session.workspaceId),
+            eq(workspaces.activeSessionId, sessionId),
+          ),
+        )
+        .run();
+
+      this.appendSessionStatusChangedEvent({
+        sessionId,
+        occurredAt: completedAt,
+        fromStatus: session.status as SessionStatus,
+        toStatus: "waiting_input",
+      });
+    })();
+
+    return this.getSession(sessionId);
   }
 }

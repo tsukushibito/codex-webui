@@ -8,6 +8,27 @@ export interface RuntimeConfig {
   appServerCommand: string;
   appServerArgs: string[];
   appServerCwd?: string;
+  appServerBridgeEnabled: boolean;
+  appServerApprovalPolicy: string;
+  appServerSandbox: string;
+  appServerPersonality: string;
+}
+
+function parseBooleanFlag(rawValue: string | undefined, defaultValue: boolean) {
+  if (rawValue === undefined) {
+    return defaultValue;
+  }
+
+  const normalized = rawValue.trim().toLowerCase();
+  if (normalized === "1" || normalized === "true" || normalized === "yes") {
+    return true;
+  }
+
+  if (normalized === "0" || normalized === "false" || normalized === "no") {
+    return false;
+  }
+
+  return defaultValue;
 }
 
 function parseAppServerArgs(rawValue: string | undefined): string[] {
@@ -49,5 +70,20 @@ export function resolveConfig(
     appServerCwd:
       overrides.appServerCwd ??
       process.env.CODEX_APP_SERVER_CWD,
+    appServerBridgeEnabled:
+      overrides.appServerBridgeEnabled ??
+      parseBooleanFlag(process.env.CODEX_WEBUI_APP_SERVER_BRIDGE_ENABLED, false),
+    appServerApprovalPolicy:
+      overrides.appServerApprovalPolicy ??
+      process.env.CODEX_WEBUI_APP_SERVER_APPROVAL_POLICY ??
+      "untrusted",
+    appServerSandbox:
+      overrides.appServerSandbox ??
+      process.env.CODEX_WEBUI_APP_SERVER_SANDBOX ??
+      "danger-full-access",
+    appServerPersonality:
+      overrides.appServerPersonality ??
+      process.env.CODEX_WEBUI_APP_SERVER_PERSONALITY ??
+      "pragmatic",
   };
 }
