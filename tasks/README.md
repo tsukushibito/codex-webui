@@ -67,7 +67,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Current Active Tasks
 
-- None
+- [issue-102-approval-wait-state-convergence](./issue-102-approval-wait-state-convergence/README.md)
 
 ## Archived Task Packages
 
