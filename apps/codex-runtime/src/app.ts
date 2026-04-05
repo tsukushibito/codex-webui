@@ -7,6 +7,7 @@ import {
   AppServerSupervisor,
   type AppServerController,
 } from "./domain/app-server/app-server-supervisor.js";
+import { CodexAppServerGateway } from "./domain/app-server/codex-app-server-gateway.js";
 import {
   SyntheticNativeSessionGateway,
   type NativeSessionGateway,
@@ -45,8 +46,24 @@ export async function buildApp(options: BuildAppOptions = {}) {
   const workspaceRegistry =
     options.services?.workspaceRegistry ??
     new WorkspaceRegistry(ownedDatabase, workspaceFilesystem);
+  let liveAppServerGateway: CodexAppServerGateway | null = null;
   const nativeSessionGateway =
-    options.services?.nativeSessionGateway ?? new SyntheticNativeSessionGateway();
+    options.services?.nativeSessionGateway ??
+    (runtimeConfig.appServerBridgeEnabled
+      ? (() => {
+          liveAppServerGateway = new CodexAppServerGateway({
+            command: runtimeConfig.appServerCommand,
+            args: runtimeConfig.appServerArgs,
+            cwd: runtimeConfig.appServerCwd,
+            env: process.env,
+            approvalPolicy: runtimeConfig.appServerApprovalPolicy,
+            sandbox: runtimeConfig.appServerSandbox,
+            personality: runtimeConfig.appServerPersonality,
+          });
+
+          return liveAppServerGateway;
+        })()
+      : new SyntheticNativeSessionGateway());
   const sessionService =
     options.services?.sessionService ??
     new SessionService(
@@ -55,14 +72,16 @@ export async function buildApp(options: BuildAppOptions = {}) {
       workspaceFilesystem,
       nativeSessionGateway,
     );
+  liveAppServerGateway?.bindEventSink(sessionService);
   const appServerSupervisor =
     options.services?.appServerSupervisor ??
-    new AppServerSupervisor({
-      command: runtimeConfig.appServerCommand,
-      args: runtimeConfig.appServerArgs,
-      cwd: runtimeConfig.appServerCwd,
-      env: process.env,
-    });
+    (liveAppServerGateway ??
+      new AppServerSupervisor({
+        command: runtimeConfig.appServerCommand,
+        args: runtimeConfig.appServerArgs,
+        cwd: runtimeConfig.appServerCwd,
+        env: process.env,
+      }));
 
   const app = Fastify({
     logger: false,

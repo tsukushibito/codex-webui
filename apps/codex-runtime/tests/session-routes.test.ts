@@ -330,6 +330,30 @@ function createSseReader(response: Response) {
   };
 }
 
+async function waitForExpectation(
+  assertion: () => Promise<void>,
+  options: {
+    attempts?: number;
+    delayMs?: number;
+  } = {},
+) {
+  const attempts = options.attempts ?? 40;
+  const delayMs = options.delayMs ?? 25;
+
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      await assertion();
+      return;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw lastError;
+}
+
 afterEach(async () => {
   await Promise.all(
     cleanupPaths.splice(0).map((entryPath) =>
@@ -686,6 +710,123 @@ describe("session routes", () => {
     await app.close();
   });
 
+  it("bridges live app-server assistant responses back into session history", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
+    const database = await createTempDatabase("workspace-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const appServerFixturePath = path.join(
+      process.cwd(),
+      "tests/fixtures/fake-codex-app-server.mjs",
+    );
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: [appServerFixturePath],
+        appServerBridgeEnabled: true,
+      },
+      database,
+    });
+
+    const workspaceResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/workspaces",
+      payload: {
+        workspace_name: "alpha",
+      },
+    });
+    const workspace = workspaceResponse.json();
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/workspaces/${workspace.workspace_id}/sessions`,
+      payload: {
+        title: "Fix build error",
+      },
+    });
+    expect(createResponse.statusCode).toBe(201);
+    const sessionId = createResponse.json().session_id as string;
+
+    const startResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/start`,
+      payload: {},
+    });
+    expect(startResponse.statusCode).toBe(200);
+    expect(startResponse.json()).toMatchObject({
+      session_id: sessionId,
+      status: "waiting_input",
+    });
+
+    const sendResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/sessions/${sessionId}/messages`,
+      payload: {
+        client_message_id: "msgclient_live_bridge",
+        content: "Please explain the diff.",
+      },
+    });
+    expect(sendResponse.statusCode).toBe(202);
+
+    await waitForExpectation(async () => {
+      const sessionResponse = await app.inject({
+        method: "GET",
+        url: `/api/v1/sessions/${sessionId}`,
+      });
+
+      expect(sessionResponse.statusCode).toBe(200);
+      expect(sessionResponse.json()).toMatchObject({
+        session_id: sessionId,
+        status: "waiting_input",
+        current_turn_id: null,
+      });
+
+      const messageResponse = await app.inject({
+        method: "GET",
+        url: `/api/v1/sessions/${sessionId}/messages`,
+      });
+
+      expect(messageResponse.statusCode).toBe(200);
+      expect(messageResponse.json()).toEqual({
+        items: [
+          {
+            message_id: expect.stringMatching(/^msg_user_/),
+            session_id: sessionId,
+            role: "user",
+            content: "Please explain the diff.",
+            created_at: expect.any(String),
+            source_item_type: "user_message",
+          },
+          {
+            message_id: expect.stringMatching(/^msg_assistant_/),
+            session_id: sessionId,
+            role: "assistant",
+            content: "Synthetic assistant response for: Please explain the diff.",
+            created_at: expect.any(String),
+            source_item_type: "agent_message",
+          },
+        ],
+        next_cursor: null,
+        has_more: false,
+      });
+    });
+
+    const workspaceAfterCompletion = await app.inject({
+      method: "GET",
+      url: `/api/v1/workspaces/${workspace.workspace_id}`,
+    });
+
+    expect(workspaceAfterCompletion.statusCode).toBe(200);
+    expect(workspaceAfterCompletion.json()).toMatchObject({
+      active_session_id: null,
+      active_session_summary: null,
+    });
+
+    await app.close();
+  });
+
   it("validates session titles and session state transitions", async () => {
     const workspaceRoot = await createTempWorkspaceRoot("workspace-root");
     const database = await createTempDatabase("workspace-db");
@@ -1029,6 +1170,7 @@ describe("session routes", () => {
             message_id: deltaResponse.json().message_id,
             turn_id: "turn_001",
             content: "I checked the diff and summarized the changes.",
+            created_at: assistantMessage.created_at,
           },
           native_event_name: "item/agent_message/completed",
         },
@@ -1079,6 +1221,7 @@ describe("session routes", () => {
             message_id: deltaResponse.json().message_id,
             turn_id: "turn_001",
             content: "I checked the diff and summarized the changes.",
+            created_at: assistantMessage.created_at,
           },
           native_event_name: "item/agent_message/completed",
         },
