@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-EXPECTED_VSCODE_CLI_VERSION="${EXPECTED_VSCODE_CLI_VERSION:-1.109.3}"
 EXPECTED_PYTHON_VERSION="${EXPECTED_PYTHON_VERSION:-3.14.3}"
 EXPECTED_UV_VERSION="${EXPECTED_UV_VERSION:-0.9.21}"
 EXPECTED_NODE_VERSION="${EXPECTED_NODE_VERSION:-25.6.0}"
@@ -97,7 +96,6 @@ check_command "vulkaninfo" "vulkaninfo"
 
 echo
 echo "== version checks =="
-check_contains "code --version" "$(code --version | head -n1 || true)" "${EXPECTED_VSCODE_CLI_VERSION}"
 check_contains "python --version" "$(python --version 2>&1 || true)" "${EXPECTED_PYTHON_VERSION}"
 check_contains "uv --version" "$(uv --version || true)" "${EXPECTED_UV_VERSION}"
 check_contains "node --version" "$(node --version || true)" "v${EXPECTED_NODE_VERSION}"
