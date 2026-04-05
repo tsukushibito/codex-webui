@@ -53,3 +53,38 @@
 ## Archive conditions
 
 - Archive this package when the live assistant-response slice is complete, validation evidence is recorded, and the handoff notes are updated.
+
+## Completion retrospective
+
+### Completion boundary
+
+- Issue close after PR `#100` reached `main`, GitHub Issue `#97` closed, and the linked Project item moved to `Done`.
+
+### Contract check
+
+- Satisfied: sending a browser message now produces a real assistant response or approval wait through the live runtime path, evidenced by the merged `codex app-server` bridge, focused runtime/frontend regressions, and a DevTunnel browser confirmation without reload.
+- Satisfied: the normal live chat path no longer depends on manual `/assistant-events` posts, evidenced by the merged `CodexAppServerGateway` bridge and the fake app-server regression coverage.
+- Satisfied: focused validation covers the browser-visible send -> response flow, evidenced by runtime route tests, frontend recovery tests, production build checks, and the remote manual smoke check.
+
+### What worked
+
+- Layered validation was effective: runtime bridge tests, frontend missed-SSE recovery tests, and one remote DevTunnel confirmation caught different failure modes.
+- Env-gated debug logging made the remote-only chat failure reproducible without changing default behavior.
+
+### Workflow problems
+
+- The initial `intake` delegation drifted into execution behavior instead of staying read-only.
+- Local Playwright and localhost checks were not enough to expose the remote DevTunnel behavior; the blocking symptom only became clear during external-browser validation.
+
+### Improvements to adopt
+
+- Keep remote browser smoke checks in the loop for live chat convergence work that depends on SSE, tunnel behavior, or browser runtime timing.
+- Preserve env-gated debug hooks for browser-path incidents that do not reproduce reliably in local-only validation.
+
+### Skill candidates or skill updates
+
+- Existing improvement already adopted: `codex-webui-execution-orchestrator` now requires delegated `intake` runs to invoke `codex-webui-work-intake` first.
+
+### Follow-up updates
+
+- Continue `#93` and parent `#63` with the remaining DevTunnel/UI acceptance work; no additional `#97` follow-up is required from this retrospective.
