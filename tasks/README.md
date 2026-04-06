@@ -77,6 +77,7 @@ Each active task package `README.md` must include at least the following section
 - [issue-92-restore-recovery-validation](./archive/issue-92-restore-recovery-validation/README.md)
 - [issue-97-live-assistant-response](./archive/issue-97-live-assistant-response/README.md)
 - [issue-93-playwright-e2e-acceptance](./archive/issue-93-playwright-e2e-acceptance/README.md)
+- [issue-102-approval-wait-state-convergence](./archive/issue-102-approval-wait-state-convergence/README.md)
 - [issue-90-post-start-sendability](./archive/issue-90-post-start-sendability/README.md)
 - [issue-91-contract-validation](./archive/issue-91-contract-validation/README.md)
 - [issue-80-phase-4a3-sse-relay](./archive/issue-80-phase-4a3-sse-relay/README.md)

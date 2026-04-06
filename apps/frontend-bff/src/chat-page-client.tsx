@@ -326,12 +326,24 @@ export function ChatPageClient() {
         if (typeof approvalId === "string") {
           setSelectedSession((currentSession) =>
             currentSession
-              ? {
-                  ...currentSession,
-                  active_approval_id: approvalId,
-                  status: "waiting_approval",
-                }
+              ? applySessionStatus(
+                  currentSession,
+                  "waiting_approval",
+                  event.occurred_at,
+                  {
+                    active_approval_id: approvalId,
+                  },
+                )
               : currentSession,
+          );
+          setSessions((currentSessions) =>
+            currentSessions.map((session) =>
+              session.session_id === selectedSessionId
+                ? applySessionStatus(session, "waiting_approval", event.occurred_at, {
+                    active_approval_id: approvalId,
+                  })
+                : session,
+            ),
           );
         }
       }

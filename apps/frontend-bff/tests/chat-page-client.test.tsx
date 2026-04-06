@@ -305,4 +305,72 @@ describe("ChatPageClient", () => {
     expect(container.textContent).toContain("message.assistant.completed");
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it("reflects approval wait-state without reload when approval is requested", async () => {
+    chatDataMocks.listWorkspaceSessions.mockResolvedValue({
+      items: [buildSession()],
+      next_cursor: null,
+      has_more: false,
+    });
+    chatDataMocks.loadChatSessionBundle.mockResolvedValue({
+      session: buildSession(),
+      messages: [],
+      events: [buildEvent()],
+    });
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    const stream = MockEventSource.instances[0];
+    expect(stream).toBeDefined();
+
+    await act(async () => {
+      stream?.onmessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify(
+            buildEvent({
+              event_id: "evt_approval_status",
+              event_type: "session.status_changed",
+              sequence: 2,
+              occurred_at: "2026-03-27T05:16:00Z",
+              payload: {
+                from_status: "running",
+                to_status: "waiting_approval",
+              },
+            }),
+          ),
+        }),
+      );
+      stream?.onmessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify(
+            buildEvent({
+              event_id: "evt_approval_requested",
+              event_type: "approval.requested",
+              sequence: 3,
+              occurred_at: "2026-03-27T05:16:00Z",
+              payload: {
+                approval_id: "apr_001",
+                workspace_id: "ws_alpha",
+                approval_category: "external_side_effect",
+                summary: "Run git push",
+              },
+            }),
+          ),
+        }),
+      );
+    });
+    await flushUi();
+
+    expect(container.textContent).toContain("Approval waiting: apr_001");
+    expect(container.textContent).toContain("waiting approval");
+
+    const sendMessageButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Send message",
+    );
+    expect(sendMessageButton).not.toBeUndefined();
+    expect((sendMessageButton as HTMLButtonElement).disabled).toBe(true);
+  });
 });
