@@ -277,6 +277,11 @@ input {
   gap: 16px;
 }
 
+.chat-feedback-stack {
+  display: grid;
+  gap: 10px;
+}
+
 .chat-panel {
   display: grid;
   gap: 14px;
@@ -364,6 +369,10 @@ input {
   }
 
   .chat-layout > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .chat-feedback-stack {
     grid-column: 1 / -1;
   }
 }

@@ -178,8 +178,20 @@ export function ChatView({
           </section>
         ) : null}
 
-        {errorMessage ? <p className="error-banner">{errorMessage}</p> : null}
-        {statusMessage ? <p className="status-message">{statusMessage}</p> : null}
+        {errorMessage || statusMessage ? (
+          <div aria-live="polite" className="chat-feedback-stack">
+            {errorMessage ? (
+              <p className="error-banner" role="alert">
+                {errorMessage}
+              </p>
+            ) : null}
+            {statusMessage ? (
+              <p className="status-message" role="status">
+                {statusMessage}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {workspaceId ? (
           <>
