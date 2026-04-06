@@ -111,4 +111,43 @@ describe("ChatView", () => {
     expect(markup).toContain("Streaming update");
     expect(markup).toContain("approval.requested");
   });
+
+  it("renders transient feedback in a dedicated layout row before the chat panels", () => {
+    const markup = renderToStaticMarkup(
+      <ChatView
+        connectionState="live"
+        createSessionTitle=""
+        draftAssistantMessages={[]}
+        errorMessage="Failed to stop the session."
+        events={[]}
+        isCreatingSession={false}
+        isLoadingSession={false}
+        isLoadingSessions={false}
+        isSendingMessage={false}
+        isStartingSession={false}
+        isStoppingSession={false}
+        messageDraft=""
+        messages={[]}
+        onCreateSession={() => {}}
+        onCreateSessionTitleChange={() => {}}
+        onMessageDraftChange={() => {}}
+        onSelectSession={() => {}}
+        onSendMessage={() => {}}
+        onStartSession={() => {}}
+        onStopSession={() => {}}
+        selectedSession={null}
+        selectedSessionId={null}
+        sessions={[]}
+        statusMessage="Session started."
+        workspaceId="ws_alpha"
+      />,
+    );
+
+    expect(markup).toContain("chat-feedback-stack");
+    expect(markup).toContain("Session started.");
+    expect(markup).toContain("Failed to stop the session.");
+    expect(markup.indexOf("chat-feedback-stack")).toBeLessThan(
+      markup.indexOf("chat-panel create-card"),
+    );
+  });
 });

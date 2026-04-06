@@ -20,3 +20,4 @@ Archive entries preserve the work instructions that were used at the time, while
 - [issue-80-phase-4a3-sse-relay](./issue-80-phase-4a3-sse-relay/README.md)
 - [issue-84-home-ui-shell](./issue-84-home-ui-shell/README.md)
 - [issue-85-chat-ui-flow](./issue-85-chat-ui-flow/README.md)
+- [issue-98-chat-status-feedback](./issue-98-chat-status-feedback/README.md)
