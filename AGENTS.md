@@ -2,6 +2,7 @@
 
 This repository is an experimental project for a WebUI for `codex`.
 
+Start with the root `README.md` for the repo map, implementation shape, and development entrypoints.
 Read the nearest relevant `README.md` before editing files in that area.  
 Directory-specific responsibilities, document policies, and workflow details belong in local README files, not in this root `AGENTS.md`.
 
@@ -15,9 +16,19 @@ Directory-specific responsibilities, document policies, and workflow details bel
 
 ## Workspace Environment
 
-- `.venv/` may be used for local Python-based validation and must remain ignored
+- Primary app implementation in this repository is `Node.js` and `TypeScript`; use local app `README.md` files for setup and commands
+- `.venv/` may be used as the repo-local Python virtual environment for skill validation and other Python-based validation helpers; prefer it over ad hoc global installs and keep it ignored
 - GitHub repository and project management may use `gh` when it is available
+- Use `docs/codex_webui_dev_container_onboarding.md` for the dev container, tunnel, and repo-level operational workflow
 - Keep root guidance environment-light; put area-specific setup or tool usage details in local `README.md` files
+
+## Repository Map
+
+- `docs/`: maintained source-of-truth requirements, specifications, validation plans, roadmap notes, and wiki entrypoints
+- `apps/`: implementation directories for `codex-runtime` and `frontend-bff`
+- `tasks/`: active local work packages for Issues currently in progress
+- `artifacts/`: execution outputs such as evidence, observations, and judgment notes
+- `scripts/`: repo-level helper scripts for setup, launch, and diagnostics
 
 ## Cross-cutting Workflow
 
@@ -44,6 +55,7 @@ Directory-specific responsibilities, document policies, and workflow details bel
 - When updating roadmap tracking, prefer updating the existing Project and linked issues instead of creating competing tracking structures
 - Keep Project items and issue bodies aligned with the maintained documents, and prefer links or short summaries over duplicating detailed specification text
 - Do not delete Projects, issues, or project items unless the user explicitly asks for deletion
+- Use `docs/README.md` for docs placement and wiki maintenance details, and `tasks/README.md` for active package, archive, and completion-flow details
 - If GitHub Projects workflow details are needed, prefer the repo skill under `.agents/skills/codex-webui-github-projects/` rather than expanding this root file
 - If repo-local LLM Wiki maintenance workflow details are needed, prefer the repo skill under `.agents/skills/codex-webui-llm-wiki-maintenance/` rather than expanding this root file
 - If completion retrospective workflow details are needed, prefer the repo skill under `.agents/skills/codex-webui-completion-retrospective/` rather than expanding this root file
