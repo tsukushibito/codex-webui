@@ -22,6 +22,7 @@ Responsibilities:
 - select exactly one next existing repo skill
 - invoke that selected repo skill in the same turn when the user asked to proceed with execution
 - own the cross-skill continuation loop when the user asked to keep going until a concrete end-state is reached
+- route to `codex-webui-execution-handoff` before stopping when the requested work cannot be completed in the current session but resumable follow-up is still required
 
 The main agent should remain an orchestrator. Planning, implementation, sprint evaluation, and pre-push validation should be delegated to the repo's sub-agents through the selected handoff skill instead of being executed directly by the main agent.
 
@@ -68,13 +69,15 @@ Follow this order every time.
 8. Append a routing event for the selected handoff or any blocking drift before continuing.
 9. If the user asked to proceed with work in the current turn, invoke that selected handoff skill in the same turn instead of stopping after the routing brief.
 10. If the user asked to continue until a concrete end-state, treat steps 3-9 as one iteration, then re-run intake after the invoked handoff skill returns instead of stopping after the first handoff.
-11. Append `run_completed` or `run_blocked` before ending the turn.
-12. Stop only when the requested end-state is reached or execution is hard blocked.
-13. Park the other Issues explicitly.
+11. If the requested end-state cannot be reached in the current session and resumable follow-up is the correct outcome, invoke `codex-webui-execution-handoff` once before ending the turn.
+12. Append `run_completed` or `run_blocked` after the final handoff outcome is known.
+13. Stop only when the requested end-state is reached, or execution is hard blocked and the required handoff outcome has been produced or has itself failed.
+14. Park the other Issues explicitly.
 
 Do not skip delegated intake in this workflow.
 
 If the user explicitly asked only for routing, target selection, or a next-skill recommendation, the workflow may stop after the routing brief.
+In that routing-only case, do not force a resumable handoff doc unless the user explicitly asked for one.
 
 ## Run Logging
 
@@ -101,6 +104,8 @@ Append an `anomaly` event immediately when any of the following happens:
 - a selected handoff skill fails to complete cleanly
 - the logger script itself fails
 - execution hits a real hard block and the loop must stop
+
+When a resumable stop requires `codex-webui-execution-handoff`, log the failed or blocked condition first, then log the selected handoff and its result. Include the created `.tmp/` handoff path in `details` when available.
 
 Use concise structured entries. Do not dump long transcripts into the run log.
 
@@ -178,6 +183,8 @@ If no drift blocks progress, route to one of these skills:
 
 Do not recommend multiple competing handoffs in the same result.
 
+Before selecting a normal next-step handoff, ask whether execution can still continue toward the requested end-state in the current session. If the answer is no and resumable follow-up is required, the handoff must become `codex-webui-execution-handoff` for a single terminal handoff pass.
+
 When the user asked to proceed with execution, do not stop after naming the next handoff skill. Invoke exactly one selected handoff skill in the same turn.
 Treat this as exactly one handoff per iteration, not necessarily one handoff for the entire user request.
 
@@ -187,6 +194,13 @@ When the user asked to continue until a concrete end-state, return to delegated 
 - execution is hard blocked and requires user input
 - execution is hard blocked on external state that the repo agent cannot change in the current turn
 - no unambiguous next handoff exists without making a product or implementation decision that should be surfaced to the user
+
+Treat these cases as requiring a terminal `codex-webui-execution-handoff` before the run stops, unless the user asked only for routing or there is no meaningful local state to preserve:
+
+- a selected handoff skill fails to complete cleanly
+- the continue-until loop reaches a concrete hard block
+- progress is blocked on external state that cannot change in the current turn
+- the current repo or worktree state is dirty enough that the next session needs explicit resumption guidance
 
 After each invoked handoff skill returns, reassess in this order:
 
@@ -207,6 +221,14 @@ When locally complete work is moving toward push-oriented, merge-oriented, or ar
 
 When the chosen target still needs task-package creation, resumption, reconciliation, or archive work, the handoff must be `codex-webui-work-packages`.
 
+When the orchestration run must stop without reaching the requested end-state, the final handoff must be `codex-webui-execution-handoff` unless:
+
+- the user asked only for routing or recommendation output
+- no resumable state exists beyond the routing brief
+- `codex-webui-execution-handoff` already ran for this orchestration run
+
+Do not recurse from `codex-webui-execution-handoff` into another handoff. If the handoff skill itself fails, append an `anomaly`, report the failure concretely, and stop.
+
 Do not bypass the selected handoff skill by letting the main agent implement directly after routing.
 
 ## Required Output Shape
@@ -223,6 +245,7 @@ The result should be short and routing-oriented.
 
 If the user asked to proceed with work in the current turn, present the brief and then continue into the selected handoff skill instead of ending after the brief.
 If the user also asked to continue until a concrete end-state, keep iterating after that handoff returns instead of treating the first completed handoff as the end of the request.
+If the run ends by creating a resumable handoff, `Next handoff` should report that `codex-webui-execution-handoff` was used and identify the created `.tmp/` file.
 
 ## Guardrails
 
@@ -241,6 +264,9 @@ If the user also asked to continue until a concrete end-state, keep iterating af
 - Do not let the main agent absorb planner, worker, evaluator, or validator duties once a handoff skill has been selected
 - Do not treat one completed handoff or one approved sprint as sufficient to end a continue-until request
 - Do not treat one approved sprint as immediately ready for push-oriented, merge-oriented, or archive-oriented follow-through before the dedicated pre-push validation gate runs
+- Do not end a blocked continue-until run without attempting `codex-webui-execution-handoff` when resumable follow-up context exists
+- Do not create more than one `codex-webui-execution-handoff` document for the same orchestration run unless the user explicitly asks
+- Do not recurse into another handoff after `codex-webui-execution-handoff` runs
 - Do not keep looping past a real hard block; stop and report the blocking condition concretely
 
 ## Example Requests
