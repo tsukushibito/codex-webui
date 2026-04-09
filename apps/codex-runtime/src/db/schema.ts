@@ -6,8 +6,6 @@ export const workspaces = sqliteTable("workspaces", {
   directoryName: text("directory_name").notNull().unique(),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
-  activeSessionId: text("active_session_id"),
-  pendingApprovalCount: integer("pending_approval_count").notNull().default(0),
 });
 
 export const workspaceSessionMappings = sqliteTable(
@@ -26,6 +24,26 @@ export const workspaceSessionMappings = sqliteTable(
     uniqueSessionId: uniqueIndex("workspace_session_mappings_session_id_idx").on(
       table.sessionId,
     ),
+  }),
+);
+
+export const threadInputRequests = sqliteTable(
+  "thread_input_requests",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.workspaceId, { onDelete: "cascade" }),
+    clientRequestId: text("client_request_id").notNull(),
+    threadId: text("thread_id").notNull(),
+    content: text("content").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => ({
+    workspaceRequestIndex: uniqueIndex("thread_input_requests_workspace_client_request_idx").on(
+      table.workspaceId,
+      table.clientRequestId,
+    ),
+    threadIndex: uniqueIndex("thread_input_requests_thread_id_idx").on(table.threadId),
   }),
 );
 
@@ -132,6 +150,7 @@ export const sessionEvents = sqliteTable(
 );
 
 export type WorkspaceRow = typeof workspaces.$inferSelect;
+export type ThreadInputRequestRow = typeof threadInputRequests.$inferSelect;
 export type SessionRow = typeof sessions.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;
 export type ApprovalRow = typeof approvals.$inferSelect;

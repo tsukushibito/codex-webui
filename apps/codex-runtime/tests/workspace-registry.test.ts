@@ -36,8 +36,6 @@ describe("WorkspaceRegistry", () => {
 
     expect(created.workspace_name).toBe("alpha");
     expect(created.directory_name).toBe("alpha");
-    expect(created.pending_approval_count).toBe(0);
-    expect(created.active_session_id).toBeNull();
     expect(listed).toHaveLength(1);
     expect(await fs.stat(path.join(workspaceRoot, "alpha"))).toBeTruthy();
   });

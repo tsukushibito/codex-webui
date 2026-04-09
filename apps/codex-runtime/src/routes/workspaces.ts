@@ -4,6 +4,17 @@ import { ZodError } from "zod";
 import { RuntimeError } from "../errors.js";
 import { parseCreateWorkspaceInput } from "../domain/workspaces/workspace-name.js";
 import { WorkspaceRegistry } from "../domain/workspaces/workspace-registry.js";
+import type { WorkspaceSummary } from "../domain/workspaces/types.js";
+
+function toWorkspaceResource(workspace: WorkspaceSummary) {
+  return {
+    workspace_id: workspace.workspace_id,
+    workspace_name: workspace.workspace_name,
+    directory_name: workspace.directory_name,
+    created_at: workspace.created_at,
+    updated_at: workspace.updated_at,
+  };
+}
 
 export async function registerWorkspaceRoutes(
   app: FastifyInstance,
@@ -13,7 +24,7 @@ export async function registerWorkspaceRoutes(
     const items = await workspaceRegistry.listWorkspaces();
 
     return {
-      items,
+      items: items.map(toWorkspaceResource),
       next_cursor: null,
       has_more: false,
     };
@@ -41,16 +52,11 @@ export async function registerWorkspaceRoutes(
 
     const workspace = await workspaceRegistry.createWorkspace(payload.workspace_name);
     reply.code(201);
-    return workspace;
+    return toWorkspaceResource(workspace);
   });
 
   app.get("/api/v1/workspaces/:workspaceId", async (request) => {
     const params = request.params as { workspaceId: string };
-    return workspaceRegistry.getWorkspace(params.workspaceId);
-  });
-
-  app.post("/api/v1/workspaces/:workspaceId/reconcile", async (request) => {
-    const params = request.params as { workspaceId: string };
-    return workspaceRegistry.reconcileWorkspace(params.workspaceId);
+    return toWorkspaceResource(await workspaceRegistry.getWorkspace(params.workspaceId));
   });
 }

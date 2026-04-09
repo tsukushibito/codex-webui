@@ -4,12 +4,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { RuntimeError } from "../../errors.js";
 import type { RuntimeDatabase } from "../../db/database.js";
-import {
-  approvals,
-  sessions,
-  workspaceSessionMappings,
-  workspaces,
-} from "../../db/schema.js";
+import { workspaceSessionMappings, workspaces } from "../../db/schema.js";
 import type { EligibleWorkspaceDirectory, WorkspaceSummary } from "./types.js";
 import { validateWorkspaceName } from "./workspace-name.js";
 import { WorkspaceFilesystem } from "./workspace-filesystem.js";
@@ -20,7 +15,6 @@ function toIsoString(date: Date) {
 
 function mapWorkspaceSummary(
   record: typeof workspaces.$inferSelect,
-  activeSession: typeof sessions.$inferSelect | null = null,
 ): WorkspaceSummary {
   return {
     workspace_id: record.workspaceId,
@@ -28,24 +22,11 @@ function mapWorkspaceSummary(
     directory_name: record.directoryName,
     created_at: record.createdAt,
     updated_at: record.updatedAt,
-    active_session_id: record.activeSessionId,
-    active_session_summary: activeSession
-      ? {
-          session_id: activeSession.sessionId,
-          status: activeSession.status,
-          last_message_at: activeSession.lastMessageAt,
-        }
-      : null,
-    pending_approval_count: record.pendingApprovalCount,
   };
 }
 
 function firstRow<T>(rows: T[]) {
   return rows[0];
-}
-
-function isActiveSessionStatus(status: string) {
-  return status === "running" || status === "waiting_approval";
 }
 
 export class WorkspaceRegistry {
@@ -70,27 +51,7 @@ export class WorkspaceRegistry {
       .orderBy(desc(workspaces.updatedAt), desc(workspaces.workspaceId))
       .all();
 
-    const activeSessionIds = rows
-      .map((row) => row.activeSessionId)
-      .filter((value): value is string => value !== null);
-    const activeSessions =
-      activeSessionIds.length === 0
-        ? new Map<string, typeof sessions.$inferSelect>()
-        : new Map(
-            this.database.db
-              .select()
-              .from(sessions)
-              .where(inArray(sessions.sessionId, activeSessionIds))
-              .all()
-              .map((row) => [row.sessionId, row]),
-          );
-
-    return rows.map((row) =>
-      mapWorkspaceSummary(
-        row,
-        row.activeSessionId ? activeSessions.get(row.activeSessionId) ?? null : null,
-      ),
-    );
+    return rows.map((row) => mapWorkspaceSummary(row));
   }
 
   async getWorkspace(workspaceId: string) {
@@ -109,19 +70,7 @@ export class WorkspaceRegistry {
       });
     }
 
-    const activeSession =
-      row.activeSessionId === null
-        ? null
-        : firstRow(
-            this.database.db
-              .select()
-              .from(sessions)
-              .where(eq(sessions.sessionId, row.activeSessionId))
-              .limit(1)
-              .all(),
-          ) ?? null;
-
-    return mapWorkspaceSummary(row, activeSession);
+    return mapWorkspaceSummary(row);
   }
 
   async createWorkspace(workspaceName: string) {
@@ -190,8 +139,6 @@ export class WorkspaceRegistry {
           directoryName: normalizedDirectoryName,
           createdAt: now,
           updatedAt: now,
-          activeSessionId: null,
-          pendingApprovalCount: 0,
         })
         .run();
     } catch (error) {
@@ -273,26 +220,10 @@ export class WorkspaceRegistry {
     await this.getWorkspace(workspaceId);
 
     const now = toIsoString(this.now());
-    const activeSession = firstRow(
-      this.database.db
-        .select()
-        .from(sessions)
-        .where(eq(sessions.workspaceId, workspaceId))
-        .orderBy(desc(sessions.updatedAt), desc(sessions.sessionId))
-        .all()
-        .filter((row) => isActiveSessionStatus(row.status)),
-    );
-    const pendingApprovalCount = this.database.db
-      .select()
-      .from(approvals)
-      .where(and(eq(approvals.workspaceId, workspaceId), eq(approvals.status, "pending")))
-      .all().length;
 
     this.database.db
       .update(workspaces)
       .set({
-        activeSessionId: activeSession?.sessionId ?? null,
-        pendingApprovalCount,
         updatedAt: now,
       })
       .where(eq(workspaces.workspaceId, workspaceId))
