@@ -1,5 +1,7 @@
 .venv/
 .venv
+__pycache__/
+*.pyc
 .tmp/
 .worktrees/
 DevTunnels/
