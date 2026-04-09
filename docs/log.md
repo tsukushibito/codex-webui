@@ -29,6 +29,27 @@ After the heading, keep the body concise:
 
 ## Entries
 
+## [2026-04-09] query | v0.9 roadmap review follow-up and implementation-line tracking
+
+Source:
+
+- user review request for the v0.9 migration roadmap
+- `docs/requirements/codex_webui_mvp_requirements_v0_9.md`
+- `docs/specs/codex_webui_public_api_v0_9.md`
+- `docs/specs/codex_webui_internal_api_v0_9.md`
+- `docs/specs/codex_webui_app_server_contract_matrix_v0_9.md`
+
+Updated:
+
+- `docs/codex_webui_mvp_roadmap_v0_1.md`
+- `docs/log.md`
+
+Notes:
+
+- tightened the roadmap around maintained validation deliverables, resume-priority preservation, and background high-priority notification handling
+- clarified that `#60` remains the closed v0.8 legacy parent while `#124` is the active v0.9 cutover parent
+- recommended a single-Project lineage field or equivalent labels instead of creating competing tracking structures
+
 ## [2026-04-09] ingest | v0.9 implementation cutover roadmap and tracking reset
 
 Source:

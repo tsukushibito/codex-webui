@@ -142,6 +142,13 @@ Replace the current public `session` / `approval` facade with the v0.9 public `t
    - `GET /api/v1/threads/{thread_id}/stream`
    - `GET /api/v1/notifications/stream`
 5. Update home aggregation to emit `resume_candidates` and v0.9 helper summaries rather than old approval counters as the primary interaction signal.
+6. Preserve the requirements-level resume priority in public shaping and home/thread-list aggregation:
+   - `waitingOnApproval`
+   - `systemError`
+   - latest turn `failed`
+   - currently active thread
+   - last viewed thread
+   - most recently updated thread
 
 #### Exit criteria
 
@@ -163,11 +170,13 @@ Replace the current session-first Chat and standalone Approval UI with a v0.9 th
 4. Present pending and just-resolved request information from thread context instead of a standalone approval domain flow.
 5. Keep smartphone usability as a first-class constraint while removing assumptions that MVP requires a dedicated Approval screen.
 6. Converge reconnect behavior on REST reacquisition of `thread_view`, `timeline`, and request helper state.
+7. Consume the global notifications path to surface background high-priority thread promotion without requiring a dedicated approval screen or continuous subscription to every thread stream.
 
 #### Exit criteria
 
 - browser interaction follows the v0.9 thread-first model
 - request response actions are reachable from thread context with minimum confirmation information
+- background high-priority thread promotion is noticeable from the browser UI
 - desktop and smartphone layouts work without depending on the old session/approval UI model
 
 ### 5.4 Phase 5: v0.9 validation, convergence, and MVP judgment
@@ -178,14 +187,17 @@ Validate the cutover implementation against the maintained v0.9 documents and de
 
 #### Main workstreams
 
-1. Contract validation for runtime and public APIs.
-2. Recovery validation for disconnect, reload, partial failure, and just-resolved request retention.
-3. End-to-end browser validation for first-input thread start, existing-thread input, request response, interrupt, and reconnect.
-4. UI acceptance validation for PC and smartphone widths.
-5. Final MVP judgment against the v0.9 requirements.
+1. Publish and maintain v0.9 validation source-of-truth documents for contract, recovery, end-to-end browser flows, and smartphone acceptance; do not rely on the app-server observation plan alone for final MVP judgment.
+2. Contract validation for runtime and public APIs.
+3. Recovery validation for disconnect, reload, partial failure, and just-resolved request retention.
+4. End-to-end browser validation for first-input thread start, existing-thread input, request response, interrupt, and reconnect.
+5. UI acceptance validation for PC and smartphone widths, including the requirements-level `360 CSS px`, `two taps`, and `two actions` checks.
+6. Validation of background high-priority promotion signaling, including `waitingOnApproval`, `systemError`, and latest-turn-`failed` cases.
+7. Final MVP judgment against the v0.9 requirements.
 
 #### Exit criteria
 
+- maintained validation sources exist for contract, recovery, E2E, and smartphone acceptance judgments
 - contract behavior matches the maintained v0.9 docs
 - thread-scoped recovery converges through REST reacquisition after SSE problems
 - request response flow is safe and usable on browser and smartphone paths
@@ -204,6 +216,8 @@ The GitHub Project should track at least the following active items for the cuto
 
 The first item is the cross-phase parent tracker. The remaining items are the main execution units.
 
+For implementation-line clarity, keep the earlier v0.8 parent tracker `#60` as the closed legacy parent and treat `#124` as the active v0.9 cutover parent. Do not reopen `#60` for new work.
+
 Recommended Project field defaults:
 
 - parent cutover tracker: `Priority=P0`
@@ -212,6 +226,12 @@ Recommended Project field defaults:
 - UI cutover: `Phase=Phase 4 BFF/UI`, `Area=UI`, `Priority=P0`
 - validation parent: `Phase=Phase 5 Test`, `Area=Validation`, `Priority=P1`
 - E2E validation child: `Phase=Phase 5 Test`, `Area=Validation`, `Priority=P1`
+
+Recommended lineage tracking:
+
+- `#60` and any historical v0.8 implementation issues: `Implementation Line=v0.8 legacy`
+- `#124`, `#125`, `#126`, `#127`, `#63`, and `#93`: `Implementation Line=v0.9 cutover`
+- if the current Project does not yet have an `Implementation Line` field, prefer adding that field to the existing Project; if that is not practical, use a consistent label family such as `impl:v0.8-legacy` and `impl:v0.9-cutover`
 
 ## 7. Sequencing Rules
 
