@@ -1,0 +1,51 @@
+# Codex WebUI LLM Wiki Log
+
+Last updated: 2026-04-09
+
+## Purpose
+
+This file is the chronological maintenance log for the repo-local LLM Wiki.
+
+Use it to record when wiki-relevant material is added, revised, linted, or restructured so later sessions can understand recent changes without rediscovering them from scratch.
+
+## Entry format
+
+Start each entry with a level-2 heading in this format:
+
+`## [YYYY-MM-DD] <kind> | <topic>`
+
+Use `<kind>` values such as:
+
+- `ingest`
+- `query`
+- `lint`
+- `restructure`
+
+After the heading, keep the body concise:
+
+- source material or reason for the change
+- maintained files that were added or updated
+- short note on what changed or remains deferred
+
+## Entries
+
+## [2026-04-09] restructure | repo-local LLM Wiki scope and entrypoints
+
+Source:
+
+- issue `#115`
+- issue `#116`
+- `docs/codex_webui_llm_wiki_adoption_note_v0_1.md`
+
+Updated:
+
+- `docs/codex_webui_llm_wiki_adoption_note_v0_1.md`
+- `docs/notes/README.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- formalized the repo-local wiki boundary inside `docs/`
+- introduced initial `index.md` and `log.md` entrypoints
+- deferred agent workflow rules to issue `#117`
