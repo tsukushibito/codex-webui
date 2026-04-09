@@ -22,38 +22,21 @@ Directory-specific responsibilities, document policies, and workflow details bel
 - Use `docs/codex_webui_dev_container_onboarding.md` for the dev container, tunnel, and repo-level operational workflow
 - Keep root guidance environment-light; put area-specific setup or tool usage details in local `README.md` files
 
-## Repository Map
-
-- `docs/`: maintained source-of-truth requirements, specifications, validation plans, roadmap notes, and wiki entrypoints
-- `apps/`: implementation directories for `codex-runtime` and `frontend-bff`
-- `tasks/`: active local work packages for Issues currently in progress
-- `artifacts/`: execution outputs such as evidence, observations, and judgment notes
-- `scripts/`: repo-level helper scripts for setup, launch, and diagnostics
-
 ## Cross-cutting Workflow
 
-- Treat `docs/` as the maintained source of truth for requirements, specifications, validation plans, and roadmap decisions
-- Treat `docs/index.md` and `docs/log.md` as the repo-local LLM Wiki entrypoints for maintained navigation, discoverability, and chronological update history
-- Treat `tasks/` as the area for active work packages only; move completed task packages to `tasks/archive/`
+- Treat `docs/` as the maintained source of truth; keep reusable synthesis there and update `docs/index.md` and `docs/log.md` when maintained wiki content materially changes
+- Treat `tasks/` as the area for active work packages only; move completed packages to `tasks/archive/`
 - Treat `artifacts/` as the area for execution outputs such as logs, evidence, and judgment notes
-- Promote reusable chat-derived synthesis into maintained `docs/` pages only when the result is likely to be reused; keep transient exploration out of the repo
-- When a maintained wiki page is added, moved, removed, or materially revised in `docs/`, refresh `docs/index.md` when navigation, discoverability, or content summaries changed and append `docs/log.md` with the source and affected files
 - Default repo-tracked change flow is a short-lived branch and PR; direct commits to `main` are exceptions only, such as urgent fixes or explicit user direction
 - For normal branch/PR work, create and use a dedicated git worktree under `.worktrees/<branch>`; keep the parent checkout as the control checkout for sync, tracking, and worktree management
 - Approved direct-to-`main` exceptions may use the parent checkout and should record `Active worktree: .`
 - Sprint approval is a local implementation gate only; before any push-oriented, merge-oriented, or archive-oriented handoff, run the dedicated pre-push validation skill
-- Before archiving a completed task package or closing an Issue, perform a brief completion retrospective that checks for workflow problems, improvement opportunities, and repeated patterns that should become repo skills
-- Do not close an Issue or set a Project item to `Done` until the corresponding work is reachable on `main`
-- Under the default branch workflow, `reachable on main` means the PR is merged to `main`; under an approved direct-to-`main` exception, it means the commits are pushed to `origin/main`
-- Before marking execution complete, verify the local repo state is clean and synced with the relevant remote branch
-- For normal branch/PR work, require worktree cleanup after the slice reaches `main` and before final completion
+- Before archiving a completed task package or closing an Issue, perform a brief completion retrospective
+- Do not mark work complete, close an Issue, or set a Project item to `Done` until the work is reachable on `main` and the local repo state is clean and synced
 - When exploring from the parent checkout, treat `.worktrees/` as outside the normal search and edit surface by default
 - When sub-agents can materially advance the current task, use them proactively for bounded planning, evaluation, or parallel sidecar work instead of defaulting to single-agent execution
-- Record concise retrospective results in task-package handoff notes, and use `artifacts/` only when the review needs more than a short summary
-- If the retrospective identifies a durable process improvement, reflect it into the maintained source of truth instead of leaving it only in task notes
 - Use GitHub Projects for execution tracking such as progress, ownership, dependencies, and review state; do not treat Projects as the source of truth for specifications
 - When updating roadmap tracking, prefer updating the existing Project and linked issues instead of creating competing tracking structures
-- Keep Project items and issue bodies aligned with the maintained documents, and prefer links or short summaries over duplicating detailed specification text
 - Do not delete Projects, issues, or project items unless the user explicitly asks for deletion
 - Use `docs/README.md` for docs placement and wiki maintenance details, and `tasks/README.md` for active package, archive, and completion-flow details
 - If GitHub Projects workflow details are needed, prefer the repo skill under `.agents/skills/codex-webui-github-projects/` rather than expanding this root file
