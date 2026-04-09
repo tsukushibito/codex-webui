@@ -33,6 +33,7 @@ Follow this order every time.
 5. Append a terminal event such as `run_completed` or `run_blocked` before ending the turn.
 
 Prefer concise, factual summaries. Store references, targets, skills, and issue numbers in structured fields instead of burying them in prose.
+The helper script also appends a token-usage snapshot under `details.token_usage_snapshot` when it can resolve the current Codex thread.
 
 ## Run Id Rules
 
@@ -83,7 +84,17 @@ Useful optional flags:
 - `--skill codex-webui-sprint-cycle`
 - `--issue 130`
 - `--details-json '{"timeout_seconds": 30, "agent": "intake"}'`
+- `--token-thread-id 019d728a-253b-7550-ab46-eb5bb727b0e9` to inspect a different Codex thread than `CODEX_THREAD_ID`
+- `--sessions-root /custom/sessions/root` when testing against a different Codex sessions tree
+- `--no-token-usage` to skip the automatic token snapshot
 - `--artifact-root /custom/path` when testing outside the repo artifact tree
+
+Token usage notes:
+
+- the helper records a cumulative snapshot for the current thread, not a per-event delta
+- when direct subagent sessions are discoverable from the local Codex session logs, they are included under `details.token_usage_snapshot.direct_subagents`
+- `aggregate_total_token_usage` is the sum of the current thread and known direct subagents at snapshot time
+- when the current thread or session log cannot be resolved, the snapshot still records `available: false` with an `unavailable_reason`
 
 ## Guardrails
 

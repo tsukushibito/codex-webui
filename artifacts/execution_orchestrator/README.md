@@ -50,6 +50,14 @@ Optional fields:
 - `issue`
 - `details`
 
+When available, the logger stores token information under `details.token_usage_snapshot`.
+That snapshot is cumulative at the time the event is appended and may include:
+
+- `current_thread`
+- `direct_subagents`
+- `aggregate_total_token_usage`
+- `available` and `unavailable_reason` when usage could not be resolved
+
 ## Required anomaly coverage
 
 Record an `anomaly` event when any of the following happens:
