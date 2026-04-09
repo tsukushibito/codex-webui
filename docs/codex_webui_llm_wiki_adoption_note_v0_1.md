@@ -9,82 +9,88 @@ Source inspiration:
 
 ## 1. Purpose
 
-This note records how the "LLM wiki" pattern may apply to this repository without prematurely turning it into tracked implementation work.
+This note defines the repo-local LLM Wiki scope and structure for `codex-webui`.
 
-The source idea is a workflow where an LLM incrementally maintains a persistent markdown knowledge base instead of re-synthesizing knowledge from raw inputs on every query. This note is a repo-specific interpretation of that idea, not a copy of the original proposal. For this repository, the immediate goal is not to introduce a separate wiki product inside the repo. The immediate goal is to clarify whether the same pattern helps maintain `docs/` as the compiled knowledge layer for ongoing product work.
+The source idea is a workflow where an LLM incrementally maintains a persistent markdown knowledge base instead of re-synthesizing knowledge from raw inputs on every query. For this repository, the LLM Wiki is not a separate product or a competing top-level knowledge base. It is a maintained markdown layer inside the existing repo documentation structure.
 
-## 2. Why this is not an Issue yet
+## 2. Current scope decision
 
-At the current level, the idea is still an operating pattern, not a concrete repo change.
+The repo-local LLM Wiki covers the following maintained knowledge surfaces:
 
-It does not yet define:
+- source-of-truth documents under `docs/`
+- maintained design-thinking notes that explain architecture, UX, or workflow reasoning before or beside formal specs
+- maintained research memos that capture reusable investigation output, external references, and cross-source synthesis
 
-- a required directory addition
-- a script or tool to build
-- a document that must be split or migrated
-- a validation flow that must be automated
-- an owner, dependency, or delivery slice that belongs on the roadmap
+The repo-local LLM Wiki does not include:
 
-Until one of those becomes concrete, creating an Issue would produce tracking overhead without a bounded implementation target.
+- `tasks/`, which remains the execution-package area for in-progress work only
+- `artifacts/`, which remains the evidence/output area
+- GitHub Issues and Projects, which remain the execution-tracking layer
+- transient chat history that has not been promoted into maintained repo documents
 
-## 3. Repo-specific interpretation
+## 3. Repository placement and boundaries
 
-This repository already has a structure that partially matches the pattern:
+This repository already has a structure that partially matches the LLM Wiki pattern:
 
 - raw sources: issue threads, PR reviews, local observations, external references, runtime behavior evidence, and implementation code
-- compiled knowledge: `docs/`
+- maintained compiled knowledge: `docs/`
 - execution slices: `tasks/`
 - execution outputs and evidence: `artifacts/`
 - schema and workflow rules: `AGENTS.md` and local `README.md` files
 
-Because of that, the nearest useful interpretation is not "create a new wiki tree." The nearer fit is "use the existing `docs/` tree more deliberately as the maintained synthesis layer."
+The boundary decision is:
 
-In other words:
+- keep the repo-local LLM Wiki inside `docs/`
+- keep formal source-of-truth documents in their existing category directories
+- store non-normative but maintained design and research pages under `docs/notes/`
+- keep cross-cutting wiki guidance and future entrypoints such as `index.md` and `log.md` directly under `docs/`
 
-- do not create a competing knowledge base beside `docs/`
-- do not duplicate source facts that already belong in issues, tasks, or artifacts
-- do use LLM assistance to consolidate repeated multi-source understanding back into maintained documents
+This keeps the wiki visible to the repo workflow while avoiding a competing tree beside `docs/`.
 
-## 4. Low-cost trial policy
+## 4. Page categories
 
-For now, adopt the pattern only in a minimal form.
+Use these page categories for repo-local LLM Wiki content:
 
-### 4.1 Ingest
+- `requirements/`: what to build
+- `specs/`: how to build it
+- `validation/`: validation plans, review points, design decisions, and confirmed behavior notes that directly support quality or correctness judgments
+- `notes/`: maintained non-normative wiki pages such as design-thinking notes, research memos, and cross-source synthesis pages
+- directly under `docs/`: cross-cutting guidance, repo-wide orientation, and future wiki entrypoints such as `index.md` and `log.md`
 
-When new source material materially changes project understanding, prefer updating an existing source-of-truth document or adding a small new note under `docs/` instead of leaving the synthesis only in chat history.
+When a note becomes normative, promote or split the relevant parts into `requirements/`, `specs/`, or `validation/` instead of letting `notes/` become the hidden source of truth.
 
-Examples:
+## 5. Naming and placement rules
 
-- a clarified runtime behavior should become a validation note or specification update
-- a repeated architectural explanation should become a maintained design note
-- a recurring workflow decision should become README or AGENTS guidance in the correct area
+For note-style wiki pages under `docs/notes/`:
 
-### 4.2 Query
+- use filenames that stay explicit about subject and note type
+- prefer `codex_webui_<topic>_<note_type>_v0_1.md`
+- use `<note_type>` values such as `design_note`, `research_memo`, or `synthesis_note`
+- keep one note focused on one reusable topic rather than combining unrelated investigations
 
-When answering questions that require reading across issues, specs, validation notes, and implementation context, treat the answer as potentially promotable to `docs/` if it will likely be needed again.
+Place a page under `docs/notes/` when it is maintained and reusable but not yet the authoritative contract or acceptance source.
 
-### 4.3 Lint
+Do not place the following under `docs/notes/`:
 
-If repeated inconsistencies appear across `docs/`, `tasks/`, and `artifacts/`, treat that as evidence that a stronger maintenance workflow may be justified later. Until then, normal document hygiene is enough.
+- active execution instructions that belong in `tasks/`
+- raw evidence or logs that belong in `artifacts/`
+- finalized API or requirement contracts that belong in `requirements/` or `specs/`
 
-## 5. When this should become an Issue
+## 6. Deferred follow-up work
 
-Create an Issue only when the pattern turns into bounded repo work, such as:
+This note resolves only the scope and structure questions for issue `#115`.
 
-- introducing a dedicated directory, index, or log for maintained synthesis
-- adding scripts or tooling for ingest, search, or consistency checks
-- standardizing a repeatable maintenance workflow that spans multiple docs
-- restructuring existing source-of-truth documents to support incremental compilation
-- assigning roadmap priority, ownership, and validation to that work
+The following remain follow-up work:
 
-At that point, the Issue should describe the concrete delta, not the general idea.
+- issue `#116`: add the initial `index.md` and `log.md` entrypoints
+- issue `#117`: define the minimum `ingest`, `query`, and `lint` workflow for repo agents
 
-## 6. Current decision
+## 7. Operating intent
 
-The current decision is:
+The operating intent is:
 
-- record the pattern as a lightweight repo note
-- use it opportunistically when chat-derived synthesis clearly belongs in maintained docs
-- avoid opening a tracking Issue until concrete implementation work exists
+- capture reusable multi-source synthesis in maintained repo pages instead of losing it in chat history
+- keep formal contracts in the established source-of-truth categories
+- give design-thinking and research notes a stable maintained home without confusing them with execution packages or evidence storage
 
-This note can be revisited if repeated manual synthesis becomes expensive enough to justify dedicated tooling or a more explicit wiki-like structure.
+This note can be revised as `#116` and `#117` make the wiki entrypoints and operating workflow more concrete.
