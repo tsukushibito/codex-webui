@@ -1,33 +1,23 @@
 import crypto from "node:crypto";
 
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-
-import { RuntimeError } from "../../errors.js";
 import type { RuntimeDatabase } from "../../db/database.js";
-import {
-  approvals,
-  messages,
-  sessionEvents,
-  sessions,
-  workspaces,
-} from "../../db/schema.js";
+import { approvals, messages, sessionEvents, sessions, workspaces } from "../../db/schema.js";
+import { RuntimeError } from "../../errors.js";
 import type {
-  ApprovalProjection,
-  ApprovalSummary,
   ApprovalCategory,
+  ApprovalProjection,
   ApprovalResolution,
   ApprovalStatus,
+  ApprovalSummary,
 } from "../approvals/types.js";
-import { WorkspaceRegistry } from "../workspaces/workspace-registry.js";
-import { WorkspaceFilesystem } from "../workspaces/workspace-filesystem.js";
+import type { WorkspaceFilesystem } from "../workspaces/workspace-filesystem.js";
+import type { WorkspaceRegistry } from "../workspaces/workspace-registry.js";
+import { type NativeSessionGateway, resolveWorkspaceSessionCwd } from "./native-session-gateway.js";
 import {
   mapSessionEventProjection,
-  SessionEventPublisher,
+  type SessionEventPublisher,
 } from "./session-event-publisher.js";
-import {
-  type NativeSessionGateway,
-  resolveWorkspaceSessionCwd,
-} from "./native-session-gateway.js";
 import type {
   ApprovalStreamEventProjection,
   AppSessionOverlayState,
@@ -140,10 +130,7 @@ export class SessionService {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  subscribeSessionEvents(
-    sessionId: string,
-    listener: (event: SessionEventProjection) => void,
-  ) {
+  subscribeSessionEvents(sessionId: string, listener: (event: SessionEventProjection) => void) {
     return this.sessionEventPublisher.subscribeSessionEvents(sessionId, listener);
   }
 
@@ -454,14 +441,9 @@ export class SessionService {
           .limit(1)
           .all(),
         () => {
-          throw new RuntimeError(
-            404,
-            "approval_not_found",
-            "approval was not found",
-            {
-              approval_id: session.active_approval_id,
-            },
-          );
+          throw new RuntimeError(404, "approval_not_found", "approval was not found", {
+            approval_id: session.active_approval_id,
+          });
         },
       );
 
@@ -496,14 +478,9 @@ export class SessionService {
             .limit(1)
             .all(),
           () => {
-            throw new RuntimeError(
-              404,
-              "approval_not_found",
-              "approval was not found",
-              {
-                approval_id: activeApprovalRecord.approvalId,
-              },
-            );
+            throw new RuntimeError(404, "approval_not_found", "approval was not found", {
+              approval_id: activeApprovalRecord.approvalId,
+            });
           },
         );
         canceledApproval = mapApprovalProjection(updatedApproval);
@@ -570,7 +547,9 @@ export class SessionService {
 
     return new Map(
       await Promise.all(
-        rows.map(async (row) => [row.sessionId, await this.materializeSessionSummary(row)] as const),
+        rows.map(
+          async (row) => [row.sessionId, await this.materializeSessionSummary(row)] as const,
+        ),
       ),
     );
   }
@@ -624,11 +603,7 @@ export class SessionService {
             desc(sessionEvents.sequence),
             desc(sessionEvents.eventId),
           ]
-        : [
-            asc(sessionEvents.occurredAt),
-            asc(sessionEvents.sequence),
-            asc(sessionEvents.eventId),
-          ];
+        : [asc(sessionEvents.occurredAt), asc(sessionEvents.sequence), asc(sessionEvents.eventId)];
 
     const rows = this.database.db
       .select()
@@ -691,15 +666,17 @@ export class SessionService {
               ? "running"
               : "waiting_input"
             : "waiting_input";
-      const nextOverlayState =
-        nextStatus === "stopped" ? "closed" : ("open" as const);
+      const nextOverlayState = nextStatus === "stopped" ? "closed" : ("open" as const);
       this.database.db
         .update(sessions)
         .set({
           status: nextStatus,
           updatedAt,
           activeApprovalId: null,
-          currentTurnId: nextStatus === "waiting_input" || nextStatus === "stopped" ? null : session.currentTurnId,
+          currentTurnId:
+            nextStatus === "waiting_input" || nextStatus === "stopped"
+              ? null
+              : session.currentTurnId,
           pendingAssistantMessageId:
             nextStatus === "running" ? session.pendingAssistantMessageId : null,
           appSessionOverlayState: nextOverlayState,
@@ -809,15 +786,10 @@ export class SessionService {
         };
       }
 
-      throw new RuntimeError(
-        409,
-        "approval_not_pending",
-        "approval is not pending",
-        {
-          approval_id: approvalId,
-          status: approval.status,
-        },
-      );
+      throw new RuntimeError(409, "approval_not_pending", "approval is not pending", {
+        approval_id: approvalId,
+        status: approval.status,
+      });
     }
 
     const session = firstRequiredRow(
@@ -1197,8 +1169,7 @@ export class SessionService {
       );
     }
 
-    const assistantMessageId =
-      session.pendingAssistantMessageId ?? generateMessageId("assistant");
+    const assistantMessageId = session.pendingAssistantMessageId ?? generateMessageId("assistant");
     const updatedAt = toIsoString(this.now());
 
     this.database.sqlite.transaction(() => {
@@ -1268,8 +1239,7 @@ export class SessionService {
       );
     }
 
-    const assistantMessageId =
-      session.pendingAssistantMessageId ?? generateMessageId("assistant");
+    const assistantMessageId = session.pendingAssistantMessageId ?? generateMessageId("assistant");
     const assistantCreatedAt = toIsoString(this.now());
 
     this.database.sqlite.transaction(() => {

@@ -1,4 +1,3 @@
-import { isErrorEnvelope } from "./errors";
 import type {
   PublicListResponse,
   PublicMessage,
@@ -6,6 +5,7 @@ import type {
   PublicSessionSummary,
   PublicStopResult,
 } from "./chat-types";
+import { isErrorEnvelope } from "./errors";
 
 type FetchLike = typeof fetch;
 
@@ -23,19 +23,13 @@ async function readJson<T>(response: Response) {
   return payload as T;
 }
 
-export async function listWorkspaceSessions(
-  workspaceId: string,
-  fetchImpl: FetchLike = fetch,
-) {
-  const response = await fetchImpl(
-    `/api/v1/workspaces/${workspaceId}/sessions?sort=-updated_at`,
-    {
-      cache: "no-store",
-      headers: {
-        accept: "application/json",
-      },
+export async function listWorkspaceSessions(workspaceId: string, fetchImpl: FetchLike = fetch) {
+  const response = await fetchImpl(`/api/v1/workspaces/${workspaceId}/sessions?sort=-updated_at`, {
+    cache: "no-store",
+    headers: {
+      accept: "application/json",
     },
-  );
+  });
 
   return readJson<PublicListResponse<PublicSessionSummary>>(response);
 }
@@ -57,10 +51,7 @@ export async function createSessionFromChat(
   return readJson<PublicSessionSummary>(response);
 }
 
-export async function startSessionFromChat(
-  sessionId: string,
-  fetchImpl: FetchLike = fetch,
-) {
+export async function startSessionFromChat(sessionId: string, fetchImpl: FetchLike = fetch) {
   const response = await fetchImpl(`/api/v1/sessions/${sessionId}/start`, {
     method: "POST",
     headers: {
@@ -73,10 +64,7 @@ export async function startSessionFromChat(
   return readJson<PublicSessionSummary>(response);
 }
 
-export async function getSessionDetails(
-  sessionId: string,
-  fetchImpl: FetchLike = fetch,
-) {
+export async function getSessionDetails(sessionId: string, fetchImpl: FetchLike = fetch) {
   const response = await fetchImpl(`/api/v1/sessions/${sessionId}`, {
     cache: "no-store",
     headers: {
@@ -87,44 +75,29 @@ export async function getSessionDetails(
   return readJson<PublicSessionSummary>(response);
 }
 
-export async function listSessionMessages(
-  sessionId: string,
-  fetchImpl: FetchLike = fetch,
-) {
-  const response = await fetchImpl(
-    `/api/v1/sessions/${sessionId}/messages?sort=created_at`,
-    {
-      cache: "no-store",
-      headers: {
-        accept: "application/json",
-      },
+export async function listSessionMessages(sessionId: string, fetchImpl: FetchLike = fetch) {
+  const response = await fetchImpl(`/api/v1/sessions/${sessionId}/messages?sort=created_at`, {
+    cache: "no-store",
+    headers: {
+      accept: "application/json",
     },
-  );
+  });
 
   return readJson<PublicListResponse<PublicMessage>>(response);
 }
 
-export async function listSessionEvents(
-  sessionId: string,
-  fetchImpl: FetchLike = fetch,
-) {
-  const response = await fetchImpl(
-    `/api/v1/sessions/${sessionId}/events?sort=occurred_at`,
-    {
-      cache: "no-store",
-      headers: {
-        accept: "application/json",
-      },
+export async function listSessionEvents(sessionId: string, fetchImpl: FetchLike = fetch) {
+  const response = await fetchImpl(`/api/v1/sessions/${sessionId}/events?sort=occurred_at`, {
+    cache: "no-store",
+    headers: {
+      accept: "application/json",
     },
-  );
+  });
 
   return readJson<PublicListResponse<PublicSessionEvent>>(response);
 }
 
-export async function loadChatSessionBundle(
-  sessionId: string,
-  fetchImpl: FetchLike = fetch,
-) {
+export async function loadChatSessionBundle(sessionId: string, fetchImpl: FetchLike = fetch) {
   const [session, messages, events] = await Promise.all([
     getSessionDetails(sessionId, fetchImpl),
     listSessionMessages(sessionId, fetchImpl),
@@ -159,10 +132,7 @@ export async function sendSessionMessage(
   return readJson<PublicMessage>(response);
 }
 
-export async function stopSessionFromChat(
-  sessionId: string,
-  fetchImpl: FetchLike = fetch,
-) {
+export async function stopSessionFromChat(sessionId: string, fetchImpl: FetchLike = fetch) {
   const response = await fetchImpl(`/api/v1/sessions/${sessionId}/stop`, {
     method: "POST",
     headers: {

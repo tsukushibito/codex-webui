@@ -46,10 +46,7 @@ export class RuntimeClient {
         "session_runtime_error",
         "backend dependency temporarily unavailable",
         {
-          cause:
-            error instanceof Error
-              ? error.message
-              : "failed to connect to codex-runtime",
+          cause: error instanceof Error ? error.message : "failed to connect to codex-runtime",
         },
       );
     }
@@ -94,10 +91,7 @@ export class RuntimeClient {
         "session_runtime_error",
         "backend dependency temporarily unavailable",
         {
-          cause:
-            error instanceof Error
-              ? error.message
-              : "failed to connect to codex-runtime",
+          cause: error instanceof Error ? error.message : "failed to connect to codex-runtime",
         },
       );
     }

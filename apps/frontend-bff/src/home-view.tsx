@@ -1,4 +1,3 @@
-import React from "react";
 import Link from "next/link";
 
 import type { HomeResponse } from "./runtime-types";
@@ -59,16 +58,14 @@ export function HomeView({
             <p className="eyebrow">codex-webui</p>
             <h1>Home</h1>
             <p className="hero-copy">
-              Manage workspaces, see active sessions, and jump toward Chat or
-              Approval from a smartphone-first shell.
+              Manage workspaces, see active sessions, and jump toward Chat or Approval from a
+              smartphone-first shell.
             </p>
             <div className="hero-metrics">
               <span className="metric-chip">
                 Pending approvals: {home?.pending_approval_count ?? 0}
               </span>
-              <span className="metric-chip">
-                Workspaces: {home?.workspaces.length ?? 0}
-              </span>
+              <span className="metric-chip">Workspaces: {home?.workspaces.length ?? 0}</span>
               <span className="metric-chip">
                 Updated: {home ? formatTimestamp(home.updated_at) : "Waiting"}
               </span>
@@ -112,9 +109,7 @@ export function HomeView({
             >
               {isSubmitting ? "Creating workspace..." : "Create workspace"}
             </button>
-            {statusMessage ? (
-              <p className="status-message">{statusMessage}</p>
-            ) : null}
+            {statusMessage ? <p className="status-message">{statusMessage}</p> : null}
           </div>
         </section>
 
@@ -137,9 +132,7 @@ export function HomeView({
 
           {home?.workspaces.map((workspace) => {
             const activeSession = workspace.active_session_summary;
-            const statusClassName = activeSession
-              ? "status-badge success"
-              : "status-badge warning";
+            const statusClassName = activeSession ? "status-badge success" : "status-badge warning";
 
             return (
               <article className="workspace-card" key={workspace.workspace_id}>
@@ -153,9 +146,7 @@ export function HomeView({
                     </span>
                   </div>
                   <h2>{workspace.workspace_name}</h2>
-                  <p className="workspace-meta">
-                    Updated {formatTimestamp(workspace.updated_at)}
-                  </p>
+                  <p className="workspace-meta">Updated {formatTimestamp(workspace.updated_at)}</p>
                 </header>
 
                 <p className="workspace-status">
@@ -170,18 +161,13 @@ export function HomeView({
                   <span className="metric-chip">
                     Local approvals: {workspace.pending_approval_count}
                   </span>
-                  <span className="metric-chip">
-                    ID: {workspace.workspace_id}
-                  </span>
+                  <span className="metric-chip">ID: {workspace.workspace_id}</span>
                 </div>
 
                 <div className="workspace-actions">
                   <Link
                     className="primary-link"
-                    href={workspaceChatHref(
-                      workspace.workspace_id,
-                      activeSession?.session_id,
-                    )}
+                    href={workspaceChatHref(workspace.workspace_id, activeSession?.session_id)}
                   >
                     Go to Chat
                   </Link>

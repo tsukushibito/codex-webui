@@ -1,22 +1,22 @@
 import Fastify from "fastify";
 
-import { resolveConfig, type RuntimeConfig } from "./config.js";
+import { type RuntimeConfig, resolveConfig } from "./config.js";
 import { openRuntimeDatabase, type RuntimeDatabase } from "./db/database.js";
-import { toErrorEnvelope } from "./errors.js";
 import {
-  AppServerSupervisor,
   type AppServerController,
+  AppServerSupervisor,
 } from "./domain/app-server/app-server-supervisor.js";
 import { CodexAppServerGateway } from "./domain/app-server/codex-app-server-gateway.js";
 import {
-  SyntheticNativeSessionGateway,
   type NativeSessionGateway,
+  SyntheticNativeSessionGateway,
 } from "./domain/sessions/native-session-gateway.js";
 import { SessionEventPublisher } from "./domain/sessions/session-event-publisher.js";
 import { SessionService } from "./domain/sessions/session-service.js";
 import { ThreadService } from "./domain/threads/thread-service.js";
 import { WorkspaceFilesystem } from "./domain/workspaces/workspace-filesystem.js";
 import { WorkspaceRegistry } from "./domain/workspaces/workspace-registry.js";
+import { toErrorEnvelope } from "./errors.js";
 import { registerThreadRoutes } from "./routes/threads.js";
 import { registerWorkspaceRoutes } from "./routes/workspaces.js";
 
@@ -88,13 +88,13 @@ export async function buildApp(options: BuildAppOptions = {}) {
   liveAppServerGateway?.bindEventSink(sessionService);
   const appServerSupervisor =
     options.services?.appServerSupervisor ??
-    (liveAppServerGateway ??
-      new AppServerSupervisor({
-        command: runtimeConfig.appServerCommand,
-        args: runtimeConfig.appServerArgs,
-        cwd: runtimeConfig.appServerCwd,
-        env: process.env,
-      }));
+    liveAppServerGateway ??
+    new AppServerSupervisor({
+      command: runtimeConfig.appServerCommand,
+      args: runtimeConfig.appServerArgs,
+      cwd: runtimeConfig.appServerCwd,
+      env: process.env,
+    });
 
   const app = Fastify({
     logger: false,

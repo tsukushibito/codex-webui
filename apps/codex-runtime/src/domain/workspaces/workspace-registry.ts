@@ -1,21 +1,18 @@
 import crypto from "node:crypto";
 
 import { and, desc, eq, inArray } from "drizzle-orm";
-
-import { RuntimeError } from "../../errors.js";
 import type { RuntimeDatabase } from "../../db/database.js";
 import { workspaceSessionMappings, workspaces } from "../../db/schema.js";
+import { RuntimeError } from "../../errors.js";
 import type { EligibleWorkspaceDirectory, WorkspaceSummary } from "./types.js";
+import type { WorkspaceFilesystem } from "./workspace-filesystem.js";
 import { validateWorkspaceName } from "./workspace-name.js";
-import { WorkspaceFilesystem } from "./workspace-filesystem.js";
 
 function toIsoString(date: Date) {
   return date.toISOString();
 }
 
-function mapWorkspaceSummary(
-  record: typeof workspaces.$inferSelect,
-): WorkspaceSummary {
+function mapWorkspaceSummary(record: typeof workspaces.$inferSelect): WorkspaceSummary {
   return {
     workspace_id: record.workspaceId,
     workspace_name: record.workspaceName,
@@ -142,9 +139,7 @@ export class WorkspaceRegistry {
         })
         .run();
     } catch (error) {
-      await this.workspaceFilesystem.removeWorkspaceDirectoryIfEmpty(
-        normalizedDirectoryName,
-      );
+      await this.workspaceFilesystem.removeWorkspaceDirectoryIfEmpty(normalizedDirectoryName);
       throw error;
     }
 

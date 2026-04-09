@@ -1,11 +1,6 @@
-import React from "react";
 import Link from "next/link";
 
-import type {
-  PublicMessage,
-  PublicSessionEvent,
-  PublicSessionSummary,
-} from "./chat-types";
+import type { PublicMessage, PublicSessionEvent, PublicSessionSummary } from "./chat-types";
 
 export interface DraftAssistantMessage {
   message_id: string;
@@ -138,23 +133,20 @@ export function ChatView({
             <p className="eyebrow">codex-webui</p>
             <h1>Chat</h1>
             <p className="hero-copy">
-              Run a workspace session, watch stream updates, and re-acquire state
-              after disconnects from one smartphone-first screen.
+              Run a workspace session, watch stream updates, and re-acquire state after disconnects
+              from one smartphone-first screen.
             </p>
             <div className="hero-metrics">
+              <span className="metric-chip">Workspace: {workspaceId ?? "Choose from Home"}</span>
               <span className="metric-chip">
-                Workspace: {workspaceId ?? "Choose from Home"}
-              </span>
-              <span className="metric-chip">
-                Stream: {connectionState === "live"
+                Stream:{" "}
+                {connectionState === "live"
                   ? "live"
                   : connectionState === "reconnecting"
                     ? "reacquiring"
                     : "idle"}
               </span>
-              <span className="metric-chip">
-                Sessions: {sessions.length}
-              </span>
+              <span className="metric-chip">Sessions: {sessions.length}</span>
             </div>
             <div className="hero-actions">
               <Link className="secondary-link" href="/">
@@ -172,8 +164,7 @@ export function ChatView({
             <p className="eyebrow">Missing workspace</p>
             <h1>Start from Home</h1>
             <p>
-              Open Chat from the Home workspace cards so the workspace context is
-              already selected.
+              Open Chat from the Home workspace cards so the workspace context is already selected.
             </p>
           </section>
         ) : null}
@@ -200,8 +191,7 @@ export function ChatView({
                 <p className="eyebrow">Sessions</p>
                 <h2>Create or select a session</h2>
                 <p className="field-hint">
-                  Pick an existing session or create a new one before starting the
-                  chat flow.
+                  Pick an existing session or create a new one before starting the chat flow.
                 </p>
               </header>
 
@@ -228,9 +218,7 @@ export function ChatView({
               </div>
 
               <div className="session-list">
-                {isLoadingSessions ? (
-                  <p className="workspace-status">Loading sessions...</p>
-                ) : null}
+                {isLoadingSessions ? <p className="workspace-status">Loading sessions...</p> : null}
 
                 {!isLoadingSessions && sessions.length === 0 ? (
                   <p className="empty-state">
@@ -291,9 +279,7 @@ export function ChatView({
               <div className="workspace-actions">
                 <button
                   className="primary-link action-button"
-                  disabled={
-                    !selectedSession || !selectedSession.can_start || isStartingSession
-                  }
+                  disabled={!selectedSession?.can_start || isStartingSession}
                   onClick={onStartSession}
                   type="button"
                 >
@@ -301,7 +287,7 @@ export function ChatView({
                 </button>
                 <button
                   className="secondary-link action-button"
-                  disabled={!selectedSession || !selectedSession.can_stop || isStoppingSession}
+                  disabled={!selectedSession?.can_stop || isStoppingSession}
                   onClick={onStopSession}
                   type="button"
                 >
@@ -325,8 +311,7 @@ export function ChatView({
                 <button
                   className="submit-button"
                   disabled={
-                    !selectedSession ||
-                    !selectedSession.can_send_message ||
+                    !selectedSession?.can_send_message ||
                     isSendingMessage ||
                     messageDraft.trim().length === 0
                   }
@@ -343,8 +328,8 @@ export function ChatView({
                 <p className="eyebrow">Transcript</p>
                 <h2>Messages</h2>
                 <p className="field-hint">
-                  User and assistant messages are restored from the public message
-                  history, with assistant delta streamed into the latest bubble.
+                  User and assistant messages are restored from the public message history, with
+                  assistant delta streamed into the latest bubble.
                 </p>
               </header>
 
@@ -355,25 +340,20 @@ export function ChatView({
               <div className="chat-message-list">
                 {!isLoadingSession && allMessages.length === 0 ? (
                   <p className="empty-state">
-                    No chat messages yet. Start the session and send a message to
-                    begin.
+                    No chat messages yet. Start the session and send a message to begin.
                   </p>
                 ) : null}
 
                 {allMessages.map((message) => (
                   <article
                     className={
-                      message.role === "assistant"
-                        ? "chat-message assistant"
-                        : "chat-message user"
+                      message.role === "assistant" ? "chat-message assistant" : "chat-message user"
                     }
                     key={message.message_id}
                   >
                     <div className="workspace-meta-row">
                       <strong>{message.role === "assistant" ? "Assistant" : "You"}</strong>
-                      <span className="workspace-meta">
-                        {formatTimestamp(message.created_at)}
-                      </span>
+                      <span className="workspace-meta">{formatTimestamp(message.created_at)}</span>
                     </div>
                     <p>{message.content}</p>
                   </article>
@@ -386,8 +366,8 @@ export function ChatView({
                 <p className="eyebrow">Activity</p>
                 <h2>Event log</h2>
                 <p className="field-hint">
-                  Session events stay ordered by sequence and are re-acquired after
-                  stream disconnects.
+                  Session events stay ordered by sequence and are re-acquired after stream
+                  disconnects.
                 </p>
               </header>
 
@@ -403,9 +383,7 @@ export function ChatView({
                       <span className="workspace-meta">#{event.sequence}</span>
                     </div>
                     <p>{eventSummary(event)}</p>
-                    <span className="workspace-meta">
-                      {formatTimestamp(event.occurred_at)}
-                    </span>
+                    <span className="workspace-meta">{formatTimestamp(event.occurred_at)}</span>
                   </article>
                 ))}
               </div>

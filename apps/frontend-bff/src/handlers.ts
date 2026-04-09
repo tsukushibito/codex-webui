@@ -22,9 +22,9 @@ import type {
   HomeResponse,
   ListResponse,
   RuntimeApprovalProjection,
-  RuntimeApprovalSummary,
-  RuntimeApprovalStreamEventProjection,
   RuntimeApprovalResolveResult,
+  RuntimeApprovalStreamEventProjection,
+  RuntimeApprovalSummary,
   RuntimeMessageProjection,
   RuntimeSessionEventProjection,
   RuntimeSessionSummary,
@@ -77,9 +77,7 @@ async function parseRuntimeErrorResponse(response: Response) {
     // fall through
   }
 
-  return toErrorResponse(
-    new Error("codex-runtime returned an invalid stream error response"),
-  );
+  return toErrorResponse(new Error("codex-runtime returned an invalid stream error response"));
 }
 
 function encodeSseData(data: unknown) {
@@ -116,10 +114,7 @@ function mapSseChunk<TInput, TOutput>(
       path,
       event_type: typeof event.event_type === "string" ? event.event_type : null,
       session_id: typeof event.session_id === "string" ? event.session_id : null,
-      sequence:
-        typeof event.sequence === "number"
-          ? event.sequence
-          : null,
+      sequence: typeof event.sequence === "number" ? event.sequence : null,
     });
   }
 
@@ -175,10 +170,7 @@ function createSseRelayStream<TInput, TOutput>(
   });
 }
 
-async function relaySse<TInput, TOutput>(
-  path: string,
-  mapper: (value: TInput) => TOutput,
-) {
+async function relaySse<TInput, TOutput>(path: string, mapper: (value: TInput) => TOutput) {
   logLiveChatDebug("sse-relay", "opening runtime stream", {
     path,
   });
@@ -208,10 +200,7 @@ async function relaySse<TInput, TOutput>(
   });
 }
 
-function passthroughRuntimeError(
-  status: number,
-  body: unknown,
-) {
+function passthroughRuntimeError(status: number, body: unknown) {
   if (isErrorEnvelope(body)) {
     return jsonResponse(status, body);
   }
@@ -247,10 +236,7 @@ export async function getHome(_request: Request) {
     }
 
     if (isErrorEnvelope(approvalSummaryResult.body)) {
-      return passthroughRuntimeError(
-        approvalSummaryResult.status,
-        approvalSummaryResult.body,
-      );
+      return passthroughRuntimeError(approvalSummaryResult.status, approvalSummaryResult.body);
     }
 
     const workspaces = workspaceResult.body.items.map(mapWorkspace);
@@ -273,13 +259,10 @@ export async function getHome(_request: Request) {
 
 export async function createWorkspace(request: Request) {
   try {
-    const result = await runtimeClient.requestJson<RuntimeWorkspaceSummary>(
-      "/api/v1/workspaces",
-      {
-        method: "POST",
-        body: await readJsonBody(request),
-      },
-    );
+    const result = await runtimeClient.requestJson<RuntimeWorkspaceSummary>("/api/v1/workspaces", {
+      method: "POST",
+      body: await readJsonBody(request),
+    });
 
     if (isErrorEnvelope(result.body)) {
       return passthroughRuntimeError(result.status, result.body);
@@ -320,10 +303,7 @@ export async function listSessions(request: Request, workspaceId: string) {
       return passthroughRuntimeError(sessionResult.status, sessionResult.body);
     }
 
-    return jsonResponse(
-      sessionResult.status,
-      mapSessionList(sessionResult.body, activeSessionId),
-    );
+    return jsonResponse(sessionResult.status, mapSessionList(sessionResult.body, activeSessionId));
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -345,10 +325,7 @@ export async function createSession(request: Request, workspaceId: string) {
 
     const activeSessionId = await fetchWorkspaceActiveSessionId(workspaceId);
 
-    return jsonResponse(
-      sessionResult.status,
-      mapSession(sessionResult.body, activeSessionId),
-    );
+    return jsonResponse(sessionResult.status, mapSession(sessionResult.body, activeSessionId));
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -364,14 +341,9 @@ export async function getSession(_request: Request, sessionId: string) {
       return passthroughRuntimeError(sessionResult.status, sessionResult.body);
     }
 
-    const activeSessionId = await fetchWorkspaceActiveSessionId(
-      sessionResult.body.workspace_id,
-    );
+    const activeSessionId = await fetchWorkspaceActiveSessionId(sessionResult.body.workspace_id);
 
-    return jsonResponse(
-      sessionResult.status,
-      mapSession(sessionResult.body, activeSessionId),
-    );
+    return jsonResponse(sessionResult.status, mapSession(sessionResult.body, activeSessionId));
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -391,14 +363,9 @@ export async function startSession(_request: Request, sessionId: string) {
       return passthroughRuntimeError(sessionResult.status, sessionResult.body);
     }
 
-    const activeSessionId = await fetchWorkspaceActiveSessionId(
-      sessionResult.body.workspace_id,
-    );
+    const activeSessionId = await fetchWorkspaceActiveSessionId(sessionResult.body.workspace_id);
 
-    return jsonResponse(
-      sessionResult.status,
-      mapSession(sessionResult.body, activeSessionId),
-    );
+    return jsonResponse(sessionResult.status, mapSession(sessionResult.body, activeSessionId));
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -474,10 +441,7 @@ export async function stopSession(_request: Request, sessionId: string) {
       stopResult.body.session.workspace_id,
     );
 
-    return jsonResponse(
-      stopResult.status,
-      mapStopResult(stopResult.body, activeSessionId),
-    );
+    return jsonResponse(stopResult.status, mapStopResult(stopResult.body, activeSessionId));
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -528,14 +492,9 @@ async function resolveApproval(approvalId: string, resolution: "approved" | "den
     return passthroughRuntimeError(result.status, result.body);
   }
 
-  const activeSessionId = await fetchWorkspaceActiveSessionId(
-    result.body.session.workspace_id,
-  );
+  const activeSessionId = await fetchWorkspaceActiveSessionId(result.body.session.workspace_id);
 
-  return jsonResponse(
-    result.status,
-    mapApprovalResolveResult(result.body, activeSessionId),
-  );
+  return jsonResponse(result.status, mapApprovalResolveResult(result.body, activeSessionId));
 }
 
 export async function approveApproval(_request: Request, approvalId: string) {

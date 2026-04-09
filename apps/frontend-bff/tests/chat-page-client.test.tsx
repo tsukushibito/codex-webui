@@ -1,15 +1,11 @@
 // @vitest-environment jsdom
 
-import React from "react";
+import type React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type {
-  PublicMessage,
-  PublicSessionEvent,
-  PublicSessionSummary,
-} from "../src/chat-types";
+import type { PublicMessage, PublicSessionEvent, PublicSessionSummary } from "../src/chat-types";
 
 const searchParams = new URLSearchParams({
   sessionId: "thread_001",
@@ -56,9 +52,7 @@ vi.mock("../src/chat-data", () => ({
 
 import { ChatPageClient } from "../src/chat-page-client";
 
-function buildSession(
-  overrides: Partial<PublicSessionSummary> = {},
-): PublicSessionSummary {
+function buildSession(overrides: Partial<PublicSessionSummary> = {}): PublicSessionSummary {
   return {
     session_id: "thread_001",
     workspace_id: "ws_alpha",
@@ -76,9 +70,7 @@ function buildSession(
   };
 }
 
-function buildEvent(
-  overrides: Partial<PublicSessionEvent> = {},
-): PublicSessionEvent {
+function buildEvent(overrides: Partial<PublicSessionEvent> = {}): PublicSessionEvent {
   return {
     event_id: "evt_001",
     session_id: "thread_001",
@@ -93,9 +85,7 @@ function buildEvent(
   };
 }
 
-function buildMessage(
-  overrides: Partial<PublicMessage> = {},
-): PublicMessage {
+function buildMessage(overrides: Partial<PublicMessage> = {}): PublicMessage {
   return {
     message_id: "msg_user_001",
     session_id: "thread_001",
@@ -132,8 +122,9 @@ describe("ChatPageClient", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.stubGlobal("EventSource", MockEventSource);
-    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
-      .IS_REACT_ACT_ENVIRONMENT = true;
+    (
+      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -153,9 +144,8 @@ describe("ChatPageClient", () => {
     });
     container.remove();
     vi.unstubAllGlobals();
-    delete (
-      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-    ).IS_REACT_ACT_ENVIRONMENT;
+    delete (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
+      .IS_REACT_ACT_ENVIRONMENT;
     vi.useRealTimers();
   });
 
@@ -240,9 +230,7 @@ describe("ChatPageClient", () => {
 
     expect(container.textContent).toContain("Fix build error");
     expect(container.textContent).toContain("No chat messages yet.");
-    expect(MockEventSource.instances[0]?.url).toBe(
-      "/api/v1/sessions/thread_001/stream",
-    );
+    expect(MockEventSource.instances[0]?.url).toBe("/api/v1/sessions/thread_001/stream");
 
     const textarea = container.querySelector("#message-input");
     expect(textarea).not.toBeNull();
@@ -253,10 +241,7 @@ describe("ChatPageClient", () => {
         "value",
       )?.set;
 
-      setTextareaValue?.call(
-        textarea as HTMLTextAreaElement,
-        "Please explain the changes.",
-      );
+      setTextareaValue?.call(textarea as HTMLTextAreaElement, "Please explain the changes.");
       textarea!.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await flushUi();
@@ -277,9 +262,7 @@ describe("ChatPageClient", () => {
       "Please explain the changes.",
       expect.any(String),
     );
-    expect(container.textContent).toContain(
-      "Message accepted. Waiting for stream updates.",
-    );
+    expect(container.textContent).toContain("Message accepted. Waiting for stream updates.");
     expect(container.textContent).toContain("Please explain the changes.");
     expect(container.textContent).not.toContain("Here is the explanation.");
 

@@ -28,10 +28,7 @@ body {
     radial-gradient(circle at top, rgba(255, 255, 255, 0.72), transparent 30%),
     linear-gradient(180deg, #f7f1e7 0%, var(--page-bg) 100%);
   color: var(--text-main);
-  font-family:
-    "IBM Plex Sans",
-    "Segoe UI",
-    sans-serif;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
 }
 
 a {
@@ -93,10 +90,7 @@ input {
 .hero-card h1,
 .placeholder-card h1 {
   margin: 0;
-  font-family:
-    "IBM Plex Serif",
-    Georgia,
-    serif;
+  font-family: "IBM Plex Serif", Georgia, serif;
   font-size: clamp(2rem, 6vw, 3.2rem);
   line-height: 0.95;
 }

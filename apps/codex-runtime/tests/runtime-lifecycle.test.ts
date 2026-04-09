@@ -12,9 +12,7 @@ import { createTempDatabase, createTempWorkspaceRoot } from "./helpers.js";
 
 const cleanupPaths: string[] = [];
 
-function createSnapshot(
-  overrides: Partial<AppServerSnapshot> = {},
-): AppServerSnapshot {
+function createSnapshot(overrides: Partial<AppServerSnapshot> = {}): AppServerSnapshot {
   return {
     status: "stopped",
     command: "codex",
@@ -30,9 +28,7 @@ function createSnapshot(
 
 afterEach(async () => {
   await Promise.all(
-    cleanupPaths.splice(0).map((entryPath) =>
-      fs.rm(entryPath, { recursive: true, force: true }),
-    ),
+    cleanupPaths.splice(0).map((entryPath) => fs.rm(entryPath, { recursive: true, force: true })),
   );
 });
 

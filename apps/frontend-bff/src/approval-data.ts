@@ -1,10 +1,10 @@
-import { isErrorEnvelope } from "./errors";
 import type {
   PublicApprovalDetail,
   PublicApprovalResolveResult,
   PublicApprovalSummary,
   PublicListResponse,
 } from "./approval-types";
+import { isErrorEnvelope } from "./errors";
 
 type FetchLike = typeof fetch;
 
@@ -36,10 +36,7 @@ export async function fetchPendingApprovals(fetchImpl: FetchLike = fetch) {
   );
 }
 
-export async function fetchApprovalDetail(
-  approvalId: string,
-  fetchImpl: FetchLike = fetch,
-) {
+export async function fetchApprovalDetail(approvalId: string, fetchImpl: FetchLike = fetch) {
   const response = await fetchImpl(`/api/v1/approvals/${approvalId}`, {
     cache: "no-store",
     headers: {
@@ -64,10 +61,7 @@ async function resolveApproval(
     body: JSON.stringify({}),
   });
 
-  return readJson<PublicApprovalResolveResult>(
-    response,
-    `Failed to ${resolution} the approval.`,
-  );
+  return readJson<PublicApprovalResolveResult>(response, `Failed to ${resolution} the approval.`);
 }
 
 export function approveApproval(approvalId: string, fetchImpl: FetchLike = fetch) {

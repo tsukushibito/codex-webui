@@ -21,9 +21,7 @@ export const workspaceSessionMappings = sqliteTable(
     primaryKey: primaryKey({
       columns: [table.workspaceId, table.sessionId],
     }),
-    uniqueSessionId: uniqueIndex("workspace_session_mappings_session_id_idx").on(
-      table.sessionId,
-    ),
+    uniqueSessionId: uniqueIndex("workspace_session_mappings_session_id_idx").on(table.sessionId),
   }),
 );
 

@@ -1,16 +1,16 @@
-import { createInterface, type Interface } from "node:readline";
+import { type ChildProcessByStdio, spawn } from "node:child_process";
 import { once } from "node:events";
-import { spawn, type ChildProcessByStdio } from "node:child_process";
+import { createInterface, type Interface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 
 import { logLiveChatDebug } from "../../debug.js";
-import type { AppServerController, AppServerSnapshot } from "./app-server-supervisor.js";
+import type { ApprovalCategory } from "../approvals/types.js";
 import type {
   CreateNativeSessionInput,
   NativeSessionGateway,
   SendNativeSessionMessageInput,
 } from "../sessions/native-session-gateway.js";
-import type { ApprovalCategory } from "../approvals/types.js";
+import type { AppServerController, AppServerSnapshot } from "./app-server-supervisor.js";
 
 export interface CodexAppServerGatewayConfig {
   command: string;
@@ -317,7 +317,10 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
       return;
     }
 
-    if (typeof message.id === "number" && (message.result !== undefined || message.error !== undefined)) {
+    if (
+      typeof message.id === "number" &&
+      (message.result !== undefined || message.error !== undefined)
+    ) {
       logLiveChatDebug("app-server", "received rpc response", {
         id: message.id,
         has_error: message.error !== undefined,
@@ -329,7 +332,9 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
 
       this.pendingRequests.delete(message.id);
       if (message.error) {
-        pending.reject(new Error(String(message.error.message ?? "codex app-server request failed")));
+        pending.reject(
+          new Error(String(message.error.message ?? "codex app-server request failed")),
+        );
       } else {
         pending.resolve(message.result);
       }
@@ -522,10 +527,7 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
     state.hasFinalAssistantMessage = true;
   }
 
-  private async resolvePendingApproval(
-    approvalId: string,
-    decision: "accept" | "cancel",
-  ) {
+  private async resolvePendingApproval(approvalId: string, decision: "accept" | "cancel") {
     await this.ensureStarted();
     const pendingApproval = this.pendingApprovals.get(approvalId);
     if (!pendingApproval) {

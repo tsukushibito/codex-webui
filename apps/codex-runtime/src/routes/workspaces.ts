@@ -1,10 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { ZodError } from "zod";
-
-import { RuntimeError } from "../errors.js";
-import { parseCreateWorkspaceInput } from "../domain/workspaces/workspace-name.js";
-import { WorkspaceRegistry } from "../domain/workspaces/workspace-registry.js";
 import type { WorkspaceSummary } from "../domain/workspaces/types.js";
+import { parseCreateWorkspaceInput } from "../domain/workspaces/workspace-name.js";
+import type { WorkspaceRegistry } from "../domain/workspaces/workspace-registry.js";
+import { RuntimeError } from "../errors.js";
 
 function toWorkspaceResource(workspace: WorkspaceSummary) {
   return {
@@ -37,14 +36,9 @@ export async function registerWorkspaceRoutes(
       payload = parseCreateWorkspaceInput(request.body);
     } catch (error) {
       if (error instanceof ZodError) {
-        throw new RuntimeError(
-          422,
-          "workspace_name_invalid",
-          "workspace request body is invalid",
-          {
-            issues: error.issues,
-          },
-        );
+        throw new RuntimeError(422, "workspace_name_invalid", "workspace request body is invalid", {
+          issues: error.issues,
+        });
       }
 
       throw error;

@@ -16,9 +16,7 @@ test("renders the approval queue and resolves a pending approval on desktop and 
   await expect(page.getByRole("heading", { name: "Approval", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Run deployment", exact: true })).toBeVisible();
   await expect(page.getByText("Deploy the latest checked-in build to staging.")).toBeVisible();
-  await expect
-    .poll(async () => expectNoHorizontalScroll(page))
-    .toBe(true);
+  await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
 
   await page.getByRole("button", { name: "Approve request" }).click();
   await expect(page.getByText("Approved apr_001. Session running.")).toBeVisible();

@@ -132,9 +132,7 @@ describe("frontend-bff route handlers", () => {
         }),
       );
 
-    const response = await getHome(
-      new Request("http://localhost/api/v1/home"),
-    );
+    const response = await getHome(new Request("http://localhost/api/v1/home"));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
@@ -582,9 +580,7 @@ describe("frontend-bff route handlers", () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
 
-    const response = await listWorkspaces(
-      new Request("http://localhost/api/v1/workspaces"),
-    );
+    const response = await listWorkspaces(new Request("http://localhost/api/v1/workspaces"));
 
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({

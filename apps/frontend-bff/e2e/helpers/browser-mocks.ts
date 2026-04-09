@@ -117,10 +117,7 @@ export async function mockChatFlow(page: Page) {
       });
     }
 
-    if (
-      pathname === "/api/v1/workspaces/ws_alpha/sessions" &&
-      request.method() === "POST"
-    ) {
+    if (pathname === "/api/v1/workspaces/ws_alpha/sessions" && request.method() === "POST") {
       sessionExists = true;
       sessionStatus = "created";
       return json(route, session(), 201);

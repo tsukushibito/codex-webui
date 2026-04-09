@@ -36,6 +36,7 @@ Before running the gate, gather:
 - the worker implementation summary
 - the worker-run targeted validation evidence from the sprint
 - any additional required pre-push commands or evidence named in the task package or source docs
+- any touched TypeScript app paths so the validator can run required app-local `npm run check` commands
 - the exact worktree path that will be pushed or handed off
 
 Read `README.md`, `AGENTS.md`, `tasks/README.md`, and the active task package `README.md` when the gate is tied to a tracked Issue.
@@ -43,7 +44,7 @@ Read `README.md`, `AGENTS.md`, `tasks/README.md`, and the active task package `R
 ## Workflow
 
 1. Confirm the slice is locally complete enough for publish-oriented follow-through. If implementation is still changing, return to sprint execution instead of running this gate.
-2. Identify the exact pre-push validation commands that should run now. Prefer commands already named by the planner, task package, or source-of-truth docs, plus any narrow read-only inspections needed to explain failures.
+2. Identify the exact pre-push validation commands that should run now. Prefer commands already named by the planner, task package, or source-of-truth docs, plus any narrow read-only inspections needed to explain failures. For TypeScript or TSX changes under `apps/frontend-bff` or `apps/codex-runtime`, include each touched app's local `npm run check` as a required Biome lint/style gate before any push-oriented handoff.
 3. Spawn the read-only `validator` agent and explicitly tell it that this is the dedicated pre-push validation gate, not part of the default sprint loop.
 4. In the validator prompt, require read-only command execution, faithful evidence capture, and no approval judgment, file edits, commits, pushes, or tracking mutations.
 5. Review the validator result locally for command coverage, pass/fail status, and any blocked commands.

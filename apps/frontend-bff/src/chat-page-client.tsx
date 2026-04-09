@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 import {
   createSessionFromChat,
@@ -12,18 +12,14 @@ import {
   stopSessionFromChat,
 } from "./chat-data";
 import {
+  type ChatSessionSnapshot,
   createMissedStreamRecoveryController,
   createSendRecoveryBaseline,
-  type ChatSessionSnapshot,
 } from "./chat-send-recovery";
-import { logLiveChatDebug } from "./debug";
-import type {
-  PublicMessage,
-  PublicSessionEvent,
-  PublicSessionSummary,
-} from "./chat-types";
-import { applySessionStatus } from "./session-status";
+import type { PublicMessage, PublicSessionEvent, PublicSessionSummary } from "./chat-types";
 import { ChatView } from "./chat-view";
+import { logLiveChatDebug } from "./debug";
+import { applySessionStatus } from "./session-status";
 
 function createClientMessageId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -33,13 +29,8 @@ function createClientMessageId() {
   return `msgclient_${Date.now()}`;
 }
 
-function upsertSession(
-  sessions: PublicSessionSummary[],
-  nextSession: PublicSessionSummary,
-) {
-  const remaining = sessions.filter(
-    (session) => session.session_id !== nextSession.session_id,
-  );
+function upsertSession(sessions: PublicSessionSummary[], nextSession: PublicSessionSummary) {
+  const remaining = sessions.filter((session) => session.session_id !== nextSession.session_id);
 
   return [nextSession, ...remaining];
 }
@@ -53,15 +44,11 @@ function upsertMessage(messages: PublicMessage[], nextMessage: PublicMessage) {
     return [...messages, nextMessage];
   }
 
-  return messages.map((message, index) =>
-    index === existingIndex ? nextMessage : message,
-  );
+  return messages.map((message, index) => (index === existingIndex ? nextMessage : message));
 }
 
 function upsertEvent(events: PublicSessionEvent[], nextEvent: PublicSessionEvent) {
-  const existingIndex = events.findIndex(
-    (event) => event.event_id === nextEvent.event_id,
-  );
+  const existingIndex = events.findIndex((event) => event.event_id === nextEvent.event_id);
 
   if (existingIndex < 0) {
     return [...events, nextEvent].sort((left, right) => left.sequence - right.sequence);
@@ -75,17 +62,11 @@ export function ChatPageClient() {
   const workspaceId = searchParams.get("workspaceId");
   const initialSessionId = searchParams.get("sessionId");
   const [sessions, setSessions] = useState<PublicSessionSummary[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
-    initialSessionId,
-  );
-  const [selectedSession, setSelectedSession] = useState<PublicSessionSummary | null>(
-    null,
-  );
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(initialSessionId);
+  const [selectedSession, setSelectedSession] = useState<PublicSessionSummary | null>(null);
   const [messages, setMessages] = useState<PublicMessage[]>([]);
   const [events, setEvents] = useState<PublicSessionEvent[]>([]);
-  const [draftAssistantMessages, setDraftAssistantMessages] = useState<
-    Record<string, string>
-  >({});
+  const [draftAssistantMessages, setDraftAssistantMessages] = useState<Record<string, string>>({});
   const [createSessionTitle, setCreateSessionTitle] = useState("");
   const [messageDraft, setMessageDraft] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -96,9 +77,7 @@ export function ChatPageClient() {
   const [isStartingSession, setIsStartingSession] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isStoppingSession, setIsStoppingSession] = useState(false);
-  const [connectionState, setConnectionState] = useState<
-    "idle" | "live" | "reconnecting"
-  >("idle");
+  const [connectionState, setConnectionState] = useState<"idle" | "live" | "reconnecting">("idle");
   const [streamVersion, setStreamVersion] = useState(0);
   const reconnectTimerRef = useRef<number | null>(null);
   const latestSnapshotRef = useRef<ChatSessionSnapshot>({
@@ -106,9 +85,7 @@ export function ChatPageClient() {
     messages: [],
     events: [],
   });
-  const missedStreamRecoveryRef = useRef(
-    createMissedStreamRecoveryController(),
-  );
+  const missedStreamRecoveryRef = useRef(createMissedStreamRecoveryController());
 
   useEffect(() => {
     latestSnapshotRef.current = {
@@ -141,13 +118,11 @@ export function ChatPageClient() {
             : initialSessionId &&
                 response.items.some((item) => item.session_id === initialSessionId)
               ? initialSessionId
-              : response.items[0]?.session_id ?? null;
+              : (response.items[0]?.session_id ?? null);
 
       setSelectedSessionId(nextSelectedId);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to load sessions.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Failed to load sessions.");
     } finally {
       setIsLoadingSessions(false);
     }
@@ -326,14 +301,9 @@ export function ChatPageClient() {
         if (typeof approvalId === "string") {
           setSelectedSession((currentSession) =>
             currentSession
-              ? applySessionStatus(
-                  currentSession,
-                  "waiting_approval",
-                  event.occurred_at,
-                  {
-                    active_approval_id: approvalId,
-                  },
-                )
+              ? applySessionStatus(currentSession, "waiting_approval", event.occurred_at, {
+                  active_approval_id: approvalId,
+                })
               : currentSession,
           );
           setSessions((currentSessions) =>
@@ -406,9 +376,7 @@ export function ChatPageClient() {
       setSelectedSessionId(nextSession.session_id);
       setStatusMessage(`Session "${trimmedTitle}" created.`);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to create a session.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Failed to create a session.");
     } finally {
       setIsCreatingSession(false);
     }
@@ -430,9 +398,7 @@ export function ChatPageClient() {
       await refreshSelectedSession(selectedSessionId);
       setStatusMessage("Session started.");
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to start the session.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Failed to start the session.");
     } finally {
       setIsStartingSession(false);
     }
@@ -520,9 +486,7 @@ export function ChatPageClient() {
       );
     } catch (error) {
       missedStreamRecoveryRef.current.cancel();
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to send the message.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Failed to send the message.");
     } finally {
       setIsSendingMessage(false);
     }
@@ -548,9 +512,7 @@ export function ChatPageClient() {
       );
       await refreshSelectedSession(selectedSessionId);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to stop the session.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Failed to stop the session.");
     } finally {
       setIsStoppingSession(false);
     }

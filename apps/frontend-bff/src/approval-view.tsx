@@ -1,10 +1,6 @@
-import React from "react";
 import Link from "next/link";
 
-import type {
-  PublicApprovalDetail,
-  PublicApprovalSummary,
-} from "./approval-types";
+import type { PublicApprovalDetail, PublicApprovalSummary } from "./approval-types";
 
 export interface ApprovalViewProps {
   approvals: PublicApprovalSummary[];
@@ -56,10 +52,7 @@ function contextEntries(context: Record<string, unknown> | null) {
 
   return Object.entries(context).map(([key, value]) => ({
     key,
-    value:
-      typeof value === "string"
-        ? value
-        : JSON.stringify(value),
+    value: typeof value === "string" ? value : JSON.stringify(value),
   }));
 }
 
@@ -90,21 +83,20 @@ export function ApprovalView({
             <p className="eyebrow">codex-webui</p>
             <h1>Approval</h1>
             <p className="hero-copy">
-              Review the minimum confirmation information, then approve or deny
-              the pending request from a smartphone-first queue.
+              Review the minimum confirmation information, then approve or deny the pending request
+              from a smartphone-first queue.
             </p>
             <div className="hero-metrics">
               <span className="metric-chip">Pending: {approvals.length}</span>
               <span className="metric-chip">
-                Stream: {connectionState === "live"
+                Stream:{" "}
+                {connectionState === "live"
                   ? "live"
                   : connectionState === "reconnecting"
                     ? "reacquiring"
                     : "idle"}
               </span>
-              <span className="metric-chip">
-                Selected: {selectedItem?.approval_id ?? "none"}
-              </span>
+              <span className="metric-chip">Selected: {selectedItem?.approval_id ?? "none"}</span>
             </div>
             <div className="hero-actions">
               <Link className="secondary-link" href="/">
@@ -125,8 +117,8 @@ export function ApprovalView({
             <p className="eyebrow">Queue</p>
             <h2>Pending approvals</h2>
             <p className="field-hint">
-              The list stays global. Select an item to reach the minimum
-              confirmation information before acting.
+              The list stays global. Select an item to reach the minimum confirmation information
+              before acting.
             </p>
           </header>
 
@@ -138,8 +130,8 @@ export function ApprovalView({
             {!isLoadingApprovals && approvals.length === 0 ? (
               <article className="workspace-card approval-empty-card">
                 <p className="empty-state">
-                  No pending approvals. New requests will appear here through the
-                  queue refresh and approval stream.
+                  No pending approvals. New requests will appear here through the queue refresh and
+                  approval stream.
                 </p>
               </article>
             ) : null}
@@ -195,8 +187,8 @@ export function ApprovalView({
 
           {!selectedItem ? (
             <p className="empty-state">
-              The detail view shows the minimum confirmation information needed
-              before approve or deny.
+              The detail view shows the minimum confirmation information needed before approve or
+              deny.
             </p>
           ) : (
             <>

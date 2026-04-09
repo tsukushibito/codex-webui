@@ -1,14 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-import {
-  expectNoHorizontalScroll,
-  mockChatFlow,
-  stubEventSource,
-} from "./helpers/browser-mocks";
+import { expectNoHorizontalScroll, mockChatFlow, stubEventSource } from "./helpers/browser-mocks";
 
-async function sectionBox(
-  section: ReturnType<Parameters<typeof test>[0]["page"]["locator"]>,
-) {
+async function sectionBox(section: ReturnType<Parameters<typeof test>[0]["page"]["locator"]>) {
   await expect(section).toBeVisible();
 
   const box = await section.boundingBox();
@@ -17,10 +11,7 @@ async function sectionBox(
   return box!;
 }
 
-async function sectionBoxByHeading(
-  page: Parameters<typeof test>[0]["page"],
-  heading: string,
-) {
+async function sectionBoxByHeading(page: Parameters<typeof test>[0]["page"], heading: string) {
   const section = page
     .locator("section")
     .filter({ has: page.getByRole("heading", { name: heading, exact: true }) })
@@ -96,9 +87,7 @@ test("runs the main chat flow from Home through stop on desktop and mobile", asy
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Home", exact: true })).toBeVisible();
-  await expect
-    .poll(async () => expectNoHorizontalScroll(page))
-    .toBe(true);
+  await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
 
   await page.getByLabel("Workspace name").fill("alpha");
   await expect(page.getByRole("button", { name: "Create workspace" })).toBeEnabled();
@@ -108,13 +97,9 @@ test("runs the main chat flow from Home through stop on desktop and mobile", asy
   await page.getByRole("link", { name: "Go to Chat" }).click();
   await expect(page).toHaveURL(/\/chat\?workspaceId=ws_alpha/);
   await expect(page.getByRole("heading", { name: "Chat", exact: true })).toBeVisible();
-  await expect
-    .poll(async () => expectNoHorizontalScroll(page))
-    .toBe(true);
+  await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
 
-  let baselineDesktopLayout:
-    | Awaited<ReturnType<typeof desktopChatCardLayout>>
-    | undefined;
+  let baselineDesktopLayout: Awaited<ReturnType<typeof desktopChatCardLayout>> | undefined;
 
   if (isDesktop) {
     baselineDesktopLayout = await desktopChatCardLayout(page);
@@ -124,27 +109,17 @@ test("runs the main chat flow from Home through stop on desktop and mobile", asy
   await page.getByRole("button", { name: "Create session" }).click();
   await expect(page.getByText('Session "Fix build error" created.')).toBeVisible();
   if (isDesktop) {
-    expectDesktopLayoutStable(
-      baselineDesktopLayout!,
-      await desktopChatCardLayout(page),
-    );
+    expectDesktopLayoutStable(baselineDesktopLayout!, await desktopChatCardLayout(page));
   } else {
-    await expect
-      .poll(async () => expectNoHorizontalScroll(page))
-      .toBe(true);
+    await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
   }
 
   await page.getByRole("button", { name: "Start session" }).click();
   await expect(page.getByText("Session started.")).toBeVisible();
   if (isDesktop) {
-    expectDesktopLayoutStable(
-      baselineDesktopLayout!,
-      await desktopChatCardLayout(page),
-    );
+    expectDesktopLayoutStable(baselineDesktopLayout!, await desktopChatCardLayout(page));
   } else {
-    await expect
-      .poll(async () => expectNoHorizontalScroll(page))
-      .toBe(true);
+    await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
   }
 
   await page.getByRole("textbox", { name: "Send message" }).fill("Please explain the diff.");
@@ -153,26 +128,16 @@ test("runs the main chat flow from Home through stop on desktop and mobile", asy
   await expect(page.getByText("Message accepted. Waiting for stream updates.")).toBeVisible();
   await expect(page.getByText("Please explain the diff.")).toBeVisible();
   if (isDesktop) {
-    expectDesktopLayoutStable(
-      baselineDesktopLayout!,
-      await desktopChatCardLayout(page),
-    );
+    expectDesktopLayoutStable(baselineDesktopLayout!, await desktopChatCardLayout(page));
   } else {
-    await expect
-      .poll(async () => expectNoHorizontalScroll(page))
-      .toBe(true);
+    await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
   }
 
   await page.getByRole("button", { name: "Stop session" }).click();
   await expect(page.getByText("Session stopped.")).toBeVisible();
   if (isDesktop) {
-    expectDesktopLayoutStable(
-      baselineDesktopLayout!,
-      await desktopChatCardLayout(page),
-    );
+    expectDesktopLayoutStable(baselineDesktopLayout!, await desktopChatCardLayout(page));
   } else {
-    await expect
-      .poll(async () => expectNoHorizontalScroll(page))
-      .toBe(true);
+    await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
   }
 });

@@ -46,6 +46,18 @@ Run tests:
 npm test
 ```
 
+Run Biome lint/style checks:
+
+```bash
+npm run check
+```
+
+Apply Biome formatting:
+
+```bash
+npm run format
+```
+
 ## Configuration
 
 - `CODEX_WEBUI_RUNTIME_BASE_URL`: base URL of the private `codex-runtime` service
@@ -56,3 +68,5 @@ npm test
 - `app/api/`: public REST route handlers
 - `src/`: runtime client, mappings, and handler logic
 - `tests/`: focused route and mapping coverage
+
+This app uses the shared repo-level [`biome.json`](../../biome.json) configuration.

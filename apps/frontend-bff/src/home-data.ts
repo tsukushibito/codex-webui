@@ -28,10 +28,7 @@ export async function fetchHomeData(fetchImpl: FetchLike = fetch) {
   return payload as HomeResponse;
 }
 
-export async function createWorkspaceFromHome(
-  workspaceName: string,
-  fetchImpl: FetchLike = fetch,
-) {
+export async function createWorkspaceFromHome(workspaceName: string, fetchImpl: FetchLike = fetch) {
   const response = await fetchImpl("/api/v1/workspaces", {
     method: "POST",
     headers: {

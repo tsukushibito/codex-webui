@@ -1,4 +1,4 @@
-import type { PublicListResponse, PublicSessionSummary } from "./chat-types";
+import type { PublicSessionSummary } from "./chat-types";
 
 export type { PublicListResponse } from "./chat-types";
 

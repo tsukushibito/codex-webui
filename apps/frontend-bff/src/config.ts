@@ -6,7 +6,6 @@ export interface FrontendBffConfig {
 
 export function resolveConfig(): FrontendBffConfig {
   return {
-    runtimeBaseUrl:
-      process.env.CODEX_WEBUI_RUNTIME_BASE_URL?.trim() || DEFAULT_RUNTIME_BASE_URL,
+    runtimeBaseUrl: process.env.CODEX_WEBUI_RUNTIME_BASE_URL?.trim() || DEFAULT_RUNTIME_BASE_URL,
   };
 }

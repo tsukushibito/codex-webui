@@ -1,11 +1,15 @@
 import type { FastifyInstance } from "fastify";
 import { ZodError } from "zod";
-
-import { RuntimeError } from "../errors.js";
 import { parseThreadInput, parseThreadResponse } from "../domain/threads/thread-input.js";
-import { ThreadService } from "../domain/threads/thread-service.js";
+import type { ThreadService } from "../domain/threads/thread-service.js";
+import { RuntimeError } from "../errors.js";
 
-function parsePayload<T>(body: unknown, parser: (value: unknown) => T, code: string, message: string) {
+function parsePayload<T>(
+  body: unknown,
+  parser: (value: unknown) => T,
+  code: string,
+  message: string,
+) {
   try {
     return parser(body);
   } catch (error) {
@@ -19,10 +23,7 @@ function parsePayload<T>(body: unknown, parser: (value: unknown) => T, code: str
   }
 }
 
-export async function registerThreadRoutes(
-  app: FastifyInstance,
-  threadService: ThreadService,
-) {
+export async function registerThreadRoutes(app: FastifyInstance, threadService: ThreadService) {
   app.get("/api/v1/workspaces/:workspaceId/threads", async (request) => {
     const params = request.params as { workspaceId: string };
     return threadService.listThreads(params.workspaceId);

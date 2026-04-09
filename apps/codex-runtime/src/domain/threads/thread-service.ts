@@ -4,14 +4,14 @@ import { and, desc, eq } from "drizzle-orm";
 
 import type { RuntimeDatabase } from "../../db/database.js";
 import {
+  type ApprovalRow,
   approvals,
   messages,
+  type SessionRow,
   sessionEvents,
   sessions,
-  workspaces,
   threadInputRequests,
-  type ApprovalRow,
-  type SessionRow,
+  workspaces,
 } from "../../db/schema.js";
 import { RuntimeError } from "../../errors.js";
 import type { ApprovalProjection } from "../approvals/types.js";
@@ -19,14 +19,14 @@ import {
   type NativeSessionGateway,
   resolveWorkspaceSessionCwd,
 } from "../sessions/native-session-gateway.js";
-import { SessionEventPublisher } from "../sessions/session-event-publisher.js";
+import type { SessionEventPublisher } from "../sessions/session-event-publisher.js";
 import type {
   MessageProjection,
   SessionEventProjection,
   SessionStatus,
 } from "../sessions/types.js";
-import { WorkspaceFilesystem } from "../workspaces/workspace-filesystem.js";
-import { WorkspaceRegistry } from "../workspaces/workspace-registry.js";
+import type { WorkspaceFilesystem } from "../workspaces/workspace-filesystem.js";
+import type { WorkspaceRegistry } from "../workspaces/workspace-registry.js";
 import type {
   LatestResolvedRequestSummary,
   NotificationEvent,
@@ -110,8 +110,7 @@ function summarizeTimelineEvent(event: SessionEventProjection): string {
 
 function toTimelineItem(event: SessionEventProjection): TimelineItem {
   const payload = event.payload as Record<string, unknown>;
-  const requestId =
-    typeof payload.approval_id === "string" ? payload.approval_id : null;
+  const requestId = typeof payload.approval_id === "string" ? payload.approval_id : null;
 
   return {
     timeline_item_id: event.event_id,
@@ -231,10 +230,7 @@ function mapThreadInputError(error: unknown, threadId: string): never {
       "thread is not accepting user input",
       {
         thread_id: threadId,
-        status:
-          runtimeError.details?.current_status ??
-          runtimeError.details?.status ??
-          null,
+        status: runtimeError.details?.current_status ?? runtimeError.details?.status ?? null,
         workspace_id: runtimeError.details?.workspace_id ?? null,
         active_thread_id: runtimeError.details?.active_session_id ?? null,
       },
@@ -279,18 +275,10 @@ function mapThreadInterruptError(error: unknown, threadId: string): never {
   }
 
   if (runtimeError.code === "session_invalid_state") {
-    throw new RuntimeError(
-      409,
-      "thread_not_interruptible",
-      "thread is not interruptible",
-      {
-        thread_id: threadId,
-        status:
-          runtimeError.details?.current_status ??
-          runtimeError.details?.status ??
-          null,
-      },
-    );
+    throw new RuntimeError(409, "thread_not_interruptible", "thread is not interruptible", {
+      thread_id: threadId,
+      status: runtimeError.details?.current_status ?? runtimeError.details?.status ?? null,
+    });
   }
 
   throw error;
@@ -511,16 +499,15 @@ export class ThreadService {
     const latestResolved =
       threadApprovals
         .filter((approval) => approval.status !== "pending" && approval.resolved_at !== null)
-        .sort((left, right) => (right.resolved_at ?? "").localeCompare(left.resolved_at ?? ""))[0] ??
-      null;
+        .sort((left, right) =>
+          (right.resolved_at ?? "").localeCompare(left.resolved_at ?? ""),
+        )[0] ?? null;
 
     return {
       thread_id: threadId,
       pending_request: pending ? toPendingRequestSummary(pending) : null,
       latest_resolved_request:
-        pending || latestResolved === null
-          ? null
-          : toLatestResolvedRequestSummary(latestResolved),
+        pending || latestResolved === null ? null : toLatestResolvedRequestSummary(latestResolved),
       checked_at: this.now().toISOString(),
     };
   }
@@ -544,10 +531,7 @@ export class ThreadService {
     return toRequestDetailView(this.mapApprovalRow(approval));
   }
 
-  async respondToRequest(
-    requestId: string,
-    input: { decision: "approved" | "denied" },
-  ) {
+  async respondToRequest(requestId: string, input: { decision: "approved" | "denied" }) {
     let result: {
       approval: ApprovalProjection;
       session: ThreadSummary;
@@ -642,10 +626,7 @@ export class ThreadService {
     };
   }
 
-  subscribeThreadStream(
-    threadId: string,
-    listener: (event: SessionEventProjection) => void,
-  ) {
+  subscribeThreadStream(threadId: string, listener: (event: SessionEventProjection) => void) {
     return this.sessionEventPublisher.subscribeSessionEvents(threadId, listener);
   }
 
@@ -803,17 +784,10 @@ export class ThreadService {
     };
   }
 
-  private async createThreadSession(
-    workspaceId: string,
-    directoryName: string,
-    title: string,
-  ) {
+  private async createThreadSession(workspaceId: string, directoryName: string, title: string) {
     const now = this.now().toISOString();
     const { sessionId } = await this.nativeSessionGateway.createSession({
-      cwd: resolveWorkspaceSessionCwd(
-        this.workspaceFilesystem.getWorkspaceRoot(),
-        directoryName,
-      ),
+      cwd: resolveWorkspaceSessionCwd(this.workspaceFilesystem.getWorkspaceRoot(), directoryName),
       title,
     });
 

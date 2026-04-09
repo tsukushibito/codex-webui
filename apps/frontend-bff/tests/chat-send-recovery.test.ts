@@ -1,15 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  type ChatSessionSnapshot,
   createMissedStreamRecoveryController,
   createSendRecoveryBaseline,
   hasSendRecoveryConverged,
-  type ChatSessionSnapshot,
 } from "../src/chat-send-recovery";
 
-function buildSnapshot(
-  overrides: Partial<ChatSessionSnapshot> = {},
-): ChatSessionSnapshot {
+function buildSnapshot(overrides: Partial<ChatSessionSnapshot> = {}): ChatSessionSnapshot {
   return {
     session: {
       session_id: "thread_001",

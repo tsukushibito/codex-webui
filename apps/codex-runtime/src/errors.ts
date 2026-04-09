@@ -7,12 +7,7 @@ export class RuntimeError extends Error {
   readonly statusCode: number;
   readonly details?: ErrorDetails;
 
-  constructor(
-    statusCode: number,
-    code: string,
-    message: string,
-    details?: ErrorDetails,
-  ) {
+  constructor(statusCode: number, code: string, message: string, details?: ErrorDetails) {
     super(message);
     this.name = "RuntimeError";
     this.statusCode = statusCode;

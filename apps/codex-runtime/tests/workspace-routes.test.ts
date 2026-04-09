@@ -11,9 +11,7 @@ const cleanupPaths: string[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    cleanupPaths.splice(0).map((entryPath) =>
-      fs.rm(entryPath, { recursive: true, force: true }),
-    ),
+    cleanupPaths.splice(0).map((entryPath) => fs.rm(entryPath, { recursive: true, force: true })),
   );
 });
 
@@ -104,10 +102,7 @@ describe("workspace routes", () => {
   });
 
   it("returns workspace_root_not_found when the workspace root is missing", async () => {
-    const missingWorkspaceRoot = path.join(
-      os.tmpdir(),
-      `missing-workspace-root-${Date.now()}`,
-    );
+    const missingWorkspaceRoot = path.join(os.tmpdir(), `missing-workspace-root-${Date.now()}`);
     const database = await createTempDatabase("workspace-db");
     cleanupPaths.push(path.dirname(database.sqlite.name));
 
@@ -172,10 +167,7 @@ describe("workspace routes", () => {
 
     await fs.rename(path.join(workspaceRoot, "beta"), path.join(workspaceRoot, ".beta"));
     await fs.rm(path.join(workspaceRoot, "gamma"), { recursive: true });
-    await fs.symlink(
-      path.join(workspaceRoot, "alpha"),
-      path.join(workspaceRoot, "gamma"),
-    );
+    await fs.symlink(path.join(workspaceRoot, "alpha"), path.join(workspaceRoot, "gamma"));
 
     const listResponse = await app.inject({
       method: "GET",

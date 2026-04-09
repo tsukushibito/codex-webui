@@ -1,6 +1,6 @@
+import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { constants as fsConstants } from "node:fs";
 
 import { RuntimeError } from "../../errors.js";
 import type { EligibleWorkspaceDirectory } from "./types.js";
@@ -105,10 +105,7 @@ export class WorkspaceFilesystem {
       }
 
       try {
-        await fs.access(
-          fullPath,
-          fsConstants.R_OK | fsConstants.W_OK | fsConstants.X_OK,
-        );
+        await fs.access(fullPath, fsConstants.R_OK | fsConstants.W_OK | fsConstants.X_OK);
       } catch {
         continue;
       }
@@ -119,8 +116,6 @@ export class WorkspaceFilesystem {
       });
     }
 
-    return eligible.sort((left, right) =>
-      left.directoryName.localeCompare(right.directoryName),
-    );
+    return eligible.sort((left, right) => left.directoryName.localeCompare(right.directoryName));
   }
 }

@@ -21,9 +21,7 @@ export function HomePageClient() {
     try {
       setHome(await fetchHomeData());
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to load Home data.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Failed to load Home data.");
     } finally {
       setIsLoading(false);
     }
@@ -49,9 +47,7 @@ export function HomePageClient() {
       setStatusMessage(`Workspace "${trimmedName}" created.`);
       await loadHome();
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to create workspace.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Failed to create workspace.");
     } finally {
       setIsSubmitting(false);
     }

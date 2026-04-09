@@ -1,10 +1,9 @@
 import crypto from "node:crypto";
 
 import { desc, eq } from "drizzle-orm";
-
-import { logLiveChatDebug } from "../../debug.js";
 import type { RuntimeDatabase } from "../../db/database.js";
 import { sessionEvents } from "../../db/schema.js";
+import { logLiveChatDebug } from "../../debug.js";
 import type {
   ApprovalStreamEventProjection,
   SessionEventProjection,
@@ -50,10 +49,7 @@ export class SessionEventPublisher {
 
   constructor(private readonly database: RuntimeDatabase) {}
 
-  subscribeSessionEvents(
-    sessionId: string,
-    listener: (event: SessionEventProjection) => void,
-  ) {
+  subscribeSessionEvents(sessionId: string, listener: (event: SessionEventProjection) => void) {
     const listeners = this.sessionEventListeners.get(sessionId) ?? new Set();
     listeners.add(listener);
     this.sessionEventListeners.set(sessionId, listeners);
@@ -126,12 +122,11 @@ export class SessionEventPublisher {
     });
 
     const sessionListeners = this.sessionEventListeners.get(input.sessionId);
-    sessionListeners?.forEach((registered) => registered(event));
+    sessionListeners?.forEach((registered) => {
+      registered(event);
+    });
 
-    if (
-      event.event_type === "approval.requested" ||
-      event.event_type === "approval.resolved"
-    ) {
+    if (event.event_type === "approval.requested" || event.event_type === "approval.resolved") {
       const approvalEvent: ApprovalStreamEventProjection = {
         event_id: event.event_id,
         session_id: event.session_id,
@@ -141,7 +136,9 @@ export class SessionEventPublisher {
         native_event_name: event.native_event_name,
       };
 
-      this.approvalEventListeners.forEach((registered) => registered(approvalEvent));
+      this.approvalEventListeners.forEach((registered) => {
+        registered(approvalEvent);
+      });
     }
   }
 

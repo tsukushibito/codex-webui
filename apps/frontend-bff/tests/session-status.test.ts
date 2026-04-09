@@ -3,9 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { PublicSessionSummary } from "../src/chat-types";
 import { applySessionStatus } from "../src/session-status";
 
-function buildSession(
-  overrides: Partial<PublicSessionSummary> = {},
-): PublicSessionSummary {
+function buildSession(overrides: Partial<PublicSessionSummary> = {}): PublicSessionSummary {
   return {
     session_id: "thread_001",
     workspace_id: "ws_alpha",
@@ -26,11 +24,7 @@ function buildSession(
 describe("applySessionStatus", () => {
   it("recomputes can_* when a session becomes waiting_input", () => {
     expect(
-      applySessionStatus(
-        buildSession(),
-        "waiting_input",
-        "2026-03-27T05:14:00Z",
-      ),
+      applySessionStatus(buildSession(), "waiting_input", "2026-03-27T05:14:00Z"),
     ).toMatchObject({
       status: "waiting_input",
       updated_at: "2026-03-27T05:14:00Z",

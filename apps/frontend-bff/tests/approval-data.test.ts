@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  approveApproval,
-  fetchApprovalDetail,
-  fetchPendingApprovals,
-} from "../src/approval-data";
+import { approveApproval, fetchApprovalDetail, fetchPendingApprovals } from "../src/approval-data";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -40,15 +36,12 @@ describe("approval data access", () => {
 
     const result = await fetchPendingApprovals(fetchMock);
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/approvals?status=pending&sort=-requested_at",
-      {
-        cache: "no-store",
-        headers: {
-          accept: "application/json",
-        },
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/approvals?status=pending&sort=-requested_at", {
+      cache: "no-store",
+      headers: {
+        accept: "application/json",
       },
-    );
+    });
     expect(result.items[0]?.approval_id).toBe("apr_001");
   });
 
@@ -113,18 +106,14 @@ describe("approval data access", () => {
         accept: "application/json",
       },
     });
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      "/api/v1/approvals/apr_001/approve",
-      {
-        method: "POST",
-        headers: {
-          accept: "application/json",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({}),
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/approvals/apr_001/approve", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
       },
-    );
+      body: JSON.stringify({}),
+    });
     expect(detail.operation_summary).toBe("git push origin main");
     expect(result.approval.status).toBe("approved");
   });

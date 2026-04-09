@@ -1,14 +1,11 @@
 // @vitest-environment jsdom
 
-import React from "react";
+import type React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type {
-  PublicApprovalDetail,
-  PublicApprovalSummary,
-} from "../src/approval-types";
+import type { PublicApprovalDetail, PublicApprovalSummary } from "../src/approval-types";
 
 const approvalDataMocks = vi.hoisted(() => ({
   approveApproval: vi.fn(),
@@ -60,9 +57,7 @@ function buildApprovalSummary(
   };
 }
 
-function buildApprovalDetail(
-  overrides: Partial<PublicApprovalDetail> = {},
-): PublicApprovalDetail {
+function buildApprovalDetail(overrides: Partial<PublicApprovalDetail> = {}): PublicApprovalDetail {
   return {
     ...buildApprovalSummary(),
     operation_summary: "git push origin main",
@@ -98,8 +93,9 @@ describe("ApprovalPageClient", () => {
 
   beforeEach(() => {
     vi.stubGlobal("EventSource", MockEventSource);
-    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
-      .IS_REACT_ACT_ENVIRONMENT = true;
+    (
+      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -117,9 +113,8 @@ describe("ApprovalPageClient", () => {
     });
     container.remove();
     vi.unstubAllGlobals();
-    delete (
-      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-    ).IS_REACT_ACT_ENVIRONMENT;
+    delete (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
+      .IS_REACT_ACT_ENVIRONMENT;
   });
 
   it("updates the approval queue and selected detail without reload when approval is requested", async () => {
@@ -134,9 +129,7 @@ describe("ApprovalPageClient", () => {
         next_cursor: null,
         has_more: false,
       });
-    approvalDataMocks.fetchApprovalDetail.mockResolvedValue(
-      buildApprovalDetail(),
-    );
+    approvalDataMocks.fetchApprovalDetail.mockResolvedValue(buildApprovalDetail());
 
     await act(async () => {
       root.render(<ApprovalPageClient />);

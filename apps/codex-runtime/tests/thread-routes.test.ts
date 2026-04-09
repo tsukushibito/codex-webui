@@ -5,8 +5,8 @@ import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
-import type { NativeSessionGateway } from "../src/domain/sessions/native-session-gateway.js";
 import { approvals, sessionEvents, sessions, workspaces } from "../src/db/schema.js";
+import type { NativeSessionGateway } from "../src/domain/sessions/native-session-gateway.js";
 import { createTempDatabase, createTempWorkspaceRoot } from "./helpers.js";
 
 const cleanupPaths: string[] = [];
@@ -58,9 +58,7 @@ class StubNativeSessionGateway implements NativeSessionGateway {
 
 afterEach(async () => {
   await Promise.all(
-    cleanupPaths.splice(0).map((entryPath) =>
-      fs.rm(entryPath, { recursive: true, force: true }),
-    ),
+    cleanupPaths.splice(0).map((entryPath) => fs.rm(entryPath, { recursive: true, force: true })),
   );
 });
 
@@ -1321,12 +1319,9 @@ describe("thread routes", () => {
     });
 
     const notificationController = new AbortController();
-    const notificationResponse = await fetch(
-      `${resolveBaseUrl(app)}/api/v1/notifications/stream`,
-      {
-        signal: notificationController.signal,
-      },
-    );
+    const notificationResponse = await fetch(`${resolveBaseUrl(app)}/api/v1/notifications/stream`, {
+      signal: notificationController.signal,
+    });
 
     expect(notificationResponse.status).toBe(200);
     expect(notificationResponse.headers.get("content-type")).toContain("text/event-stream");

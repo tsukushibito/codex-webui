@@ -44,16 +44,19 @@ describe("home data access", () => {
 
   it("posts workspace creation through the public workspace endpoint", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
-      jsonResponse({
-        workspace_id: "ws_alpha",
-        workspace_name: "alpha",
-        directory_name: "alpha",
-        created_at: "2026-03-27T05:12:34Z",
-        updated_at: "2026-03-27T05:12:34Z",
-        active_session_id: null,
-        active_session_summary: null,
-        pending_approval_count: 0,
-      }, 201),
+      jsonResponse(
+        {
+          workspace_id: "ws_alpha",
+          workspace_name: "alpha",
+          directory_name: "alpha",
+          created_at: "2026-03-27T05:12:34Z",
+          updated_at: "2026-03-27T05:12:34Z",
+          active_session_id: null,
+          active_session_summary: null,
+          pending_approval_count: 0,
+        },
+        201,
+      ),
     );
 
     const result = await createWorkspaceFromHome("alpha", fetchMock);

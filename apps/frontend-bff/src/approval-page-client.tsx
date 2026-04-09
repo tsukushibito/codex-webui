@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   approveApproval,
@@ -40,15 +40,11 @@ function pickSelection(
 export function ApprovalPageClient() {
   const [approvals, setApprovals] = useState<PublicApprovalSummary[]>([]);
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
-  const [selectedApproval, setSelectedApproval] = useState<PublicApprovalDetail | null>(
-    null,
-  );
+  const [selectedApproval, setSelectedApproval] = useState<PublicApprovalDetail | null>(null);
   const [isLoadingApprovals, setIsLoadingApprovals] = useState(true);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [connectionState, setConnectionState] = useState<
-    "idle" | "live" | "reconnecting"
-  >("idle");
+  const [connectionState, setConnectionState] = useState<"idle" | "live" | "reconnecting">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [streamVersion, setStreamVersion] = useState(0);
@@ -177,9 +173,7 @@ export function ApprovalPageClient() {
       );
       await loadApprovals();
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to resolve the approval.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Failed to resolve the approval.");
     } finally {
       setIsSubmitting(false);
     }

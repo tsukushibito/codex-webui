@@ -1,8 +1,4 @@
-import type {
-  PublicMessage,
-  PublicSessionEvent,
-  PublicSessionSummary,
-} from "./chat-types";
+import type { PublicMessage, PublicSessionEvent, PublicSessionSummary } from "./chat-types";
 
 export interface ChatSessionSnapshot {
   session: PublicSessionSummary | null;
@@ -46,9 +42,7 @@ const defaultTimerApi: TimerApi = {
   },
 };
 
-export function createSendRecoveryBaseline(
-  snapshot: ChatSessionSnapshot,
-): SendRecoveryBaseline {
+export function createSendRecoveryBaseline(snapshot: ChatSessionSnapshot): SendRecoveryBaseline {
   return {
     knownAssistantMessageIds: new Set(
       snapshot.messages
@@ -82,25 +76,19 @@ export function hasSendRecoveryConverged(
 
   return snapshot.messages.some(
     (message) =>
-      message.role === "assistant" &&
-      !baseline.knownAssistantMessageIds.has(message.message_id),
+      message.role === "assistant" && !baseline.knownAssistantMessageIds.has(message.message_id),
   );
 }
 
-function shouldRetryRecovery(
-  attempt: number,
-  maxAttempts: number,
-) {
+function shouldRetryRecovery(attempt: number, maxAttempts: number) {
   return attempt < maxAttempts;
 }
 
-export function createMissedStreamRecoveryController(
-  {
-    delayMs = 1500,
-    maxAttempts = 3,
-    timerApi = defaultTimerApi,
-  }: MissedStreamRecoveryOptions = {},
-) {
+export function createMissedStreamRecoveryController({
+  delayMs = 1500,
+  maxAttempts = 3,
+  timerApi = defaultTimerApi,
+}: MissedStreamRecoveryOptions = {}) {
   let activeRunId = 0;
   let pendingTimeoutId: number | null = null;
 
@@ -146,10 +134,7 @@ export function createMissedStreamRecoveryController(
           return;
         }
 
-        if (
-          refreshedSnapshot &&
-          hasSendRecoveryConverged(refreshedSnapshot, baseline)
-        ) {
+        if (refreshedSnapshot && hasSendRecoveryConverged(refreshedSnapshot, baseline)) {
           clearPendingTimeout();
           return;
         }

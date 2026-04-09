@@ -9,6 +9,9 @@
   "scripts": {
     "build": "node ./node_modules/next/dist/bin/next build",
     "dev": "node ./node_modules/next/dist/bin/next dev",
+    "lint": "node ./node_modules/@biomejs/biome/bin/biome lint app src tests e2e vitest.config.ts playwright.config.ts next-env.d.ts",
+    "format": "node ./node_modules/@biomejs/biome/bin/biome format --write app src tests e2e vitest.config.ts playwright.config.ts next-env.d.ts",
+    "check": "node ./node_modules/@biomejs/biome/bin/biome check app src tests e2e vitest.config.ts playwright.config.ts next-env.d.ts",
     "test": "node ./node_modules/vitest/vitest.mjs run",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed"
@@ -20,6 +23,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.3.11",
     "@playwright/test": "^1.59.1",
     "@types/node": "^24.6.0",
     "@types/react": "19.2.14",
