@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sprint Evaluator"
+  short_description: "Hard-gate one bounded sprint candidate."
+  default_prompt: "Use $codex-webui-sprint-evaluator to judge this bounded sprint candidate in read-only mode."

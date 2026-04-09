@@ -54,12 +54,13 @@ Do not use this skill when:
 5. When `worker` returns, verify locally that it produced a real implementation candidate for this sprint. If the user asked for implementation and the result is design-only, analysis-only, or otherwise leaves the write scope unchanged, do not treat that as sprint progress; tighten the instructions with concrete target files, write scope, and expected API or behavior shape, then send `worker` back to implementation instead of proceeding to validation.
 6. Treat `files changed: none`, `exact file paths changed: none`, or missing implementation evidence for an implementation-requested sprint as a blocked or incomplete worker pass, not as a completed sprint result.
 7. Review the worker-supplied targeted validation evidence locally. If required checks are missing, too weak, or unrelated to the acceptance criteria, send `worker` back for the minimum additional implementation-side validation needed for this sprint. When the sprint edits files under `apps/frontend-bff` or `apps/codex-runtime` that are covered by the app-local Biome scripts, require the worker to run the touched app's local `npm run check` immediately after implementation and include that evidence before evaluator handoff.
-8. Spawn `evaluator` and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; pass the planner acceptance criteria, the implementation result, and the worker-supplied targeted validation evidence.
+8. Spawn `evaluator` and explicitly tell it to use `$codex-webui-sprint-evaluator`, stay read-only, avoid edits and handoff creation, and judge only the current sprint against the planner acceptance criteria, implementation result, and worker-supplied targeted validation evidence.
 9. If `evaluator` returns `changes_required`, send those findings back to `worker` and run another implementation pass with updated targeted validation evidence.
 10. Allow at most 2 evaluator rejection cycles for the same sprint slice.
 11. If the second evaluator rejection still blocks completion, return to `planner` for replanning or a narrower slice.
-12. Finish the sprint only when `evaluator` returns `approved`.
-13. Return the sprint result to the caller. If the caller is `codex-webui-execution-orchestrator`, let that skill decide whether execution continues with another sprint, pre-push validation, package-state work, completion tracking, or a blocked stop.
+12. Treat evaluator output as invalid when it omits a formal `approved` or `changes_required` verdict, violates the required evaluator output shape, or creates files despite the read-only instruction; in those cases, do not finish the sprint and either retry once with a tighter evaluator prompt or stop blocked.
+13. Finish the sprint only when `evaluator` returns `approved`.
+14. Return the sprint result to the caller. If the caller is `codex-webui-execution-orchestrator`, let that skill decide whether execution continues with another sprint, pre-push validation, package-state work, completion tracking, or a blocked stop.
 
 ## Post-Sprint Caller Contract
 
@@ -85,8 +86,10 @@ Design-only worker output, no-op worker output, or implementation output without
 - `worker` is the only role allowed to edit files
 - `evaluator` is read-only and acts as a hard gate over planner criteria plus worker-supplied implementation and targeted validation evidence
 - Always tell `planner` to use `$codex-webui-sprint-planner`
+- Always tell `evaluator` to use `$codex-webui-sprint-evaluator`
 - Always tell `planner` and `evaluator` in their spawn prompts that they are read-only and must not edit files or run mutating commands
 - Always tell `planner` to return a sprint plan only, using the planner role sections, and not to claim files changed, tests run, or work completed
+- Always tell `evaluator` not to create handoff files, not to route next steps, and to return only the formal evaluator output shape
 - Always tell `worker` to either produce code or document edits in the agreed write scope plus the minimum targeted validation evidence for the slice, or return a concrete technical block; do not accept design-only or review-only output from `worker` when the sprint requested implementation
 - For edits in `apps/frontend-bff` or `apps/codex-runtime` that are covered by the app-local Biome scripts, treat the touched app's `npm run check` as part of the minimum targeted validation evidence expected from `worker`
 - Do not phrase `planner` requests as direct implementation instructions; ask for a bounded slice, acceptance criteria, validation, and worker handoff only
@@ -98,6 +101,7 @@ Design-only worker output, no-op worker output, or implementation output without
 - Do not silently weaken planner acceptance criteria to get an approval
 - Do not let `planner` or `evaluator` mutate the worktree, create commits, push branches, or update GitHub Issues/Projects
 - Do not add a mandatory post-`planner` compliance check just to police read-only behavior; prevent the issue with the spawn prompt and handle accidental edits through the fallback above
+- Do not treat evaluator prose without a formal verdict as a successful gate result
 - Do not treat evaluator approval alone as sufficient evidence to close an Issue or mark a Project item `Done`
 - Do not run the dedicated `validator` inside the default sprint loop; reserve it for the later `codex-webui-pre-push-validation` gate
 - Do not self-route to `codex-webui-work-packages` or `codex-webui-github-projects`; the caller owns next-skill selection
