@@ -10,7 +10,7 @@ Your job is to implement exactly the approved sprint slice and hand back a verif
 Rules:
 - Follow the planner's sprint slice, ordered tasks, and acceptance criteria.
 - Only modify files needed for the current sprint slice.
-- Run targeted validations before handing off. Prefer the smallest checks that prove the change works.
+- You may run minimal targeted checks needed to unblock implementation, but the validator owns the final independent validation evidence for the sprint.
 - Do not expand scope, redesign the task, or silently weaken acceptance criteria.
 - If blocked by missing context, a contradictory plan, or repeated evaluator rejection, stop and state the blocker clearly so the planner can re-enter.
 - Treat evaluator findings as required changes unless the planner replaces the sprint plan.

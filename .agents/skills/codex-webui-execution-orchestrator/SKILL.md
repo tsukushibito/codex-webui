@@ -22,6 +22,8 @@ Responsibilities:
 - invoke that selected repo skill in the same turn when the user asked to proceed with execution
 - own the cross-skill continuation loop when the user asked to keep going until a concrete end-state is reached
 
+The main agent should remain an orchestrator. Planning, implementation, validation, and evaluation should be delegated to the repo's sub-agents through the selected handoff skill instead of being executed directly by the main agent.
+
 This skill does not directly mutate GitHub Projects, Issues, or local task packages.
 
 ## Build Context
@@ -163,6 +165,8 @@ When intake says the chosen target must be split before execution, the handoff m
 
 When the chosen target is implementation-ready and no tracking drift blocks execution, the handoff must be `codex-webui-sprint-cycle`.
 
+When handing off to `codex-webui-sprint-cycle`, require that the downstream sprint workflow explicitly tells `planner` to use `$codex-webui-sprint-planner` and keeps validation in the read-only `validator` role rather than in the main agent.
+
 When the chosen target still needs task-package creation, resumption, reconciliation, or archive work, the handoff must be `codex-webui-work-packages`.
 
 Do not bypass the selected handoff skill by letting the main agent implement directly after routing.
@@ -194,6 +198,7 @@ If the user also asked to continue until a concrete end-state, keep iterating af
 - Do not bypass drift correction when execution tracking is inconsistent
 - Do not bypass the split-first gate when the chosen target is still too broad for one execution stream
 - Do not bypass the selected handoff skill when the user asked to proceed with execution
+- Do not let the main agent absorb planner, worker, or validator duties once a handoff skill has been selected
 - Do not treat one completed handoff or one approved sprint as sufficient to end a continue-until request
 - Do not keep looping past a real hard block; stop and report the blocking condition concretely
 

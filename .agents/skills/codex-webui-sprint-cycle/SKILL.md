@@ -1,13 +1,13 @@
 ---
 name: codex-webui-sprint-cycle
-description: Run one repo-local sprint workflow for `codex-webui` using the custom `planner`, `worker`, and `evaluator` agents. Use when a task should be planned, implemented, and hard-gated before completion; do not use for brainstorming-only requests or for batching multiple unrelated tasks into one run.
+description: Run one repo-local sprint workflow for `codex-webui` using the custom `planner`, `worker`, `validator`, and `evaluator` agents. Use when a task should be planned, implemented, validated, and hard-gated before completion; do not use for brainstorming-only requests or for batching multiple unrelated tasks into one run.
 ---
 
 # Codex WebUI Sprint Cycle
 
 ## Overview
 
-Use this skill to run one bounded sprint through the repo-local `planner`, `worker`, and `evaluator` agents declared in `.codex/config.toml`.
+Use this skill to run one bounded sprint through the repo-local `planner`, `worker`, `validator`, and `evaluator` agents declared in `.codex/config.toml`.
 
 Treat one sprint as one planner-defined implementation slice. A sprint is complete only when `evaluator` returns `approved`.
 
@@ -46,18 +46,19 @@ Do not use this skill when:
 
 ## Workflow
 
-1. Read the active task package and linked source-of-truth docs when the sprint is tied to a tracked Issue, then spawn `planner` and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; ask it to return a plan only with the planner sections, not an implementation summary, patch description, or completion report.
+1. Read the active task package and linked source-of-truth docs when the sprint is tied to a tracked Issue, then spawn `planner` and explicitly tell it to use `$codex-webui-sprint-planner`, stay read-only, avoid edits, and return a plan only with the planner sections, not an implementation summary, patch description, or completion report.
 2. Review the planner output locally. If the sprint slice is still too large or unclear, or if the result is implementation-shaped instead of plan-only, ask `planner` to tighten it before implementation starts.
 3. If `planner` violates the read-only instruction and mutates files anyway, do not ask it to continue editing. Treat the resulting worktree state as the effective `worker` output for this sprint and pass that implementation candidate to `evaluator`.
 4. Otherwise, spawn `worker` to execute only that sprint slice in the active worktree for normal branch/PR work, or in the parent checkout only for an approved direct-to-`main` exception.
-5. When `worker` returns, verify locally that it produced a real implementation candidate for this sprint. If the user asked for implementation and the result is design-only, analysis-only, or otherwise leaves the write scope unchanged, do not treat that as sprint progress; tighten the instructions with concrete target files, write scope, and expected API or behavior shape, then send `worker` back to implementation instead of proceeding to `evaluator`.
-6. Treat `files changed: none`, `exact file paths changed: none`, or missing validation evidence for an implementation-requested sprint as a blocked or incomplete worker pass, not as a completed sprint result.
-7. When the implementation candidate finishes, spawn `evaluator` and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; pass the planner acceptance criteria and the implementation result.
-8. If `evaluator` returns `changes_required`, send those findings back to `worker` and run another implementation pass.
-9. Allow at most 2 evaluator rejection cycles for the same sprint slice.
-10. If the second evaluator rejection still blocks completion, return to `planner` for replanning or a narrower slice.
-11. Finish the sprint only when `evaluator` returns `approved`.
-12. Return the sprint result to the caller. If the caller is `codex-webui-execution-orchestrator`, let that skill decide whether execution continues with another sprint, package-state work, completion tracking, or a blocked stop.
+5. When `worker` returns, verify locally that it produced a real implementation candidate for this sprint. If the user asked for implementation and the result is design-only, analysis-only, or otherwise leaves the write scope unchanged, do not treat that as sprint progress; tighten the instructions with concrete target files, write scope, and expected API or behavior shape, then send `worker` back to implementation instead of proceeding to validation.
+6. Treat `files changed: none`, `exact file paths changed: none`, or missing implementation evidence for an implementation-requested sprint as a blocked or incomplete worker pass, not as a completed sprint result.
+7. Spawn `validator` to run the planner-approved validation commands and collect read-only evidence for the sprint. Tell it to stay read-only and not to judge approval.
+8. When validation evidence is available, spawn `evaluator` and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; pass the planner acceptance criteria, the implementation result, and the validator evidence.
+9. If `evaluator` returns `changes_required`, send those findings back to `worker` and run another implementation pass, followed by another validator pass.
+10. Allow at most 2 evaluator rejection cycles for the same sprint slice.
+11. If the second evaluator rejection still blocks completion, return to `planner` for replanning or a narrower slice.
+12. Finish the sprint only when `evaluator` returns `approved`.
+13. Return the sprint result to the caller. If the caller is `codex-webui-execution-orchestrator`, let that skill decide whether execution continues with another sprint, package-state work, completion tracking, or a blocked stop.
 
 ## Post-Sprint Caller Contract
 
@@ -81,10 +82,13 @@ Design-only worker output, no-op worker output, or implementation output without
 
 - `planner` is read-only and defines the sprint slice
 - `worker` is the only role allowed to edit files
-- `evaluator` is read-only and acts as a hard gate
-- Always tell `planner` and `evaluator` in their spawn prompts that they are read-only and must not edit files or run mutating commands
+- `validator` is read-only and runs the agreed validation commands
+- `evaluator` is read-only and acts as a hard gate over planner criteria plus validator evidence
+- Always tell `planner` to use `$codex-webui-sprint-planner`
+- Always tell `planner`, `validator`, and `evaluator` in their spawn prompts that they are read-only and must not edit files or run mutating commands
 - Always tell `planner` to return a sprint plan only, using the planner role sections, and not to claim files changed, tests run, or work completed
 - Always tell `worker` to either produce code or document edits in the agreed write scope, or return a concrete technical block; do not accept design-only or review-only output from `worker` when the sprint requested implementation
+- Always tell `validator` to report command outcomes and evidence only, not final approval
 - Do not phrase `planner` requests as direct implementation instructions; ask for a bounded slice, acceptance criteria, validation, and worker handoff only
 - If `planner` mutates files anyway, treat that worktree state as the implementation candidate for `evaluator` rather than continuing to use `planner` as a writer
 - Do not let `worker` implement normal branch/PR work from the parent checkout when an active worktree should exist
@@ -92,7 +96,7 @@ Design-only worker output, no-op worker output, or implementation output without
 - When invoked by `codex-webui-execution-orchestrator`, do not let the main agent bypass `worker` by implementing the sprint slice directly
 - Do not run concurrent write passes on the same sprint slice
 - Do not silently weaken planner acceptance criteria to get an approval
-- Do not let `planner` or `evaluator` mutate the worktree, create commits, push branches, or update GitHub Issues/Projects
+- Do not let `planner`, `validator`, or `evaluator` mutate the worktree, create commits, push branches, or update GitHub Issues/Projects
 - Do not add a mandatory post-`planner` compliance check just to police read-only behavior; prevent the issue with the spawn prompt and handle accidental edits through the fallback above
 - Do not treat evaluator approval alone as sufficient evidence to close an Issue or mark a Project item `Done`
 - Do not self-route to `codex-webui-work-packages` or `codex-webui-github-projects`; the caller owns next-skill selection
@@ -103,6 +107,7 @@ Return a merged result that includes:
 
 - the planner objective and sprint slice
 - the worker implementation summary
+- the validator evidence summary
 - the evaluator verdict
 - the validations that were run
 - the caller-facing outcome, such as Issue still incomplete, completion-tracking handoff now needed, or blocked
@@ -114,5 +119,5 @@ If the sprint is blocked and requires replanning, say that explicitly instead of
 ## Example Requests
 
 - `Use $codex-webui-sprint-cycle to implement this bug fix in one sprint.`
-- `Run planner, worker, evaluator for this repo task.`
-- `Use $codex-webui-sprint-cycle to plan, implement, and hard-gate this change.`
+- `Run planner, worker, validator, evaluator for this repo task.`
+- `Use $codex-webui-sprint-cycle to plan, implement, validate, and hard-gate this change.`
