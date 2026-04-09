@@ -29,6 +29,27 @@ After the heading, keep the body concise:
 
 ## Entries
 
+## [2026-04-09] ingest | v0.9 implementation cutover roadmap and tracking reset
+
+Source:
+
+- user request to document the v0.9 implementation cutover plan
+- `docs/requirements/codex_webui_mvp_requirements_v0_9.md`
+- `docs/specs/codex_webui_common_spec_v0_9.md`
+- `docs/specs/codex_webui_internal_api_v0_9.md`
+- `docs/specs/codex_webui_public_api_v0_9.md`
+
+Updated:
+
+- `docs/codex_webui_mvp_roadmap_v0_1.md`
+- `docs/log.md`
+
+Notes:
+
+- replaced the old v0.8-oriented implementation roadmap with a v0.9 cutover roadmap for runtime, BFF, UI, and validation
+- recorded the recommended GitHub issue breakdown directly in the maintained roadmap
+- created GitHub issues `#124`, `#125`, `#126`, and `#127`, and repurposed open validation issues `#63` and `#93` to align Project execution tracking with the maintained roadmap
+
 ## [2026-04-09] restructure | repo-local LLM Wiki scope and entrypoints
 
 Source:

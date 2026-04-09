@@ -1,651 +1,244 @@
 # Codex WebUI MVP implementation roadmap v0.1
 
-Last updated: 2026-04-01
+Last updated: 2026-04-09
 
 ## 1. Purpose
 
-This document is a roadmap for organizing the execution order until the completion of the Codex WebUI MVP, based on the existing documents below.
+This document is the maintained execution roadmap for delivering the Codex WebUI MVP against the published v0.9 requirements and API specifications.
 
-- MVP requirements definition v0.8
-- Common specifications v0.8
-- Public API specifications v0.8
-- Internal API specifications v0.8
-- app-server behavior confirmation plan/handover memo
+The goal is no longer to refine the earlier v0.8-oriented implementation. The goal is to cut over the existing runtime, BFF, and UI to the v0.9 `thread` / `request` / `timeline` model in a controlled order, while reusing infrastructure that still fits the maintained contracts.
 
-The aim of this roadmap is to first solidify interfaces that require large rework costs, and then converge runtime, BFF, UI, and tests in an orderly manner.
+## 2. Source of Truth Inputs
 
----
+This roadmap depends on the following maintained documents:
 
-## 2. Organizing the current situation
+- `docs/requirements/codex_webui_mvp_requirements_v0_9.md`
+- `docs/specs/codex_webui_common_spec_v0_9.md`
+- `docs/specs/codex_webui_internal_api_v0_9.md`
+- `docs/specs/codex_webui_public_api_v0_9.md`
+- `docs/specs/codex_webui_app_server_contract_matrix_v0_9.md`
+- `docs/validation/app_server_behavior_validation_plan_checklist.md`
 
-### 2.1 Things that are already solidified
+GitHub Issues and Projects track execution state. This roadmap remains the maintained source of truth for sequencing, scope boundaries, and completion conditions.
 
-At present, the following has been organized as a general outline.
+## 3. Current State
 
-- Conditions for MVP
-- Public boundary is only `frontend-bff`
-- `codex-runtime` has internal responsibilities
-- Conceptual separation of `workspace / session / message / approval / event`
-- Conceptual separation of `session create` and `session start`
-- active session constraint
-- approval Constraints
-- Restoration policy with REST + SSE
-- Internal/public responsibility boundaries
+### 3.1 What is already complete
 
-### 2.2 Important rules already fixed
+- Phase 0 experimental infrastructure and observation work completed.
+- Phase 1 app-server behavior confirmation completed.
+- Phase 2 v0.9 requirements and specifications completed and published.
+- A working implementation exists in `apps/codex-runtime` and `apps/frontend-bff`.
 
-- `session_status` is `created / running / waiting_input / waiting_approval / completed / failed / stopped`
-- active session is `running` or `waiting_approval`
-- Normal message can be sent only when `waiting_input`
-- `completed` is not just one turn completion but only when determining the end of WebUI
-- If stopped during `waiting_approval`, approval has `canceled`
-- Session stream has `sequence`, and after reconnection, it converges with REST reacquisition
-- `session_id` reuses native thread ID, while `message_id` / `approval_id` / `event_id` are app-owned stable IDs
-- Messages are restored primarily from history, while approvals are restored from runtime-managed projection/state
-- Both public API / internal API assume JSON, `snake_case`, UTC RFC 3339, opaque ID
+### 3.2 What is no longer aligned
 
-### 2.3 What to do next
+The current implementation is coherent but still centered on the earlier `session / approval / message / event` model.
 
-The observation phase is complete. The next thing to do is to reflect the confirmed app-server behavior into the maintained specifications, eliminate contradictions between requirements/common/public/internal docs, and then move on to implementation.
+The main mismatches against v0.9 are:
 
----
+- runtime routes and persistence still expose `sessions` and standalone `approvals`
+- public BFF routes still expose `sessions`, `messages`, `events`, and standalone approval endpoints
+- UI still assumes separate Home / Chat / Approval screens with session-first interaction
+- first-input canonical thread start is not yet the main browser flow
+- `thread_view`, `timeline`, `pending_request`, `request_detail`, and `notifications/stream` are not yet the execution center
 
-## 3. List of unconfirmed matters
+### 3.3 Cutover decision
 
-### 3.1 app-server Items that need to be observed
+The implementation strategy is:
 
-1. ID stability of thread / turn / item / request / event
-2. Type and order of native signal / event
-3. Implementation meaning of `session create` / `session start`
-4. `running -> waiting_input` decision basis
-5. Approval pending / resolved redetectability
-6. `completed / failed / stopped` native
-7. stream Even if the first load is not connected, can it be restored by simply re-acquiring the history?
-8. approval Native acquisition source of minimum confirmation information
+- reuse the existing repository structure, workspaces foundation, app-server bridge, SQLite foundation, Next.js app shell, and generic relay/error plumbing
+- replace the v0.8-oriented runtime conversation model with a v0.9 `thread` / `request` internal model
+- replace the public BFF contract with the v0.9 public API surface
+- replace the session/approval-centric UI flow with a thread-first UI flow
+- validate only against the v0.9 maintained documents after the cutover
 
-### 3.2 Matters that should be incorporated into specifications after observation
+This is a staged reimplementation inside the existing apps, not a greenfield repository rewrite and not a compatibility-led incremental patch-up.
 
-1. Final adoption table of `session_id / message_id / approval_id / turn_id / event_id / sequence`
-2. Native signal → internal/public event correspondence table
-3. `session.status` judgment rule
-4. How to fix `session start` as façade action
-5. Minimal schema for app-owned persistence
-6. Atomicity / recovery finalization procedure
-7. workspace unit exclusion rule
-8. BFF field mapping / read model synthesis policy
-9. UI restoration rule
-10. contract test perspective
+## 4. Cutover Principles
 
-### 3.3 Items that may still be affected at the time of implementation but can be postponed
+### 4.1 Native-first
 
-- `workspace_id` / ID Specific format
-- Retention period of projection cache
-- Handling of `system` role item
-- Default limit of pagination Final value
-- Details of `event:` name of SSE transport
+- `thread` is the canonical conversation unit.
+- request flow remains native-backed helper state, not a standalone WebUI-owned canonical domain.
+- browser-visible helper models must be rebuildable from native facts plus minimal app-owned metadata.
 
----
+### 4.2 Thin facade
 
-## 4. Overall phase
+- `codex-runtime` owns internal projections, ordering, idempotency, and recovery semantics.
+- `frontend-bff` owns public naming, aggregate helpers, and browser-facing transport only.
+- the frontend owns display grouping, current-activity display, resume cues, blocked cues, and mobile interaction polish.
 
-This roadmap divides the process until MVP completion into the following six phases.
+### 4.3 Cutover over compatibility
 
-1. Phase 0: Experimental infrastructure/observation preparation
-2. Phase 1: App-server behavior confirmation
-3. Phase 2: Specification fixation
-4. Phase 3: Runtime implementation
-5. Phase 4: BFF / UI implementation
-6. Phase 5: Testing / Convergence / MVP judgment
+- do not preserve `session start`, standalone approval queues, or `waiting_input`-style public state as first-class v0.9 concepts
+- do not keep parallel long-lived v0.8 and v0.9 browser contracts in the maintained implementation
+- only keep temporary migration shims when they directly reduce cutover risk inside a bounded implementation slice
 
-As for dependencies, the results of Phase 1 are the inputs of Phase 2, and the results of Phase 2 are the inputs of Phases 3 and 4.
+### 4.4 Validation gate
 
----
+- Phase 5 validation must target the v0.9 contracts
+- no issue or Project item should be marked `Done` until the new behavior is reachable on `main`
 
-## 5. Phase 0: Experimental infrastructure/observation preparation
+## 5. Execution Phases
 
-### 5.1 Purpose
+### 5.1 Phase 3: Runtime v0.9 cutover
 
-Create a minimum verification environment that allows you to observe the actual behavior of app-server.
+#### Purpose
 
-### 5.2 Implementation details
+Replace the session-centric runtime model with the v0.9 internal `thread` / `request` / `feed` / `timeline` model while keeping the reusable infrastructure in place.
 
-- Prepare a verification runtime that can stably start `codex app-server`
-- Prepare a logger that can save native event / history / request / resolution
-- Allow observation logs for each session to be saved separately
-- Prepare a simple client that can verify both with and without stream connection
-- Prepare a prompt set that intentionally generates approval
-- stop / deny Script a /stream disconnect/first restore test scenario
+#### Main workstreams
 
-### 5.3 Products
+1. Replace runtime schema and services that currently center on `sessions`, standalone `approvals`, and session events.
+2. Implement `POST /api/v1/workspaces/{workspace_id}/inputs` as the canonical first-input thread start.
+3. Implement v0.9 internal thread routes:
+   - `GET /api/v1/workspaces/{workspace_id}/threads`
+   - `GET /api/v1/threads/{thread_id}`
+   - `POST /api/v1/threads/{thread_id}/open`
+   - `GET /api/v1/threads/{thread_id}/view`
+   - `POST /api/v1/threads/{thread_id}/inputs`
+   - `POST /api/v1/threads/{thread_id}/interrupt`
+4. Implement internal helper routes:
+   - `GET /api/v1/threads/{thread_id}/timeline`
+   - `GET /api/v1/threads/{thread_id}/pending_request`
+   - `GET /api/v1/requests/{request_id}`
+   - `POST /api/v1/requests/{request_id}/response`
+5. Replace session-scoped event projection with thread-scoped ordering and stream projection.
+6. Implement `GET /api/v1/threads/{thread_id}/stream` and `GET /api/v1/notifications/stream`.
+7. Converge request-helper retention, just-resolved recovery, and partial-failure reconstruction around the v0.9 internal rules.
 
-- Runtime stub or CLI harness for observation
-- Raw log storage format
-- Case list and execution procedure manual
-- Observation result record template
+#### Exit criteria
 
-### 5.4 Completion conditions
+- runtime internal API is aligned with `docs/specs/codex_webui_internal_api_v0_9.md`
+- thread-scoped ordering, idempotency, and request-helper behavior are implemented
+- the BFF can build the v0.9 public surface without depending on the old session/approval contract
 
-- There is a reproducible observation environment
-- The same case can be run multiple times and the differences can be compared
-- The lowest case including approval / stop / stream disconnection can be executed automatically or semi-automatically
+### 5.2 Phase 4A: BFF v0.9 public API cutover
 
----
+#### Purpose
 
-## 6. Phase 1: app-server behavior confirmation
+Replace the current public `session` / `approval` facade with the v0.9 public `thread` / `thread_view` / `request` contract.
 
-### 6.1 Purpose
+#### Main workstreams
 
-Eliminate uncertainty due to app-server dependence through observation.
+1. Replace public REST routes with:
+   - `GET /api/v1/home`
+   - `GET /api/v1/workspaces`
+   - `POST /api/v1/workspaces`
+   - `GET /api/v1/workspaces/{workspace_id}`
+   - `GET /api/v1/workspaces/{workspace_id}/threads`
+   - `POST /api/v1/workspaces/{workspace_id}/inputs`
+   - `GET /api/v1/threads/{thread_id}`
+   - `GET /api/v1/threads/{thread_id}/view`
+   - `GET /api/v1/threads/{thread_id}/timeline`
+   - `POST /api/v1/threads/{thread_id}/inputs`
+   - `POST /api/v1/threads/{thread_id}/interrupt`
+   - `GET /api/v1/threads/{thread_id}/pending_request`
+   - `GET /api/v1/requests/{request_id}`
+   - `POST /api/v1/requests/{request_id}/response`
+2. Implement public shaping for `thread`, `thread_list_item`, `thread_view`, `timeline_item`, `pending_request`, `latest_resolved_request`, and `request_detail`.
+3. Implement public absorption of the internal `open` helper so browsers do not see `thread_open_required`.
+4. Replace session and approval stream relays with:
+   - `GET /api/v1/threads/{thread_id}/stream`
+   - `GET /api/v1/notifications/stream`
+5. Update home aggregation to emit `resume_candidates` and v0.9 helper summaries rather than old approval counters as the primary interaction signal.
 
-### 6.2 Observation target
+#### Exit criteria
 
-#### Phase 1-A: Basic case
+- public API is aligned with `docs/specs/codex_webui_public_api_v0_9.md`
+- no public browser path depends on the old session/approval REST or SSE contract
+- frontend can initialize, refresh, and recover from the v0.9 public helper endpoints alone
 
-- Normally 1 turn completed
-- assistant No text turn
-- Multiple turns continued
+### 5.3 Phase 4B: UI v0.9 thread-first cutover
 
-Things to check:
+#### Purpose
 
-- Presence of thread ID and stability
-- Presence of turn ID and stability
-- Presence of message item ID and stability
-- Arrival order of delta / completed
-- Is it possible to generate multiple message-based items?
-- Is there a turn that ends with only tool/log/request?
-- Is time attached to item / event / history?
+Replace the current session-first Chat and standalone Approval UI with a v0.9 thread-first browser UX.
 
-#### Phase 1-B: create / start semantics
+#### Main workstreams
 
-Things to check:
+1. Rework Home to emphasize workspace selection, resume candidates, and thread list cues.
+2. Rework the main interaction surface around `thread_view`, `timeline`, `current_activity`, `composer`, and thread-context request helpers.
+3. Make first user input the canonical new-thread start path from the browser.
+4. Present pending and just-resolved request information from thread context instead of a standalone approval domain flow.
+5. Keep smartphone usability as a first-class constraint while removing assumptions that MVP requires a dedicated Approval screen.
+6. Converge reconnect behavior on REST reacquisition of `thread_view`, `timeline`, and request helper state.
 
-- Is it possible to create something equivalent to idle just by creating a native thread?
-- Is there a stable operation like `start without input`?
-- If not, can `session start` be a pure App-owned transition?
-- Is bootstrap necessary or unnecessary?
+#### Exit criteria
 
-#### Phase 1-C: approval
+- browser interaction follows the v0.9 thread-first model
+- request response actions are reachable from thread context with minimum confirmation information
+- desktop and smartphone layouts work without depending on the old session/approval UI model
 
-- approval occurred → approve
-- approval occurred → deny
-- approval currently occurring → stop
+### 5.4 Phase 5: v0.9 validation, convergence, and MVP judgment
 
-Things to check:
+#### Purpose
 
-- Presence of request ID and stability
-- Can pending/resolved be re-detected from the history?
-- Source of minimum confirmation information
-- Can `resolved_at` be obtained?
-- Approval How does the session proceed after resolution?
+Validate the cutover implementation against the maintained v0.9 documents and decide MVP completion.
 
-#### Phase 1-D: stop / abnormal / termination
+#### Main workstreams
 
-Things to check:
+1. Contract validation for runtime and public APIs.
+2. Recovery validation for disconnect, reload, partial failure, and just-resolved request retention.
+3. End-to-end browser validation for first-input thread start, existing-thread input, request response, interrupt, and reconnect.
+4. UI acceptance validation for PC and smartphone widths.
+5. Final MVP judgment against the v0.9 requirements.
 
-- How is stop reflected on native?
-- Is it possible to have the basis for `stopped` only in native?
-- Is it possible to distinguish between temporary failure and terminal failure?
-- Can `completed` be placed in native alone, or is runtime judgment required?
+#### Exit criteria
 
-#### Phase 1-E: Reacquisition/Reconstruction
+- contract behavior matches the maintained v0.9 docs
+- thread-scoped recovery converges through REST reacquisition after SSE problems
+- request response flow is safe and usable on browser and smartphone paths
+- no major v0.9 responsibility ambiguity remains between runtime, BFF, and frontend
 
-- stream disconnected → history reacquisition
-- stream unconnected first load → restore only by reacquiring history
+## 6. Recommended Issue Breakdown
 
-Things to check:
+The GitHub Project should track at least the following active items for the cutover:
 
-- Can messages be reconstructed from history?
-- Can approvals be reconstructed from history?
-- Can we distinguish between pending / resolved?
-- Can the latest state be re-estimated?
-- Should `sequence` be made app-owned?
+1. `#124` `Phase 3-5: Execute the v0.9 implementation cutover`
+2. `#126` `Phase 3: Cut over runtime to the v0.9 thread/request internal model`
+3. `#125` `Phase 4A: Cut over frontend-bff to the v0.9 public API and stream model`
+4. `#127` `Phase 4B: Cut over the browser UI to the v0.9 thread-first interaction model`
+5. `#63` `Phase 5: Validate v0.9 contracts, recovery, UX, and MVP completion`
+6. `#93` `Phase 5: Validate v0.9 E2E flows and UI acceptance`
 
-### 6.3 Deliverables to be produced in this phase
+The first item is the cross-phase parent tracker. The remaining items are the main execution units.
 
-1. ID stability list
-2. Native signal / event list
-3. native → public/internal event correspondence candidate table
-4. status judgment candidate table
-5. approval minimum confirmation information mapping table
-6. app-owned provisional table of required items
-7. list of unresolved matters
+Recommended Project field defaults:
 
-### 6.4 Completion conditions
+- parent cutover tracker: `Priority=P0`
+- runtime cutover: `Phase=Phase 3 Runtime`, `Area=Runtime`, `Priority=P0`
+- BFF cutover: `Phase=Phase 4 BFF/UI`, `Area=BFF`, `Priority=P0`
+- UI cutover: `Phase=Phase 4 BFF/UI`, `Area=UI`, `Priority=P0`
+- validation parent: `Phase=Phase 5 Test`, `Area=Validation`, `Priority=P1`
+- E2E validation child: `Phase=Phase 5 Test`, `Area=Validation`, `Priority=P1`
 
-- All the confirmation targets listed in the handoff document have been answered.
-- "Observed facts" and "inferences" are recorded separately.
-- Even if unresolved matters remain, tentative decisions can be made using MVP.
+## 7. Sequencing Rules
 
----
+### 7.1 Strong dependencies
 
-## 7. Phase 2: Specification fixed
+- runtime cutover before final BFF public cutover
+- BFF public cutover before final UI cutover
+- UI and BFF cutover before final E2E acceptance
+- all implementation cutover slices before final MVP judgment
 
-### 7.1 Purpose
+### 7.2 Allowed overlap
 
-Reflect observation results in requirements, common, public API, and internal API to avoid confusion in subsequent implementations.
+- UI shell work may begin once the public v0.9 route and shape inventory is stable enough
+- validation harness preparation may begin while implementation cutover is still in progress
 
-### 7.2 Fixed target
+### 7.3 Guardrails
 
-#### 7.2.1 ID / key
+- do not reopen the old v0.8-oriented design assumptions inside maintained docs
+- do not treat the old implementation as the source of truth when it conflicts with v0.9 docs
+- do not mark the cutover complete while the Project still depends on open compatibility defects from the old session/approval model
 
-- `session_id`
-- `message_id`
-- `approval_id`
-- `turn_id`
-- `event_id`
-- `sequence`
+## 8. MVP Cutover Completion Criteria
 
-#### 7.2.2 Status determination
+The v0.9 implementation cutover is complete when:
 
-- `running -> waiting_input`
-- `running -> waiting_approval`
-- `running -> completed`
-- `running -> failed`
-- `running -> stopped`
-
-#### 7.2.3 action semantics
-
-- `session create`
-- `session start`
-- `message accept`
-- `approval resolve`
-- `session stop`
-
-#### 7.2.4 event contract
-
-- public / internal `event_type`
-- Payload minimum shape
-- Relationship between `occurred_at` and `sequence`
-- stream / REST event consistency rules
-
-#### 7.2.5 persistence / recovery
-
-- workspace registry
-- `workspace_id <-> session_id`
-- session overlay
-- approval projection
-- sequence management
-- idempotency key
-- handling of recovery_pending
-
-### 7.3 Document reflection target
-
-- Requirement definition: Reflect any prerequisite differences found through observation
-- Common specifications: Adjust cross-cutting rules for event / sequence / transport
-- Public API: Determine response / error / action semantics
-- Internal API: Determine overlay / projection / atomicity / recovery
-
-### 7.4 Completion conditions
-
-- There are no contradictions between requirements, common, public, and internal
-- Undecided matters are limited to "details that do not affect implementation"
-- runtime / BFF / UI implementers can start with only specifications
-
----
-
-## 8. Phase 3: runtime implementation
-
-### 8.1 Purpose
-
-Implement `codex-runtime`, which is the core of MVP.
-
-### 8.2 Implementation Priority
-
-#### 8.2.1 Top priority
-
-1. App Server process management
-2. workspace registry
-3. `workspace_id <-> session_id` Correspondence management
-4. session overlay
-5. final guarantee of active session constraints
-6. message complex state transition of accept / approval resolve / stop
-
-#### 8.2.2 Runner-up
-
-7. message / approval / event projection
-8. canonical `sequence` numbering
-9. summary read model
-10. recovery / reconciliation
-
-### 8.3 Implementation unit
-
-#### A. workspace management
-
-- `/workspaces` Enumeration
-- Creation rule
-- Exclusion condition
-
-#### B. session management
-
-- create
-- start
-- get / list
-- stop
-- session overlay update
-
-#### C. messaging
-
-- Idempotence by `client_message_id`
-- Sending input to native thread
-- user message projection
-- assistant delta / completed processing
-
-#### D. approval
-
-- request detection
-- detail projection
-- approve / deny / cancel
-- `active_approval_id` management
-
-#### E. event / sequence
-
-- canonical event append
-- for session stream sequence
-- approval for global stream projection
-
-#### F. recovery
-
-- partial failure detection
-- Reconstruction from native history
- orphan / mismatch detection
-
-### 8.4 Completion conditions
-
-- All runtime operations that satisfy the internal API run
-- The active session constraints are guaranteed to be final at runtime
-- The basic system of approval / stop / idempotency / recovery works
-- The event source for SSE can be supplied to BFF
-
----
-
-## 9. Phase 4: BFF / UI implementation
-
-### 9.1 Purpose
-
-Convert runtime's internal contract to public API and smartphone-based UI.
-
-### 9.2 BFF implementation
-
-#### Priority order
-
-1. public REST endpoint
-2. internal → public mapping
-3. Home aggregation
-4. session stream relay
-5. approvals stream relay
-6. public error mapping
-7. `can_*` Derivation
-
-#### Particularly important conversions
-
-- approval `summary/reason` → public `title/description`
-- public approve / deny → internal resolve
-- Home aggregation response
-- stop response `canceled_approval` conversion
-
-### 9.3 UI implementation
-
-#### Screen priority order
-
-1. Home
-2. Chat
-3. Approval
-
-#### What you need for Chat
-
-- session detailed display
-- message list
-- activity log
-- delta temporary display
-- completed final display
-- status display
-- stop
-- REST reacquisition after SSE reconnection
-
-#### What you need for Approval
-
-- pending list
-- detail
-- approve / deny
-- stop origin `canceled` reflection
-- badge / banner / toast
-
-#### Smartphone perspective
-
-- Main operations can be completed with 360px width
-- Main operations can be completed with 3 screens of Home / Chat / Approval
-- Approval is within 2 taps after reaching the minimum confirmation information
-
-### 9.4 Completion conditions
-
-- Public API returns as specified
-- UI is completed with 3 screens of Home / Chat / Approval
-- Main operations can be performed on smartphone without horizontal scrolling
-- Consistency is restored by REST reacquisition when SSE is disconnected
-
----
-
-## 10. Phase 5: Testing / Convergence / MVP Determination
-
-### 10.1 Purpose
-
-Confirm that it works according to specifications and satisfies the conditions for establishing MVP.
-
-### 10.2 Test perspective
-
-#### Contract Test
-
-- Consistency of message reject
-- active session constraints
-- approval approve / deny / cancel
-- idempotent resend
-- error.code / status code except for workspace CRUD, MVP target function
-- session create / start / get / list / stop
-- `waiting_input`
-
-#### Restore test
-
-- Browser reload
-- SSE disconnect → reconnect → REST reacquire
-- stream unconnected first load
-- approval pending redisplay
-- state / approval consistency after stop
-
-#### E2E test
-
-- workspace creation → session creation → start → dialogue → stop
-- approval occurs → approve
-- approval occurs → deny
-- approval occurs → stop
-- runtime reacquisition convergence after partial failure
-
-#### UI acceptance testing
-
-- PC browser
-- Width equivalent to smartphone browser
-- Approval conductor
-- banner / toast
-- Return to previous session
-
-### 10.3 MVP Judgment Criteria
-
-MVP is completed if the following are met.
-
-- Satisfies Must in requirement definition
-- App-server Specification differences based on observations have been reflected in the document
-- No significant ambiguity remains in the responsibility boundary of runtime / BFF / UI
-- Consistency is restored by reacquiring after SSE disconnection
-- Satisfies smartphone acceptance criteria
-- Minimum confirmation information for approval can be confirmed from UI
-
----
-
-## 11. Dependencies
-
-### 11.1 Strong dependence
-
-- Phase 1 → Phase 2
- - Without observation, it is difficult to fix `start semantics`, `status judgment`, `approval re-detection`, and `ID recruitment table`
-
-- Phase 2 → Phase 3
- - Overlay / projection / atomicity specifications must be fixed before runtime implementation
-
-- Phase 3 → Phase 4
- - BFF / UI requires a lot of rework if internal contract and event contract are not solidified
-
-- Phase 4 → Phase 5
- - E2E / UX verification after UI implementation
-
-### 11.2 Things that can be parallelized
-
-- The second half of Phase 0 and part of Phase 1
-- Document reflection in Phase 2 and template implementation of non-dependent parts in Phase 3
-- Workspace/session foundation of Phase 3 and UI framework of Phase 4
-
----
-
-## 12. Priority
-
-### 12.1 Top priority
-
-1. app-server observation
-2. Fixed meaning of `session start` / `waiting_input` / `completed`
-3. Fixed source of approval rediscovery and minimum confirmation information
-4. Runtime implementation of active session constraint
-5. Atomicity of message / approval / stop and recovery
-6. Consistency of session stream and REST reacquisition
-
-### 12.2nd priority
-
-7. Home aggregation
-8. approval global stream
-9. activity log
-10. Final details of smartphone optimization
-
-### 12.3 Postponement
-
-- diff display
-- changed file list
-- session title automatic generation
-- PC auxiliary panel enhancement
-
----
-
-## 13. Risk
-
-### 13.1 Technology risks
-
-#### R1. Native ID is unstable
-
-Impact:
-- `approval_id` / `event_id` / `turn_id` ripples through design
-
-Countermeasure:
-- Design fallback for app-owned stable key first
-
-#### R2. No stable native primitive corresponding to `session start`
-
-Impact:
-- public/internal action semantics are shaken
-
-Countermeasure:
-- Design with the premise that `start` is determined as an App-owned façade action
-
-#### R3. `completed / failed / stopped` cannot be determined by native alone
-
-Impact:
-- runtime overlay is required
-
-Countermeasure:
-- Distinguish native from original and public state from app-owned overlay.
-
-#### R4. Cannot re-detect approval from history
-
-Impact:
-- Reconnection restoration is broken.
-
-Countermeasure: Move
-- approval projection closer to the original version of runtime persistence.
-
-#### R5. Native and projection shift due to partial failure
-
-Impact:
-- The latest state of the UI becomes unstable.
-
-Countermeasure:
-- Prepare `recovery_pending` and re-integration flow from the beginning
-
-### 13.2 Product Risk
-
-#### R6. Approval UX is slow on smartphones
-
-Measures:
-- Make the Approval screen independent
-- Shorten the time to reach detail from the list
-- Concentrate on the minimum confirmation information
-
-#### R7. Activity and message responsibilities are mixed
-
-Countermeasure:
-- Keep `messages` and `events` separate
-
----
-
-## 14. Postponed items
-
-It is appropriate to do the following after MVP.
-
-- workspace rename / delete
-- session delete / archive
-- arbitrary path import
-- file browser
-- terminal UI
-- advanced diff viewer
-- multi-user support
-- advanced authorization policy editing
-- persistent tunnel management UI
-- full-scale audit log
-
-Should items are also not included in the MVP judgment and are included separately after convergence.
-
----
-
-## 15. Recommended Milestones
-
-### M1. Observation completed
-
-- app-server behavior confirmation results
-- There is a tentative conclusion on the main issues of ID / status / approval
-
-### M2. Specifications frozen
-
-- 4 Documents are aligned
-- runtime / BFF / UI boundaries are fixed
-
-### M3. runtime minimum completion
-
-- session / message / approval / stop / event works internally
-
-### M4. UI minimum completion
-
-- Home / Chat / Approval works on PC / smartphone equivalent
-
-### M5. MVP convergence completed
-
-- Satisfies
-- Must requirements for E2E including restoration, reconnection, authorization, suspension, and exclusive constraints.
-
----
-
-## 16. Minimum execution order summary
-
-The safest way to proceed is as follows.
-
-1. Create an observation environment for app-server
-2. Observe the 8 main cases
-3. Fix the ID / status / approval / event specifications
-4. Implement overlay / projection / atomicity / recovery in runtime
-5. Convert to public contract with BFF
-6. UI to Home / Chat / Approval Implement in this order
-7. Verify E2E with emphasis on reconnection / approval / stop / active session constraints
-8. Determine MVP if Must requirements are met.
+- runtime, BFF, and UI all operate on the maintained v0.9 thread/request model
+- the browser no longer depends on the old session/approval contract as its primary path
+- recovery, idempotency, and request-response behavior are validated against the v0.9 docs
+- Project tracking and maintained docs agree on the active execution state
+- the resulting work is reachable on `main`
