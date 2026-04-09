@@ -72,6 +72,7 @@ Each active task package `README.md` must include at least the following section
 ## Archived Task Packages
 
 - [app_server_behavior_validation](./archive/app_server_behavior_validation/README.md)
+- [issue-117-wiki-agent-guidance](./archive/issue-117-wiki-agent-guidance/README.md)
 - [issue-116-wiki-index-log](./archive/issue-116-wiki-index-log/README.md)
 - [issue-115-wiki-scope-structure](./archive/issue-115-wiki-scope-structure/README.md)
 - [issue-64-phase-3a-foundation](./archive/issue-64-phase-3a-foundation/README.md)

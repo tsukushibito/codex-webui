@@ -13,6 +13,7 @@ Archive entries preserve the work instructions that were used at the time, while
 ## Packages
 
 - [app_server_behavior_validation](./app_server_behavior_validation/README.md)
+- [issue-117-wiki-agent-guidance](./issue-117-wiki-agent-guidance/README.md)
 - [issue-116-wiki-index-log](./issue-116-wiki-index-log/README.md)
 - [issue-115-wiki-scope-structure](./issue-115-wiki-scope-structure/README.md)
 - [issue-64-phase-3a-foundation](./issue-64-phase-3a-foundation/README.md)

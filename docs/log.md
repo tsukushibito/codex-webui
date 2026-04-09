@@ -49,3 +49,24 @@ Notes:
 - formalized the repo-local wiki boundary inside `docs/`
 - introduced initial `index.md` and `log.md` entrypoints
 - deferred agent workflow rules to issue `#117`
+
+## [2026-04-09] restructure | repo-local LLM Wiki maintenance workflow
+
+Source:
+
+- issue `#117`
+- `AGENTS.md`
+- `docs/README.md`
+
+Updated:
+
+- `AGENTS.md`
+- `docs/README.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- formalized minimum `ingest`, `query`, and `lint` expectations for repo agents
+- made `index.md` and `log.md` part of the expected wiki update flow
+- kept the workflow lightweight and documentation-first, without adding search tooling
