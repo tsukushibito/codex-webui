@@ -12,16 +12,18 @@ import {
   SyntheticNativeSessionGateway,
   type NativeSessionGateway,
 } from "./domain/sessions/native-session-gateway.js";
+import { SessionEventPublisher } from "./domain/sessions/session-event-publisher.js";
 import { SessionService } from "./domain/sessions/session-service.js";
+import { ThreadService } from "./domain/threads/thread-service.js";
 import { WorkspaceFilesystem } from "./domain/workspaces/workspace-filesystem.js";
 import { WorkspaceRegistry } from "./domain/workspaces/workspace-registry.js";
-import { registerApprovalRoutes } from "./routes/approvals.js";
-import { registerSessionRoutes } from "./routes/sessions.js";
+import { registerThreadRoutes } from "./routes/threads.js";
 import { registerWorkspaceRoutes } from "./routes/workspaces.js";
 
 export interface RuntimeServices {
   workspaceRegistry: WorkspaceRegistry;
   sessionService: SessionService;
+  threadService: ThreadService;
   appServerSupervisor: AppServerController;
   nativeSessionGateway: NativeSessionGateway;
 }
@@ -64,12 +66,23 @@ export async function buildApp(options: BuildAppOptions = {}) {
           return liveAppServerGateway;
         })()
       : new SyntheticNativeSessionGateway());
+  const sessionEventPublisher = new SessionEventPublisher(ownedDatabase);
   const sessionService =
     options.services?.sessionService ??
     new SessionService(
       ownedDatabase,
       workspaceRegistry,
       workspaceFilesystem,
+      nativeSessionGateway,
+      sessionEventPublisher,
+    );
+  const threadService =
+    options.services?.threadService ??
+    new ThreadService(
+      ownedDatabase,
+      workspaceRegistry,
+      workspaceFilesystem,
+      sessionEventPublisher,
       nativeSessionGateway,
     );
   liveAppServerGateway?.bindEventSink(sessionService);
@@ -91,6 +104,7 @@ export async function buildApp(options: BuildAppOptions = {}) {
   app.decorate("runtimeServices", {
     workspaceRegistry,
     sessionService,
+    threadService,
     appServerSupervisor,
     nativeSessionGateway,
   });
@@ -104,9 +118,8 @@ export async function buildApp(options: BuildAppOptions = {}) {
     reply.status(statusCode).send(body);
   });
 
-  await registerApprovalRoutes(app, sessionService);
   await registerWorkspaceRoutes(app, workspaceRegistry);
-  await registerSessionRoutes(app, sessionService);
+  await registerThreadRoutes(app, threadService);
 
   app.addHook("onClose", async () => {
     await appServerSupervisor.stop();

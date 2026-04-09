@@ -12,9 +12,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   workspace_name TEXT NOT NULL UNIQUE,
   directory_name TEXT NOT NULL UNIQUE,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  active_session_id TEXT,
-  pending_approval_count INTEGER NOT NULL DEFAULT 0
+  updated_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS workspace_session_mappings (
@@ -27,6 +25,21 @@ CREATE TABLE IF NOT EXISTS workspace_session_mappings (
 
 CREATE UNIQUE INDEX IF NOT EXISTS workspace_session_mappings_session_id_idx
 ON workspace_session_mappings (session_id);
+
+CREATE TABLE IF NOT EXISTS thread_input_requests (
+  workspace_id TEXT NOT NULL,
+  client_request_id TEXT NOT NULL,
+  thread_id TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (workspace_id) REFERENCES workspaces (workspace_id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS thread_input_requests_workspace_client_request_idx
+ON thread_input_requests (workspace_id, client_request_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS thread_input_requests_thread_id_idx
+ON thread_input_requests (thread_id);
 
 CREATE TABLE IF NOT EXISTS sessions (
   session_id TEXT PRIMARY KEY,

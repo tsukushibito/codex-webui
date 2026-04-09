@@ -3,7 +3,6 @@ import crypto from "node:crypto";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { RuntimeError } from "../../errors.js";
-import { logLiveChatDebug } from "../../debug.js";
 import type { RuntimeDatabase } from "../../db/database.js";
 import {
   approvals,
@@ -21,6 +20,10 @@ import type {
 } from "../approvals/types.js";
 import { WorkspaceRegistry } from "../workspaces/workspace-registry.js";
 import { WorkspaceFilesystem } from "../workspaces/workspace-filesystem.js";
+import {
+  mapSessionEventProjection,
+  SessionEventPublisher,
+} from "./session-event-publisher.js";
 import {
   type NativeSessionGateway,
   resolveWorkspaceSessionCwd,
@@ -118,28 +121,6 @@ function generateApprovalId() {
   return `apr_${crypto.randomUUID().replaceAll("-", "")}`;
 }
 
-function generateEventId() {
-  return `evt_${crypto.randomUUID().replaceAll("-", "")}`;
-}
-
-function parseEventPayload(value: string) {
-  return JSON.parse(value) as Record<string, unknown>;
-}
-
-function mapSessionEventProjection(
-  record: typeof sessionEvents.$inferSelect,
-): SessionEventProjection {
-  return {
-    event_id: record.eventId,
-    session_id: record.sessionId,
-    event_type: record.eventType as SessionEventType,
-    sequence: record.sequence,
-    occurred_at: record.occurredAt,
-    payload: parseEventPayload(record.payload),
-    native_event_name: record.nativeEventName,
-  };
-}
-
 function firstRequiredRow<T>(rows: T[], notFound: () => never) {
   const row = firstRow(rows);
   if (!row) {
@@ -150,20 +131,12 @@ function firstRequiredRow<T>(rows: T[], notFound: () => never) {
 }
 
 export class SessionService {
-  private readonly sessionEventListeners = new Map<
-    string,
-    Set<(event: SessionEventProjection) => void>
-  >();
-
-  private readonly approvalEventListeners = new Set<
-    (event: ApprovalStreamEventProjection) => void
-  >();
-
   constructor(
     private readonly database: RuntimeDatabase,
     private readonly workspaceRegistry: WorkspaceRegistry,
     private readonly workspaceFilesystem: WorkspaceFilesystem,
     private readonly nativeSessionGateway: NativeSessionGateway,
+    private readonly sessionEventPublisher: SessionEventPublisher,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
@@ -171,25 +144,11 @@ export class SessionService {
     sessionId: string,
     listener: (event: SessionEventProjection) => void,
   ) {
-    const listeners = this.sessionEventListeners.get(sessionId) ?? new Set();
-    listeners.add(listener);
-    this.sessionEventListeners.set(sessionId, listeners);
-
-    return () => {
-      listeners.delete(listener);
-
-      if (listeners.size === 0) {
-        this.sessionEventListeners.delete(sessionId);
-      }
-    };
+    return this.sessionEventPublisher.subscribeSessionEvents(sessionId, listener);
   }
 
   subscribeApprovalEvents(listener: (event: ApprovalStreamEventProjection) => void) {
-    this.approvalEventListeners.add(listener);
-
-    return () => {
-      this.approvalEventListeners.delete(listener);
-    };
+    return this.sessionEventPublisher.subscribeApprovalEvents(listener);
   }
 
   private appendSessionEvent(input: {
@@ -199,67 +158,7 @@ export class SessionService {
     payload: Record<string, unknown>;
     nativeEventName?: string | null;
   }) {
-    const latestEvent = firstRow(
-      this.database.db
-        .select()
-        .from(sessionEvents)
-        .where(eq(sessionEvents.sessionId, input.sessionId))
-        .orderBy(desc(sessionEvents.sequence), desc(sessionEvents.eventId))
-        .limit(1)
-        .all(),
-    );
-    const nextSequence = (latestEvent?.sequence ?? 0) + 1;
-
-    const eventId = generateEventId();
-
-    this.database.db
-      .insert(sessionEvents)
-      .values({
-        eventId,
-        sessionId: input.sessionId,
-        eventType: input.eventType,
-        sequence: nextSequence,
-        occurredAt: input.occurredAt,
-        payload: JSON.stringify(input.payload),
-        nativeEventName: input.nativeEventName ?? null,
-      })
-      .run();
-
-    const event = mapSessionEventProjection({
-      eventId,
-      sessionId: input.sessionId,
-      eventType: input.eventType,
-      sequence: nextSequence,
-      occurredAt: input.occurredAt,
-      payload: JSON.stringify(input.payload),
-      nativeEventName: input.nativeEventName ?? null,
-    });
-
-    logLiveChatDebug("session-events", "appended session event", {
-      session_id: event.session_id,
-      event_type: event.event_type,
-      sequence: event.sequence,
-      native_event_name: event.native_event_name ?? null,
-    });
-
-    const sessionListeners = this.sessionEventListeners.get(input.sessionId);
-    sessionListeners?.forEach((listener) => listener(event));
-
-    if (
-      event.event_type === "approval.requested" ||
-      event.event_type === "approval.resolved"
-    ) {
-      const approvalEvent: ApprovalStreamEventProjection = {
-        event_id: event.event_id,
-        session_id: event.session_id,
-        event_type: event.event_type,
-        occurred_at: event.occurred_at,
-        payload: event.payload,
-        native_event_name: event.native_event_name,
-      };
-
-      this.approvalEventListeners.forEach((listener) => listener(approvalEvent));
-    }
+    this.sessionEventPublisher.appendSessionEvent(input);
   }
 
   private appendSessionStatusChangedEvent(input: {
@@ -269,16 +168,7 @@ export class SessionService {
     toStatus: SessionStatus;
     nativeEventName?: string | null;
   }) {
-    this.appendSessionEvent({
-      sessionId: input.sessionId,
-      eventType: "session.status_changed",
-      occurredAt: input.occurredAt,
-      payload: {
-        from_status: input.fromStatus,
-        to_status: input.toStatus,
-      },
-      nativeEventName: input.nativeEventName,
-    });
+    this.sessionEventPublisher.appendSessionStatusChangedEvent(input);
   }
 
   private markSessionRecoveryPending(input: {
@@ -304,7 +194,6 @@ export class SessionService {
       this.database.db
         .update(workspaces)
         .set({
-          activeSessionId: input.sessionId,
           updatedAt: input.updatedAt,
         })
         .where(eq(workspaces.workspaceId, input.workspaceId))
@@ -388,60 +277,8 @@ export class SessionService {
     return null;
   }
 
-  private countPendingApprovals(workspaceId: string) {
-    return this.database.db
-      .select()
-      .from(approvals)
-      .where(and(eq(approvals.workspaceId, workspaceId), eq(approvals.status, "pending")))
-      .all().length;
-  }
-
-  private detectWorkspaceRecoveryMismatch(session: typeof sessions.$inferSelect) {
-    if (session.status !== "running" && session.status !== "waiting_approval") {
-      return false;
-    }
-
-    const workspace = firstRow(
-      this.database.db
-        .select()
-        .from(workspaces)
-        .where(eq(workspaces.workspaceId, session.workspaceId))
-        .limit(1)
-        .all(),
-    );
-
-    if (!workspace) {
-      return false;
-    }
-
-    if (workspace.activeSessionId === session.sessionId) {
-      return false;
-    }
-
-    if (workspace.activeSessionId === null) {
-      return true;
-    }
-
-    const activeSession = firstRow(
-      this.database.db
-        .select()
-        .from(sessions)
-        .where(eq(sessions.sessionId, workspace.activeSessionId))
-        .limit(1)
-        .all(),
-    );
-
-    if (!activeSession) {
-      return true;
-    }
-
-    return activeSession.status !== "running" && activeSession.status !== "waiting_approval";
-  }
-
   private async materializeSessionSummary(record: typeof sessions.$inferSelect) {
-    const mismatch =
-      this.detectApprovalRecoveryMismatch(record) ??
-      this.detectWorkspaceRecoveryMismatch(record);
+    const mismatch = this.detectApprovalRecoveryMismatch(record);
     return mapSessionSummaryWithOverlay(
       record,
       mismatch ? "recovery_pending" : (record.appSessionOverlayState as AppSessionOverlayState),
@@ -520,22 +357,6 @@ export class SessionService {
       });
     }
 
-    const workspace = await this.workspaceRegistry.getWorkspace(session.workspace_id);
-    if (
-      workspace.active_session_id !== null &&
-      workspace.active_session_id !== session.session_id
-    ) {
-      throw new RuntimeError(
-        409,
-        "session_conflict_active_exists",
-        "another active session already exists in this workspace",
-        {
-          workspace_id: session.workspace_id,
-          active_session_id: workspace.active_session_id,
-        },
-      );
-    }
-
     const now = toIsoString(this.now());
     const readyAt = toIsoString(this.now());
 
@@ -554,7 +375,6 @@ export class SessionService {
       this.database.db
         .update(workspaces)
         .set({
-          activeSessionId: sessionId,
           updatedAt: now,
         })
         .where(eq(workspaces.workspaceId, session.workspace_id))
@@ -580,7 +400,6 @@ export class SessionService {
       this.database.db
         .update(workspaces)
         .set({
-          activeSessionId: null,
           updatedAt: readyAt,
         })
         .where(eq(workspaces.workspaceId, session.workspace_id))
@@ -599,7 +418,6 @@ export class SessionService {
 
   async stopSession(sessionId: string): Promise<SessionStopResult> {
     const session = await this.getSession(sessionId);
-    const workspace = await this.workspaceRegistry.getWorkspace(session.workspace_id);
 
     if (session.status === "stopped") {
       return {
@@ -720,19 +538,9 @@ export class SessionService {
       this.database.db
         .update(workspaces)
         .set({
-          activeSessionId: null,
           updatedAt: now,
-          pendingApprovalCount:
-            session.status === "waiting_approval" && canceledApproval !== null
-              ? Math.max(0, workspace.pending_approval_count - 1)
-              : workspace.pending_approval_count,
         })
-        .where(
-          and(
-            eq(workspaces.workspaceId, session.workspace_id),
-            eq(workspaces.activeSessionId, sessionId),
-          ),
-        )
+        .where(eq(workspaces.workspaceId, session.workspace_id))
         .run();
 
       this.appendSessionStatusChangedEvent({
@@ -847,7 +655,6 @@ export class SessionService {
       };
     }
 
-    const pendingApprovalCount = this.countPendingApprovals(session.workspaceId);
     const updatedAt = toIsoString(this.now());
     const pendingApproval = mismatch.pendingApproval;
 
@@ -867,9 +674,7 @@ export class SessionService {
         this.database.db
           .update(workspaces)
           .set({
-            activeSessionId: sessionId,
             updatedAt,
-            pendingApprovalCount,
           })
           .where(eq(workspaces.workspaceId, session.workspaceId))
           .run();
@@ -888,8 +693,6 @@ export class SessionService {
             : "waiting_input";
       const nextOverlayState =
         nextStatus === "stopped" ? "closed" : ("open" as const);
-      const nextActiveSessionId = nextStatus === "running" ? sessionId : null;
-
       this.database.db
         .update(sessions)
         .set({
@@ -907,9 +710,7 @@ export class SessionService {
       this.database.db
         .update(workspaces)
         .set({
-          activeSessionId: nextActiveSessionId,
           updatedAt,
-          pendingApprovalCount,
         })
         .where(eq(workspaces.workspaceId, session.workspaceId))
         .run();
@@ -1032,12 +833,9 @@ export class SessionService {
         });
       },
     );
-    const workspace = await this.workspaceRegistry.getWorkspace(approval.workspaceId);
     const resolvedAt = toIsoString(this.now());
     const nextSessionStatus = input.resolution === "approved" ? "running" : "waiting_input";
     const nextTurnId = input.resolution === "approved" ? session.currentTurnId : null;
-    const nextWorkspaceActiveSessionId =
-      input.resolution === "approved" ? approval.sessionId : null;
 
     await this.nativeSessionGateway.resolveApproval({
       sessionId: approval.sessionId,
@@ -1072,9 +870,7 @@ export class SessionService {
       this.database.db
         .update(workspaces)
         .set({
-          activeSessionId: nextWorkspaceActiveSessionId,
           updatedAt: resolvedAt,
-          pendingApprovalCount: Math.max(0, workspace.pending_approval_count - 1),
         })
         .where(eq(workspaces.workspaceId, approval.workspaceId))
         .run();
@@ -1171,22 +967,6 @@ export class SessionService {
       );
     }
 
-    const workspace = await this.workspaceRegistry.getWorkspace(session.workspace_id);
-    if (
-      workspace.active_session_id !== null &&
-      workspace.active_session_id !== session.session_id
-    ) {
-      throw new RuntimeError(
-        409,
-        "session_conflict_active_exists",
-        "another active session already exists in this workspace",
-        {
-          workspace_id: session.workspace_id,
-          active_session_id: workspace.active_session_id,
-        },
-      );
-    }
-
     const nativeTurn = await this.nativeSessionGateway.sendUserMessage({
       sessionId,
       content: input.content,
@@ -1235,7 +1015,6 @@ export class SessionService {
         this.database.db
           .update(workspaces)
           .set({
-            activeSessionId: sessionId,
             updatedAt: userCreatedAt,
           })
           .where(eq(workspaces.workspaceId, session.workspace_id))
@@ -1318,7 +1097,6 @@ export class SessionService {
       );
     }
 
-    const workspace = await this.workspaceRegistry.getWorkspace(session.workspaceId);
     const approvalId = generateApprovalId();
     const createdAt = toIsoString(this.now());
 
@@ -1355,7 +1133,6 @@ export class SessionService {
       this.database.db
         .update(workspaces)
         .set({
-          pendingApprovalCount: workspace.pending_approval_count + 1,
           updatedAt: createdAt,
         })
         .where(eq(workspaces.workspaceId, session.workspaceId))
@@ -1538,15 +1315,9 @@ export class SessionService {
       this.database.db
         .update(workspaces)
         .set({
-          activeSessionId: null,
           updatedAt: assistantCreatedAt,
         })
-        .where(
-          and(
-            eq(workspaces.workspaceId, session.workspaceId),
-            eq(workspaces.activeSessionId, sessionId),
-          ),
-        )
+        .where(eq(workspaces.workspaceId, session.workspaceId))
         .run();
 
       this.appendSessionStatusChangedEvent({
@@ -1619,15 +1390,9 @@ export class SessionService {
       this.database.db
         .update(workspaces)
         .set({
-          activeSessionId: null,
           updatedAt: completedAt,
         })
-        .where(
-          and(
-            eq(workspaces.workspaceId, session.workspaceId),
-            eq(workspaces.activeSessionId, sessionId),
-          ),
-        )
+        .where(eq(workspaces.workspaceId, session.workspaceId))
         .run();
 
       this.appendSessionStatusChangedEvent({
