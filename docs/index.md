@@ -12,7 +12,7 @@ Read this file first when you need to locate maintained knowledge across source-
 
 - [docs/README.md](./README.md): directory policy and category boundaries
 - [docs/log.md](./log.md): chronological maintenance log for wiki updates
-- [docs/codex_webui_llm_wiki_adoption_note_v0_1.md](./codex_webui_llm_wiki_adoption_note_v0_1.md): repo-local LLM Wiki scope, structure, and placement rules
+- [docs/codex_webui_llm_wiki_adoption_note_v0_1.md](./codex_webui_llm_wiki_adoption_note_v0_1.md): repo-local LLM Wiki scope, structure, placement rules, and adaptation notes
 
 ## Source-of-truth documents
 
@@ -37,6 +37,6 @@ No repo-local note pages are published under `docs/notes/` yet beyond the area R
 
 ## Update expectations
 
-- update this file when a new maintained wiki entrypoint or reusable note page is added
+- update this file when maintained navigation, discoverability, or content summaries materially change
 - keep the descriptions short and content-oriented
 - prefer adding links here instead of relying on ad hoc chat-only orientation

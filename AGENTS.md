@@ -22,11 +22,11 @@ Directory-specific responsibilities, document policies, and workflow details bel
 ## Cross-cutting Workflow
 
 - Treat `docs/` as the maintained source of truth for requirements, specifications, validation plans, and roadmap decisions
-- Treat `docs/index.md` and `docs/log.md` as the repo-local LLM Wiki entrypoints for maintained navigation and chronological update history
+- Treat `docs/index.md` and `docs/log.md` as the repo-local LLM Wiki entrypoints for maintained navigation, discoverability, and chronological update history
 - Treat `tasks/` as the area for active work packages only; move completed task packages to `tasks/archive/`
 - Treat `artifacts/` as the area for execution outputs such as logs, evidence, and judgment notes
 - Promote reusable chat-derived synthesis into maintained `docs/` pages only when the result is likely to be reused; keep transient exploration out of the repo
-- When a maintained wiki page is added or materially revised in `docs/`, update `docs/index.md` if navigation changed and append `docs/log.md` with the source and affected files
+- When a maintained wiki page is added, moved, removed, or materially revised in `docs/`, refresh `docs/index.md` when navigation, discoverability, or content summaries changed and append `docs/log.md` with the source and affected files
 - Default repo-tracked change flow is a short-lived branch and PR; direct commits to `main` are exceptions only, such as urgent fixes or explicit user direction
 - For normal branch/PR work, create and use a dedicated git worktree under `.worktrees/<branch>`; keep the parent checkout as the control checkout for sync, tracking, and worktree management
 - Approved direct-to-`main` exceptions may use the parent checkout and should record `Active worktree: .`

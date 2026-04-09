@@ -1,6 +1,6 @@
 ---
 name: codex-webui-llm-wiki-maintenance
-description: Maintain the repo-local LLM Wiki for `codex-webui`. Use when new source material should be incorporated into maintained `docs/` pages, when reusable design or research synthesis should be promoted from chat into `docs/notes/`, when `docs/index.md` or `docs/log.md` need maintenance, or when stale, inconsistent, or orphaned wiki pages should be linted and corrected.
+description: Maintain the repo-local LLM Wiki for `codex-webui`. Use when new source material should be incorporated into maintained `docs/` pages, when reusable design or research synthesis should be promoted from chat into maintained `docs/` content, when `docs/index.md` or `docs/log.md` need maintenance, or when stale, inconsistent, or orphaned wiki pages should be linted and corrected.
 ---
 
 # Codex WebUI LLM Wiki Maintenance
@@ -22,6 +22,7 @@ Read these files before making wiki changes:
 - `README.md`
 - `AGENTS.md`
 - `docs/README.md`
+- `docs/codex_webui_llm_wiki_adoption_note_v0_1.md`
 - `docs/index.md`
 - `docs/log.md`
 - `docs/notes/README.md` when adding or revising note pages
@@ -30,18 +31,14 @@ Read the specific maintained pages you may update before deciding whether to rev
 
 ## Responsibility Boundaries
 
-Keep these boundaries strict:
+Use `docs/README.md` and the adoption note as the source of truth for placement and boundary decisions.
+
+Keep the repo adaptation intact:
 
 - `docs/` is the maintained knowledge layer
-- `docs/requirements/` defines what to build
-- `docs/specs/` defines how to build it
-- `docs/validation/` holds validation plans and confirmed behavior or decision records tied to quality or correctness
-- `docs/notes/` holds maintained but non-normative design notes, research memos, and synthesis pages
-- `tasks/` is for active execution packages, not wiki pages
-- `artifacts/` is for evidence, logs, and judgment notes, not wiki pages
+- `tasks/` and `artifacts/` are not wiki surfaces
 - GitHub Issues and Projects track execution state; they are not the maintained wiki itself
-
-Prefer updating an existing source-of-truth page over creating a parallel note that says the same thing.
+- prefer updating an existing maintained page over creating a parallel note that says the same thing
 
 ## Choose the Mode
 
@@ -57,23 +54,19 @@ If more than one mode applies, start with the one that best explains why the cha
 
 - Keep the repo-local wiki inside `docs/`; do not introduce a competing top-level wiki tree
 - Promote reusable knowledge, not transient exploration
-- Place new content by responsibility, not by document style alone
-- Put maintained but non-normative material in `docs/notes/`
-- Promote or split note content into `requirements/`, `specs/`, or `validation/` when it becomes normative
-- Update `docs/index.md` when a maintained page is added, moved, removed, or becomes part of the navigation path
+- Use `docs/README.md` for category placement and promotion rules
+- Use `docs/notes/README.md` for note-page naming and note-specific boundaries
+- Refresh `docs/index.md` when maintained navigation, discoverability, or content summaries materially change
 - Append `docs/log.md` whenever the maintained wiki materially changes
-- Keep `docs/log.md` concise: source, updated files, and short notes
-- Keep filenames explicit and consistent with nearby naming conventions
+- Follow the existing `docs/log.md` entry format instead of inventing a new one
 
 ## Placement Decision
 
 Choose the destination before editing:
 
-- `docs/requirements/` for authoritative product scope and expected behavior
-- `docs/specs/` for authoritative implementation and API contracts
-- `docs/validation/` for authoritative validation plans or confirmed quality and correctness records
-- `docs/notes/` for maintained design-thinking notes, research memos, or reusable synthesis that is not yet normative
-- directly under `docs/` for cross-cutting guidance and wiki entrypoints such as `index.md` and `log.md`
+- review the placement policy in `docs/README.md`
+- use `docs/notes/README.md` when the destination might be `docs/notes/`
+- use the adoption note when the question is about repo-local wiki scope or boundaries rather than document category alone
 
 If the content is primarily a work plan, execution checklist, raw observation dump, or evidence bundle, it does not belong in the wiki.
 
@@ -82,7 +75,7 @@ If the content is primarily a work plan, execution checklist, raw observation du
 1. Identify the new source material and what project understanding it changes.
 2. Find the maintained page that should absorb the change.
 3. If no existing page is appropriate, add a new maintained page in the correct `docs/` location.
-4. Update `docs/index.md` if the change affects maintained navigation.
+4. Refresh `docs/index.md` if the change affects maintained navigation, discoverability, or content summaries.
 5. Append `docs/log.md` with an `ingest` entry if the maintained wiki changed.
 
 Use `ingest` for inputs such as:
@@ -97,7 +90,7 @@ Use `ingest` for inputs such as:
 2. If it is not reusable, leave it in chat and stop.
 3. If it is reusable, choose the correct maintained destination in `docs/`.
 4. Write the result as a maintained page update or a new maintained note rather than as chat-only synthesis.
-5. Update `docs/index.md` if navigation changed and append `docs/log.md` with a `query` entry.
+5. Refresh `docs/index.md` if navigation, discoverability, or content summaries changed and append `docs/log.md` with a `query` entry.
 
 Use `query` promotion for outputs such as:
 
@@ -109,7 +102,7 @@ Use `query` promotion for outputs such as:
 
 1. Audit the relevant maintained pages for stale statements, contradictions, weak placement, or poor discoverability.
 2. Correct the maintained pages directly instead of layering on another summary page.
-3. Repair navigation if `docs/index.md` is now incomplete or misleading.
+3. Repair `docs/index.md` if navigation, discoverability, or summaries are now incomplete or misleading.
 4. Append `docs/log.md` with a `lint` entry describing what was corrected.
 
 Use `lint` when you see problems such as:
@@ -118,27 +111,6 @@ Use `lint` when you see problems such as:
 - index entries that do not reflect the current maintained pages
 - summaries that drift from the current requirement or spec documents
 - wiki pages with no clear path from `docs/index.md`
-
-## Log Entry Shape
-
-When appending `docs/log.md`, follow the existing repo format:
-
-```md
-## [YYYY-MM-DD] <kind> | <topic>
-
-Source:
-
-- source material or trigger
-
-Updated:
-
-- maintained files changed
-
-Notes:
-
-- short note on what changed
-- short note on what remains deferred
-```
 
 ## Guardrails
 

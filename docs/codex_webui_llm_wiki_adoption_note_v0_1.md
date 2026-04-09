@@ -13,6 +13,8 @@ This note defines the repo-local LLM Wiki scope and structure for `codex-webui`.
 
 The source idea is a workflow where an LLM incrementally maintains a persistent markdown knowledge base instead of re-synthesizing knowledge from raw inputs on every query. For this repository, the LLM Wiki is not a separate product or a competing top-level knowledge base. It is a maintained markdown layer inside the existing repo documentation structure.
 
+This note remains the scope-and-structure reference for that adaptation. Operational update rules now live in `AGENTS.md`, `docs/README.md`, `docs/index.md`, `docs/log.md`, and the repo skill under `.agents/skills/codex-webui-llm-wiki-maintenance/`.
+
 ## 2. Current scope decision
 
 The repo-local LLM Wiki covers the following maintained knowledge surfaces:
@@ -76,14 +78,20 @@ Do not place the following under `docs/notes/`:
 - raw evidence or logs that belong in `artifacts/`
 - finalized API or requirement contracts that belong in `requirements/` or `specs/`
 
-## 6. Deferred follow-up work
+## 6. Follow-up status
 
-This note resolves only the scope and structure questions for issue `#115`.
+This note resolved the scope and structure questions for issue `#115`.
 
-The following remain follow-up work:
+The originally planned follow-up work was completed on 2026-04-09:
 
-- issue `#116`: add the initial `index.md` and `log.md` entrypoints
-- issue `#117`: define the minimum `ingest`, `query`, and `lint` workflow for repo agents
+- issue `#116`: added the initial `index.md` and `log.md` entrypoints
+- issue `#117`: defined the minimum `ingest`, `query`, and `lint` workflow for repo agents
+
+The current follow-up expectation is maintenance rather than new structure work:
+
+- keep this note focused on scope, placement, and boundary decisions
+- update the operational guidance documents when wiki maintenance workflow details evolve
+- revise this note only when the repo-local LLM Wiki boundary or category model changes
 
 ## 7. Operating intent
 
@@ -93,4 +101,4 @@ The operating intent is:
 - keep formal contracts in the established source-of-truth categories
 - give design-thinking and research notes a stable maintained home without confusing them with execution packages or evidence storage
 
-This note can be revised as `#116` and `#117` make the wiki entrypoints and operating workflow more concrete.
+This repository intentionally adopts the LLM Wiki pattern in a lightweight way. The original pattern assumes a content index that grows with the wiki; in `codex-webui`, `docs/index.md` should still be refreshed whenever maintained navigation, discoverability, or content summaries materially change, but it does not need to become a page-per-source catalog.

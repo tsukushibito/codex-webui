@@ -112,3 +112,26 @@ Notes:
 - added a repo-local skill for repeated wiki maintenance work
 - kept `docs/README.md` and `AGENTS.md` as the source of truth for the workflow rules
 - did not add separate scripts or a second tracking structure for wiki operations
+
+## [2026-04-09] lint | wiki maintenance guidance drift cleanup
+
+Source:
+
+- review of `AGENTS.md` and `.agents/skills/codex-webui-llm-wiki-maintenance/SKILL.md`
+- `docs/codex_webui_llm_wiki_adoption_note_v0_1.md`
+- Karpathy, "LLM Wiki"
+
+Updated:
+
+- `AGENTS.md`
+- `docs/README.md`
+- `docs/codex_webui_llm_wiki_adoption_note_v0_1.md`
+- `docs/index.md`
+- `.agents/skills/codex-webui-llm-wiki-maintenance/SKILL.md`
+- `docs/log.md`
+
+Notes:
+
+- reduced workflow duplication in the repo skill so `AGENTS.md`, `docs/README.md`, and the adoption note remain the primary references
+- clarified that `docs/index.md` should be refreshed when navigation, discoverability, or content summaries materially change
+- updated the adoption note to reflect that issues `#116` and `#117` are complete and that follow-up is now maintenance-oriented
