@@ -1,0 +1,100 @@
+---
+name: codex-webui-orchestration-log
+description: Standardize append-only orchestration run logs for `codex-webui`. Use when `codex-webui-execution-orchestrator` or a closely related routing workflow needs to open a run log, append routing and handoff events, capture anomalies such as read-only violations, incomplete sub-agent work, or command failures, or record why execution stopped under `artifacts/execution_orchestrator/`.
+---
+
+# Codex WebUI Orchestration Log
+
+## Overview
+
+Use this skill to keep one append-only run log for each orchestration pass.
+
+This skill owns the log location, run-id convention, event schema, and helper script usage. It does not choose the current target or replace the orchestrator's routing judgment.
+
+## Build Context
+
+Read these files before changing the logging workflow itself:
+
+- `AGENTS.md`
+- `artifacts/execution_orchestrator/README.md`
+
+Read the helper script only when you need to change its behavior:
+
+- `scripts/append_run_event.py`
+
+## Standard Workflow
+
+Follow this order every time.
+
+1. Choose one run id for the current orchestration request or continuation loop.
+2. Append a `run_started` event before delegated intake or any handoff work begins.
+3. Append an event before and after each delegated intake or selected handoff.
+4. Append an `anomaly` event immediately when routing work hits a workflow problem.
+5. Append a terminal event such as `run_completed` or `run_blocked` before ending the turn.
+
+Prefer concise, factual summaries. Store references, targets, skills, and issue numbers in structured fields instead of burying them in prose.
+
+## Run Id Rules
+
+- Use one run id per user-visible orchestration run
+- Reuse the same run id while a continue-until loop is still in progress
+- Prefer `YYYY-MM-DDTHH-mm-ssZ-<goal-slug>`
+- Keep the slug short and path-safe
+
+## Event Coverage
+
+At minimum, log these events when they happen:
+
+- `run_started` or `run_resumed`
+- `intake_started`
+- `intake_completed`
+- `handoff_selected`
+- `handoff_started`
+- `handoff_completed`
+- `anomaly`
+- `run_completed` or `run_blocked`
+
+Use `anomaly` for problems such as:
+
+- a read-only delegated agent editing files or mutating GitHub state
+- a delegated agent failing to finish, timing out, or returning an unusable result
+- a command or validation step failing during orchestration support work
+- the logger script failing
+- a hard block that stops the continue-until loop
+
+## Helper Script
+
+Append events with:
+
+```bash
+python .agents/skills/codex-webui-orchestration-log/scripts/append_run_event.py \
+  --run-id 2026-04-09T12-30-00Z-issue-close \
+  --event-type intake_started \
+  --stage intake \
+  --status info \
+  --summary "Delegated read-only intake for current target selection." \
+  --actor orchestrator \
+  --routing-goal "Select one current target and next handoff"
+```
+
+Useful optional flags:
+
+- `--target issue-130`
+- `--skill codex-webui-sprint-cycle`
+- `--issue 130`
+- `--details-json '{"timeout_seconds": 30, "agent": "intake"}'`
+- `--artifact-root /custom/path` when testing outside the repo artifact tree
+
+## Guardrails
+
+- Do not write ad hoc orchestration logs outside `artifacts/execution_orchestrator/`
+- Do not log full command transcripts, secrets, tokens, or large copied outputs
+- Do not skip anomaly logging for read-only violations, incomplete delegated work, or command failures
+- Do not let the logger decide routing outcomes; it only records them
+- Do not rewrite prior events in place; append a corrective event instead
+
+## Example Requests
+
+- `Use $codex-webui-orchestration-log to start a run log for this orchestration pass.`
+- `Use $codex-webui-orchestration-log to append an anomaly for a read-only intake violation.`
+- `Use $codex-webui-orchestration-log to record the selected handoff and why the run stopped.`

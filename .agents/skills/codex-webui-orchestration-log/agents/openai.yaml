@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex WebUI Orchestration Log"
+  short_description: "Append orchestration run logs under artifacts."
+  default_prompt: "Use this skill to create or append a run-scoped orchestration log for execution routing events and anomalies."
