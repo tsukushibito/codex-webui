@@ -30,6 +30,7 @@ Directory-specific responsibilities, document policies, and workflow details bel
 - Default repo-tracked change flow is a short-lived branch and PR; direct commits to `main` are exceptions only, such as urgent fixes or explicit user direction
 - For normal branch/PR work, create and use a dedicated git worktree under `.worktrees/<branch>`; keep the parent checkout as the control checkout for sync, tracking, and worktree management
 - Approved direct-to-`main` exceptions may use the parent checkout and should record `Active worktree: .`
+- Sprint approval is a local implementation gate only; before any push-oriented, merge-oriented, or archive-oriented handoff, run the dedicated pre-push validation skill
 - Before archiving a completed task package or closing an Issue, perform a brief completion retrospective that checks for workflow problems, improvement opportunities, and repeated patterns that should become repo skills
 - Do not close an Issue or set a Project item to `Done` until the corresponding work is reachable on `main`
 - Under the default branch workflow, `reachable on main` means the PR is merged to `main`; under an approved direct-to-`main` exception, it means the commits are pushed to `origin/main`

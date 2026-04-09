@@ -1,17 +1,18 @@
 ---
 name: codex-webui-sprint-cycle
-description: Run one repo-local sprint workflow for `codex-webui` using the custom `planner`, `worker`, `validator`, and `evaluator` agents. Use when a task should be planned, implemented, validated, and hard-gated before completion; do not use for brainstorming-only requests or for batching multiple unrelated tasks into one run.
+description: Run one repo-local sprint workflow for `codex-webui` using the custom `planner`, `worker`, and `evaluator` agents. Use when a task should be planned, implemented, and hard-gated before local completion; do not use for brainstorming-only requests or for batching multiple unrelated tasks into one run.
 ---
 
 # Codex WebUI Sprint Cycle
 
 ## Overview
 
-Use this skill to run one bounded sprint through the repo-local `planner`, `worker`, `validator`, and `evaluator` agents declared in `.codex/config.toml`.
+Use this skill to run one bounded sprint through the repo-local `planner`, `worker`, and `evaluator` agents declared in `.codex/config.toml`.
 
 Treat one sprint as one planner-defined implementation slice. A sprint is complete only when `evaluator` returns `approved`.
 
 Treat evaluator approval as implementation approval, not as permission to close Issues or mark Project work `Done`; those tracking transitions still require the work to be reachable on `main`.
+Treat dedicated pre-push validation as a later gate that runs only after the slice is locally complete and before any push-oriented or merge-oriented handoff.
 For normal branch/PR work, run implementation from the active worktree rather than from the parent checkout. Only approved direct-to-`main` exceptions may use the parent checkout for implementation.
 
 When `codex-webui-execution-orchestrator` selects an implementation-ready target with no blocking tracking drift, this skill is the required implementation path for that target.
@@ -35,7 +36,7 @@ If the sprint touches a documented area such as `docs/`, `tasks/`, or `artifacts
 Use this skill when the user wants:
 
 - a task decomposed into one implementation-sized sprint
-- code or document changes with a hard quality gate
+- code or document changes with a hard quality gate inside the sprint
 - a plan, implementation pass, and evaluator review kept separate
 
 Do not use this skill when:
@@ -52,24 +53,24 @@ Do not use this skill when:
 4. Otherwise, spawn `worker` to execute only that sprint slice in the active worktree for normal branch/PR work, or in the parent checkout only for an approved direct-to-`main` exception.
 5. When `worker` returns, verify locally that it produced a real implementation candidate for this sprint. If the user asked for implementation and the result is design-only, analysis-only, or otherwise leaves the write scope unchanged, do not treat that as sprint progress; tighten the instructions with concrete target files, write scope, and expected API or behavior shape, then send `worker` back to implementation instead of proceeding to validation.
 6. Treat `files changed: none`, `exact file paths changed: none`, or missing implementation evidence for an implementation-requested sprint as a blocked or incomplete worker pass, not as a completed sprint result.
-7. Spawn `validator` to run the planner-approved validation commands and collect read-only evidence for the sprint. Tell it to stay read-only and not to judge approval.
-8. When validation evidence is available, spawn `evaluator` and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; pass the planner acceptance criteria, the implementation result, and the validator evidence.
-9. If `evaluator` returns `changes_required`, send those findings back to `worker` and run another implementation pass, followed by another validator pass.
+7. Review the worker-supplied targeted validation evidence locally. If required checks are missing, too weak, or unrelated to the acceptance criteria, send `worker` back for the minimum additional implementation-side validation needed for this sprint.
+8. Spawn `evaluator` and explicitly tell it that it is read-only, must not edit files, and must not run mutating commands; pass the planner acceptance criteria, the implementation result, and the worker-supplied targeted validation evidence.
+9. If `evaluator` returns `changes_required`, send those findings back to `worker` and run another implementation pass with updated targeted validation evidence.
 10. Allow at most 2 evaluator rejection cycles for the same sprint slice.
 11. If the second evaluator rejection still blocks completion, return to `planner` for replanning or a narrower slice.
 12. Finish the sprint only when `evaluator` returns `approved`.
-13. Return the sprint result to the caller. If the caller is `codex-webui-execution-orchestrator`, let that skill decide whether execution continues with another sprint, package-state work, completion tracking, or a blocked stop.
+13. Return the sprint result to the caller. If the caller is `codex-webui-execution-orchestrator`, let that skill decide whether execution continues with another sprint, pre-push validation, package-state work, completion tracking, or a blocked stop.
 
 ## Post-Sprint Caller Contract
 
 This skill completes one bounded sprint only. After the sprint result is known, the caller should treat the outcome as one of these cases:
 
 - sprint approved, but the current Issue remains incomplete
-- sprint approved, and package lifecycle or completion tracking is now the critical path
+- sprint approved, and pre-push validation or package lifecycle work is now the critical path
 - sprint blocked and requires replanning or user input
 
 This skill may describe which case it reached, but it must not choose the next repo skill itself.
-Design-only worker output, no-op worker output, or implementation output without credible validation evidence does not count as a known sprint result for this contract; the sprint is still in progress or blocked until the implementation candidate is real.
+Design-only worker output, no-op worker output, or implementation output without credible targeted validation evidence does not count as a known sprint result for this contract; the sprint is still in progress or blocked until the implementation candidate is real.
 
 ## Agent State Checks
 
@@ -82,13 +83,11 @@ Design-only worker output, no-op worker output, or implementation output without
 
 - `planner` is read-only and defines the sprint slice
 - `worker` is the only role allowed to edit files
-- `validator` is read-only and runs the agreed validation commands
-- `evaluator` is read-only and acts as a hard gate over planner criteria plus validator evidence
+- `evaluator` is read-only and acts as a hard gate over planner criteria plus worker-supplied implementation and targeted validation evidence
 - Always tell `planner` to use `$codex-webui-sprint-planner`
-- Always tell `planner`, `validator`, and `evaluator` in their spawn prompts that they are read-only and must not edit files or run mutating commands
+- Always tell `planner` and `evaluator` in their spawn prompts that they are read-only and must not edit files or run mutating commands
 - Always tell `planner` to return a sprint plan only, using the planner role sections, and not to claim files changed, tests run, or work completed
-- Always tell `worker` to either produce code or document edits in the agreed write scope, or return a concrete technical block; do not accept design-only or review-only output from `worker` when the sprint requested implementation
-- Always tell `validator` to report command outcomes and evidence only, not final approval
+- Always tell `worker` to either produce code or document edits in the agreed write scope plus the minimum targeted validation evidence for the slice, or return a concrete technical block; do not accept design-only or review-only output from `worker` when the sprint requested implementation
 - Do not phrase `planner` requests as direct implementation instructions; ask for a bounded slice, acceptance criteria, validation, and worker handoff only
 - If `planner` mutates files anyway, treat that worktree state as the implementation candidate for `evaluator` rather than continuing to use `planner` as a writer
 - Do not let `worker` implement normal branch/PR work from the parent checkout when an active worktree should exist
@@ -96,9 +95,10 @@ Design-only worker output, no-op worker output, or implementation output without
 - When invoked by `codex-webui-execution-orchestrator`, do not let the main agent bypass `worker` by implementing the sprint slice directly
 - Do not run concurrent write passes on the same sprint slice
 - Do not silently weaken planner acceptance criteria to get an approval
-- Do not let `planner`, `validator`, or `evaluator` mutate the worktree, create commits, push branches, or update GitHub Issues/Projects
+- Do not let `planner` or `evaluator` mutate the worktree, create commits, push branches, or update GitHub Issues/Projects
 - Do not add a mandatory post-`planner` compliance check just to police read-only behavior; prevent the issue with the spawn prompt and handle accidental edits through the fallback above
 - Do not treat evaluator approval alone as sufficient evidence to close an Issue or mark a Project item `Done`
+- Do not run the dedicated `validator` inside the default sprint loop; reserve it for the later `codex-webui-pre-push-validation` gate
 - Do not self-route to `codex-webui-work-packages` or `codex-webui-github-projects`; the caller owns next-skill selection
 
 ## Required Final Output
@@ -107,10 +107,10 @@ Return a merged result that includes:
 
 - the planner objective and sprint slice
 - the worker implementation summary
-- the validator evidence summary
+- the worker-supplied targeted validation evidence summary
 - the evaluator verdict
 - the validations that were run
-- the caller-facing outcome, such as Issue still incomplete, completion-tracking handoff now needed, or blocked
+- the caller-facing outcome, such as Issue still incomplete, pre-push validation now needed, completion-tracking handoff now needed, or blocked
 - any remaining risk that still exists after approval
 
 If `worker` did not edit the target write scope, say that explicitly and treat the sprint as blocked or still in progress rather than complete.
@@ -119,5 +119,5 @@ If the sprint is blocked and requires replanning, say that explicitly instead of
 ## Example Requests
 
 - `Use $codex-webui-sprint-cycle to implement this bug fix in one sprint.`
-- `Run planner, worker, validator, evaluator for this repo task.`
-- `Use $codex-webui-sprint-cycle to plan, implement, validate, and hard-gate this change.`
+- `Run planner, worker, evaluator for this repo task.`
+- `Use $codex-webui-sprint-cycle to plan, implement, and hard-gate this change before pre-push validation.`

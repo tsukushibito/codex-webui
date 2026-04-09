@@ -22,7 +22,7 @@ Responsibilities:
 - invoke that selected repo skill in the same turn when the user asked to proceed with execution
 - own the cross-skill continuation loop when the user asked to keep going until a concrete end-state is reached
 
-The main agent should remain an orchestrator. Planning, implementation, validation, and evaluation should be delegated to the repo's sub-agents through the selected handoff skill instead of being executed directly by the main agent.
+The main agent should remain an orchestrator. Planning, implementation, sprint evaluation, and pre-push validation should be delegated to the repo's sub-agents through the selected handoff skill instead of being executed directly by the main agent.
 
 This skill does not directly mutate GitHub Projects, Issues, or local task packages.
 
@@ -138,6 +138,7 @@ If no drift blocks progress, route to one of these skills:
 - `codex-webui-work-packages` when local task package state must be created, resumed, reconciled, or archived
 - `codex-webui-work-packages` when the active worktree must be created, corrected, or documented, or when package-linked Issue `Execution` metadata must move with the package lifecycle
 - `codex-webui-sprint-cycle` when one bounded sprint slice is ready to execute for the chosen Issue
+- `codex-webui-pre-push-validation` when the current slice is locally complete and the next step is push-oriented, merge-oriented, archive-oriented, or otherwise publish-oriented
 - `codex-webui-github-projects` when Project state, broader Issue tracking state, SubIssue breakdown, PR merge, parent-checkout sync, worktree cleanup, or final completion tracking must be corrected
 - `codex-webui-execution-handoff` when execution cannot continue in the current session and the correct outcome is a resumable `.tmp/` handoff rather than more implementation or tracking work
 
@@ -158,14 +159,17 @@ After each invoked handoff skill returns, reassess in this order:
 - if tracking drift now exists, route drift correction before new implementation
 - if the current target still needs to be split before execution, route `codex-webui-github-projects`
 - if the current target is still implementation-ready but incomplete, route another bounded slice through `codex-webui-sprint-cycle`
-- if the implementation slice is locally complete but package state must be created, reconciled, or archived, route `codex-webui-work-packages`
+- if the implementation slice is locally complete but has not yet passed the dedicated pre-push validation gate, route `codex-webui-pre-push-validation`
+- if the implementation slice passed the dedicated pre-push validation gate and package state must be created, reconciled, or archived, route `codex-webui-work-packages`
 - if merge, parent-checkout sync, worktree cleanup, Issue close, or Project completion tracking is now the critical path, route `codex-webui-github-projects`
 
 When intake says the chosen target must be split before execution, the handoff must be `codex-webui-github-projects`.
 
 When the chosen target is implementation-ready and no tracking drift blocks execution, the handoff must be `codex-webui-sprint-cycle`.
 
-When handing off to `codex-webui-sprint-cycle`, require that the downstream sprint workflow explicitly tells `planner` to use `$codex-webui-sprint-planner` and keeps validation in the read-only `validator` role rather than in the main agent.
+When handing off to `codex-webui-sprint-cycle`, require that the downstream sprint workflow explicitly tells `planner` to use `$codex-webui-sprint-planner` and keeps sprint approval inside the `planner` -> `worker` -> `evaluator` loop rather than in the main agent.
+
+When locally complete work is moving toward push-oriented, merge-oriented, or archive-oriented follow-through, the handoff must be `codex-webui-pre-push-validation` before `codex-webui-work-packages`, `codex-webui-github-projects`, or any publish-oriented handoff.
 
 When the chosen target still needs task-package creation, resumption, reconciliation, or archive work, the handoff must be `codex-webui-work-packages`.
 
@@ -198,8 +202,9 @@ If the user also asked to continue until a concrete end-state, keep iterating af
 - Do not bypass drift correction when execution tracking is inconsistent
 - Do not bypass the split-first gate when the chosen target is still too broad for one execution stream
 - Do not bypass the selected handoff skill when the user asked to proceed with execution
-- Do not let the main agent absorb planner, worker, or validator duties once a handoff skill has been selected
+- Do not let the main agent absorb planner, worker, evaluator, or validator duties once a handoff skill has been selected
 - Do not treat one completed handoff or one approved sprint as sufficient to end a continue-until request
+- Do not treat one approved sprint as immediately ready for push-oriented, merge-oriented, or archive-oriented follow-through before the dedicated pre-push validation gate runs
 - Do not keep looping past a real hard block; stop and report the blocking condition concretely
 
 ## Example Requests
