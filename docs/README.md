@@ -16,6 +16,9 @@ This directory is the area for source-of-truth documents such as requirements, s
 - `specs/codex_webui_common_spec_v0_8.md`
 - `specs/codex_webui_public_api_v0_8.md`
 - `specs/codex_webui_internal_api_v0_8.md`
+- `specs/codex_webui_common_spec_v0_9.md`
+- `specs/codex_webui_public_api_v0_9.md`
+- `specs/codex_webui_internal_api_v0_9.md`
 - `specs/codex_webui_technical_stack_decision_v0_1.md`
 - `validation/app_server_behavior_validation_plan_checklist.md`
 - `codex_webui_mvp_roadmap_v0_1.md`
