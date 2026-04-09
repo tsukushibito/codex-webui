@@ -194,7 +194,7 @@ Neither runtime implementation nor internal/public API implementation may silent
 
 At minimum, the matrix must fix:
 
-- the target App Server version
+- the target App Server dependency baseline
 - native thread status contracts
 - native active-flag contracts
 - native turn status contracts
@@ -205,6 +205,8 @@ At minimum, the matrix must fix:
 - native interrupt capability
 - native stream event to internal event mapping assumptions
 - native fork and archive availability
+
+If an app-server-specific version string is not observable, the dependency baseline must instead pin an explicit operational target such as the runtime or CLI version plus the supporting observation artifact set.
 
 ### 5.3 Missing-native behavior
 
@@ -229,9 +231,10 @@ If a native lifecycle capability is missing, the internal API may degrade, but i
 | `feed_entry` | canonical internal projection | native facts plus runtime ordering | thread-scoped canonical ordering unit |
 | `timeline_item` | helper projection | `feed_entry`-derived | display-oriented thread body projection |
 | `pending_request_summary` | read model | native request flow derived | current pending request helper |
+| `latest_resolved_request_summary` | read model | native request flow derived plus runtime retention | just-resolved thread-context helper |
 | `request_detail_view` | facade plus read model | native request flow derived | pre-response detail helper |
 | `thread_stream_event` | transport projection | `feed_entry`-derived | thread-scoped SSE event |
-| `notification_event` | optional transport projection | runtime aggregate | badge or resume trigger only |
+| `notification_event` | transport projection | runtime aggregate | non-authoritative trigger for the global notifications path |
 
 ### 6.1 Source-of-truth rule
 
@@ -244,7 +247,7 @@ Everything else in this specification is a facade, projection, helper aggregate,
 
 ### 6.2 Helper boundary rule
 
-`thread_view_helper`, `timeline_item`, `pending_request_summary`, and `request_detail_view` may exist as internal helpers, but they must remain replaceable and rebuildable from native facts plus minimal app-owned metadata.
+`thread_view_helper`, `timeline_item`, `pending_request_summary`, `latest_resolved_request_summary`, and `request_detail_view` may exist as internal helpers, but they must remain replaceable and rebuildable from native facts plus minimal app-owned metadata.
 
 ---
 
@@ -284,8 +287,8 @@ An internal thread status snapshot may include:
   "thread_id": "thread_123",
   "workspace_id": "ws_alpha",
   "native_status": {
-    "thread_status": "active",
-    "active_flags": ["waitingOnUserInput"],
+    "thread_status": "idle",
+    "active_flags": [],
     "latest_turn_status": "completed"
   },
   "derived_hints": {
@@ -365,6 +368,7 @@ The following should be rebuildable from native facts plus minimal app-owned met
 
 - `thread_summary`
 - `pending_request_summary`
+- `latest_resolved_request_summary`
 - `request_detail_view`
 - `feed_entry`
 - `timeline_item`
@@ -387,7 +391,9 @@ then REST reacquisition is the recovery authority.
 
 ### 9.6 Global notifications
 
-A global notification stream may exist as a trigger for badge or resume refresh, but it must not become:
+Runtime must provide a lightweight global notification path for badge refresh, resume refresh, and background high-priority promotion signals.
+
+It may be a stream or an equivalent internal contract, but it must not become:
 
 - the canonical ordering source
 - the authoritative source of thread state
@@ -527,7 +533,23 @@ It should include at least:
 - a short summary
 - request time
 
-### 12.5 `request_detail_view`
+### 12.5 `latest_resolved_request_summary`
+
+`latest_resolved_request_summary` is the thread-context helper view for a just-resolved request that remains retained during the immediate recovery window.
+
+It should include at least:
+
+- `request_id`
+- `thread_id`
+- `turn_id`
+- `item_id`
+- `request_kind`
+- `status`
+- response decision
+- request time
+- response time
+
+### 12.6 `request_detail_view`
 
 `request_detail_view` is the internal helper used to render pre-response detail.
 
@@ -542,15 +564,17 @@ It must include at least:
 - current lifecycle status
 - response decision when already resolved and still retained
 
-### 12.6 Lifetime and reachability
+### 12.7 Lifetime and reachability
 
 At minimum:
 
 - pending requests must be reachable from thread context
-- just-resolved requests may remain reachable long enough for reconnect and re-response safety
+- just-resolved requests must remain reachable from thread context long enough for reconnect and re-response safety
 - after helper retention expires, endpoint-specific not-found behavior may apply
 
-### 12.7 Absence versus missing resource
+The thread-context helper may be surfaced through `thread_view_helper`, request-related timeline items carrying `request_id`, and `GET /api/v1/threads/{thread_id}/pending_request`.
+
+### 12.8 Absence versus missing resource
 
 Internal contracts must keep a clear distinction between:
 
@@ -559,23 +583,53 @@ Internal contracts must keep a clear distinction between:
 
 `GET /api/v1/threads/{thread_id}/pending_request` must always return `200 OK`.
 
+Despite the endpoint name, it is the thread-context request-helper endpoint for:
+
+- current pending request summary
+- latest just-resolved request summary during the immediate recovery window
+
 Example no-pending response:
 
 ```json
 {
   "thread_id": "thread_123",
   "pending_request": null,
+  "latest_resolved_request": null,
   "checked_at": "2026-04-07T08:37:00Z"
 }
 ```
 
 This must not be overloaded to mean that the request namespace or thread is missing.
 
-### 12.8 Response action
+When `pending_request` is non-null, `latest_resolved_request` must be `null`.
+
+When a just-resolved request is still retained for recovery, the same endpoint may return:
+
+```json
+{
+  "thread_id": "thread_123",
+  "pending_request": null,
+  "latest_resolved_request": {
+    "request_id": "req_001",
+    "request_kind": "approval",
+    "status": "resolved",
+    "decision": "approved",
+    "requested_at": "2026-04-07T08:32:00Z",
+    "responded_at": "2026-04-07T08:33:00Z"
+  },
+  "checked_at": "2026-04-07T08:37:00Z"
+}
+```
+
+When `latest_resolved_request` is non-null, `pending_request` must be `null`.
+
+### 12.9 Response action
 
 `POST /api/v1/requests/{request_id}/response` submits request decisions.
 
 MVP requires `"once"`-like one-shot policy handling only. Broader policy-scope options remain reserved.
+
+If a policy-scope field is omitted, runtime must treat the request as `"once"`. If a policy-scope field is provided in MVP, only `"once"` is valid.
 
 `canceled` is not defined as a direct response action. Cancellation-like outcomes are interpreted from native request disappearance or thread lifecycle changes.
 
@@ -602,6 +656,7 @@ If native thread creation succeeds but runtime mapping persistence fails, runtim
 If a native request response succeeds but app-owned updates fail, runtime must reload native request flow and thread snapshots and converge:
 
 - `pending_request_summary`
+- `latest_resolved_request_summary`
 - `request_detail_view`
 - thread helper materials
 
@@ -611,6 +666,7 @@ Projection rebuild is expected for:
 
 - thread summaries
 - pending request summaries
+- latest resolved request summaries
 - request detail views
 - feed entries
 - timeline items
@@ -658,6 +714,7 @@ The internal API may include:
 - `GET /api/v1/threads/{thread_id}/feed`
 - `GET /api/v1/threads/{thread_id}/timeline`
 - `GET /api/v1/threads/{thread_id}/stream`
+- `GET /api/v1/notifications/stream`
 
 ### 14.4 Request endpoints
 

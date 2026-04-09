@@ -94,7 +94,9 @@ They are not states defined independently by WebUI.
 
 ### 4.2 Handling of target versions
 This document alone does not pin a concrete App Server implementation version.  
-However, for the App Server public contracts declared as dependencies in this document, **the target version and the exact set of allowed dependency contracts must be fixed in a separate `App Server Contract Matrix v0.9` before implementation starts**.  
+However, for the App Server public contracts declared as dependencies in this document, **the target App Server dependency baseline and the exact set of allowed dependency contracts must be fixed in a separate `App Server Contract Matrix v0.9` before implementation starts**.
+When an app-server-specific version string is not observable, that matrix must instead fix an explicit operational target pin such as the runtime or CLI version plus the supporting observation artifact set.
+The maintained matrix document for v0.9 is `docs/specs/codex_webui_app_server_contract_matrix_v0_9.md`.
 Runtime adapter, public API, and internal API implementation must not begin while that matrix is still undefined.
 
 ### 4.3 Contract dependency and degrade policy
@@ -162,8 +164,8 @@ When the App Server returns a thread as `active`, active flags may express the c
 As the **minimum public contract set** that v0.9 depends on, active flags are assumed to include at least:
 
 - `waitingOnApproval`
-- `waitingOnUserInput`
 
+Additional active flags, such as `waitingOnUserInput`, may be used when the target App Server version exposes them as stable public contracts.
 Availability of this contract in the target App Server version is assumed. If it is unavailable or unstable, the degrade policy in 4.3 applies.
 
 ### 7.4 Turn
@@ -178,9 +180,9 @@ As the **minimum public contract set** that v0.9 depends on, turn status is assu
 - `inProgress`
 - `completed`
 - `interrupted`
-- `failed`
 
-Availability of this contract in the target App Server version is assumed. If it is unavailable or unstable, the degrade policy in 4.3 applies.
+A native `failed` turn status may also be used when the target App Server version exposes it as a stable public contract.
+If it is unavailable or unstable, failure observability may instead be derived from native item or error evidence according to the degrade policy in 4.3 and the contract matrix.
 
 ### 7.6 Item
 A user-facing event that occurs inside a thread / turn.  
@@ -461,7 +463,7 @@ When a thread is `active`, its current meaning is interpreted from active flags 
 Typical examples:
 
 - `active + waitingOnApproval`
-- `active + waitingOnUserInput`
+- input-accepting thread as defined by the target contract matrix
 - `active` with turn `inProgress`
 
 ### 13.5 Number of active threads
@@ -476,6 +478,8 @@ Limiting active thread count to 1, either per workspace or globally, is not a re
 
 ### 13.7 Idle thread
 `idle` is treated as a loaded thread with no currently active turn.
+
+When the contract matrix fixes that behavior for the target dependency baseline, waiting-for-input semantics may be derived from `idle` together with latest-turn completion and absence of a blocking request.
 
 ### 13.8 notLoaded thread
 `notLoaded` is treated as a persisted thread that is not currently loaded in runtime.  
@@ -551,6 +555,7 @@ Approval must not be persisted as an independent canonical resource.
 Required history is assumed to remain readable as part of thread / turn / item / request flow history.
 
 Request flow is not an independent canonical resource, but for reconnect, revisit, and response retry, helper navigation must remain available from thread context to the minimum confirmation information for pending requests and for just-resolved requests.  
+For just-resolved requests, a thread-context access path must continue to surface a stable request reference during the recovery window; a global request lookup alone is not sufficient.
 When the request is absent, the API must provide a representation that makes that absence unambiguous.
 
 ---

@@ -25,8 +25,8 @@ When documents disagree, use this order:
 
 1. `docs/requirements/codex_webui_mvp_requirements_v0_9.md`
 2. `docs/specs/codex_webui_common_spec_v0_9.md`
-3. `docs/specs/codex_webui_internal_api_v0_9.md`
-4. this specification
+3. this specification
+4. `docs/specs/codex_webui_internal_api_v0_9.md` for implementation mapping constraints only
 5. `docs/specs/codex_webui_public_api_v0_8.md` as reference only
 
 The v0.8 public API document is not authoritative for v0.9 semantics.
@@ -154,6 +154,7 @@ The public API must not silently assume native enum values, native request capab
 | `thread_list_item` | projection | no | lightweight list view projection |
 | `timeline_item` | projection and display model | no | main body chronology item |
 | `pending_request` | helper projection | no | current pending request summary embedded in thread context |
+| `latest_resolved_request` | helper projection | no | just-resolved request summary retained in thread context during recovery |
 | `request_detail` | helper facade | no | minimum confirmation data before response |
 | `current_activity` | display model | no | pinned current progress summary |
 | `badge` | display model | no | lightweight identification hint |
@@ -162,7 +163,7 @@ The public API must not silently assume native enum values, native request capab
 | `composer` | display model | no | input availability hints |
 | `home_overview` | helper aggregate | no | app-shell and home initialization aggregate |
 | `thread_stream_event` | transport projection | no | thread-scoped SSE delta event |
-| `notification_event` | optional transport projection | no | non-authoritative refresh trigger |
+| `notification_event` | transport projection | no | non-authoritative refresh trigger for the global notifications stream |
 
 ### 4.1 `thread` and `thread_view`
 
@@ -315,8 +316,8 @@ Rules:
   "thread_id": "thread_123",
   "workspace_id": "ws_alpha",
   "native_status": {
-    "thread_status": "active",
-    "active_flags": ["waitingOnUserInput"],
+    "thread_status": "idle",
+    "active_flags": [],
     "latest_turn_status": "completed"
   },
   "updated_at": "2026-04-07T08:35:00Z"
@@ -375,8 +376,8 @@ Rules:
     "thread_id": "thread_123",
     "workspace_id": "ws_alpha",
     "native_status": {
-      "thread_status": "active",
-      "active_flags": ["waitingOnUserInput"],
+      "thread_status": "idle",
+      "active_flags": [],
       "latest_turn_status": "completed"
     },
     "updated_at": "2026-04-07T08:35:00Z"
@@ -386,6 +387,7 @@ Rules:
     "label": "Waiting for your input"
   },
   "pending_request": null,
+  "latest_resolved_request": null,
   "composer": {
     "accepting_user_input": true,
     "interrupt_available": false,
@@ -404,6 +406,7 @@ Rules:
 - `thread_view` is a helper aggregate rather than a canonical resource
 - `timeline` is a helper projection
 - `current_activity` is a display model
+- `pending_request` and `latest_resolved_request` are thread-context helpers rather than standalone resources
 - `composer` is a display model
 - `composer.accepting_user_input` is an availability hint, not the final server-side admission source
 - final input acceptance is determined at request time from native facts and request/recovery state
@@ -429,8 +432,9 @@ Rules:
 - `sequence` inherits the canonical thread-scoped ordering basis
 - this specification does not fix an exhaustive `kind` enum list
 - MVP must support at least user message, assistant message, request started, request resolved, status change, and error visibility
+- request-related timeline items should carry `request_id` in `payload` while the referenced helper remains reachable, so thread-context navigation can reopen request detail safely
 
-### 7.6 PendingRequest
+### 7.6 PendingRequest and LatestResolvedRequest
 
 ```json
 {
@@ -450,6 +454,8 @@ Rules:
 
 - pending request information is embedded in thread context
 - approval is not restored as a standalone canonical resource
+- `latest_resolved_request` may reuse the same identity fields plus `decision` and `responded_at` while the immediate recovery window remains open
+- thread-context request helpers must let the browser navigate to `request_detail` for both pending and just-resolved requests during the retention window
 
 ### 7.7 RequestDetail
 
@@ -469,7 +475,8 @@ Rules:
   "responded_at": null,
   "decision": null,
   "decision_options": {
-    "policy_scope_supported": false
+    "policy_scope_supported": false,
+    "default_policy_scope": "once"
   },
   "context": {
     "command": "git push origin main"
@@ -736,7 +743,7 @@ Rules:
 
 #### `GET /api/v1/threads/{thread_id}/pending_request`
 
-Returns whether a thread currently has a pending request plus a summary when present.
+Returns the thread-context request-helper state for the current pending request and, when retained, the latest just-resolved request.
 
 This endpoint always returns `200 OK`.
 
@@ -746,6 +753,7 @@ No pending request:
 {
   "thread_id": "thread_123",
   "pending_request": null,
+  "latest_resolved_request": null,
   "checked_at": "2026-04-07T08:37:00Z"
 }
 ```
@@ -763,6 +771,28 @@ Pending request exists:
     "summary": "Run git push",
     "requested_at": "2026-04-07T08:32:00Z"
   },
+  "latest_resolved_request": null,
+  "checked_at": "2026-04-07T08:37:00Z"
+}
+```
+
+Just-resolved request retained in thread context:
+
+```json
+{
+  "thread_id": "thread_123",
+  "pending_request": null,
+  "latest_resolved_request": {
+    "request_id": "req_001",
+    "thread_id": "thread_123",
+    "turn_id": "turn_456",
+    "item_id": "item_789",
+    "request_kind": "approval",
+    "status": "resolved",
+    "decision": "approved",
+    "requested_at": "2026-04-07T08:32:00Z",
+    "responded_at": "2026-04-07T08:33:00Z"
+  },
   "checked_at": "2026-04-07T08:37:00Z"
 }
 ```
@@ -771,6 +801,10 @@ Rules:
 
 - absence must be represented unambiguously as `pending_request: null`
 - request absence within thread context must not use `404`
+- `latest_resolved_request` is optional and may be present only during the immediate recovery window
+- a thread-context helper path for just-resolved requests is required while the recovery window remains open
+- when `pending_request` is non-null, `latest_resolved_request` must be `null`
+- when `latest_resolved_request` is non-null, `pending_request` must be `null`
 
 #### `GET /api/v1/requests/{request_id}`
 
@@ -792,10 +826,7 @@ Request:
 ```json
 {
   "client_response_id": "resp_001",
-  "decision": "approved",
-  "decision_options": {
-    "policy_scope": "once"
-  }
+  "decision": "approved"
 }
 ```
 
@@ -804,10 +835,7 @@ or:
 ```json
 {
   "client_response_id": "resp_002",
-  "decision": "denied",
-  "decision_options": {
-    "policy_scope": "once"
-  }
+  "decision": "denied"
 }
 ```
 
@@ -838,6 +866,8 @@ Rules:
 - `request_kind=approval` is the required MVP-supported request kind
 - request cancellation is not defined as an independent response action in this public contract
 - request disappearance or request invalidation is inferred from native facts and retained helper state rather than a separate public request lifecycle
+- if `decision_options` is omitted, the server must treat the response as `"policy_scope": "once"`
+- if `decision_options.policy_scope` is provided in MVP, only `"once"` is valid
 - the same `client_response_id` with the same body may return the existing result or latest compatible resolved state
 - the same `client_response_id` with a different body must return `409 idempotency_conflict`
 
@@ -882,11 +912,11 @@ Rules:
 - if the client detects a gap, incompatible duplicate, or ambiguous state, it must reacquire via REST
 - public SSE event names are facade event names for browsers and do not guarantee a one-to-one mapping with native App Server event names
 
-### 9.3 Optional notifications stream
+### 9.3 Global notifications stream
 
 #### `GET /api/v1/notifications/stream`
 
-This optional helper stream may be used for:
+This lightweight helper stream is the required MVP path for:
 
 - badge refresh triggers
 - resume-cue refresh triggers
@@ -899,6 +929,7 @@ Rules:
 - it is not a strict ordering source
 - missing events must be recoverable through REST reacquisition
 - it must not replace thread-scoped ordering semantics
+- it exists to support the MVP requirement that background high-priority thread promotion remains noticeable without subscribing to every thread stream continuously
 
 ---
 

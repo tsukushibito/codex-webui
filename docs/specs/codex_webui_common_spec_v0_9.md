@@ -66,14 +66,18 @@ The WebUI backend and frontend must treat those App Server contracts as the prim
 
 `App Server Contract Matrix v0.9` is a required prerequisite before implementation starts.
 
+The maintained matrix document for v0.9 is `docs/specs/codex_webui_app_server_contract_matrix_v0_9.md`.
+
 It must fix at least:
 
-- the target App Server version
-- the allowed native dependency contracts for that version
+- the target App Server dependency baseline
+- the allowed native dependency contracts for that baseline
 - the available native thread and turn status contracts
 - the available active-flag contracts
 - the stable identity and ordering signals that WebUI may depend on
 - any open/load/resume semantics relevant to `notLoaded` threads
+
+If an app-server-specific version string is not observable, the dependency baseline must instead pin an explicit operational target such as the runtime or CLI version plus the supporting observation artifact set.
 
 Public API, internal API, and runtime implementation must not add new implicit App Server dependencies that are not fixed in that matrix.
 
@@ -355,6 +359,8 @@ At minimum, the shared rules are:
 - pending requests must remain reachable from thread context to the minimum confirmation information needed for response
 - just-resolved requests must remain reachable long enough to support reconnect, revisit, and response-path recovery
 - after helper retention ends, the contract may transition to not-found according to resource-specific rules
+
+Resource-specific specs must define a thread-context access path for both pending and just-resolved request helpers during that retention window.
 
 ### 10.3 Absence vs missing resource
 
