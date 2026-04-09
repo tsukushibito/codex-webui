@@ -48,3 +48,13 @@ This directory is the area for source-of-truth documents such as requirements, s
 - `index.md`: content-oriented navigation entrypoint for the repo-local LLM Wiki
 - `log.md`: chronological append log for wiki maintenance
 - update both files when new maintained wiki pages or reusable note pages are added
+
+## Wiki Maintenance Workflow
+
+- `ingest`: when new source material materially changes project understanding, update the existing source-of-truth page or add a maintained note in the correct `docs/` category
+- `ingest`: if a maintained page is added, moved, or becomes a new navigation entrypoint, update `index.md`
+- `ingest`: append `log.md` with the source material, maintained files touched, and any deferred follow-up when the wiki changed
+- `query`: when a cross-source answer is likely to be reused, promote it from chat into a maintained page instead of leaving it only in conversation history
+- `query`: if the promoted result creates a new maintained note or materially changes wiki navigation, update `index.md` and append `log.md`
+- `lint`: when inconsistencies, stale summaries, or orphan wiki pages are found, correct the maintained pages and append a `lint` entry to `log.md`
+- keep `tasks/` for active execution instructions and `artifacts/` for evidence or raw logs; do not use the wiki to duplicate those areas

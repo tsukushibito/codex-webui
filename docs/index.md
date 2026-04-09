@@ -30,8 +30,10 @@ No repo-local note pages are published under `docs/notes/` yet beyond the area R
 
 ## Cross-cutting guidance
 
+- [AGENTS.md](../AGENTS.md): repo-wide workflow rules, including wiki promotion and update triggers
 - [docs/codex_webui_mvp_roadmap_v0_1.md](./codex_webui_mvp_roadmap_v0_1.md): phase breakdown and delivery order
 - [docs/codex_webui_dev_container_onboarding.md](./codex_webui_dev_container_onboarding.md): development container and tunnel workflow
+- [docs/README.md](./README.md): wiki maintenance workflow and category-specific placement rules
 
 ## Update expectations
 
