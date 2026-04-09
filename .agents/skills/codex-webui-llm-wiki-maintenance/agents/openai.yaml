@@ -1,0 +1,4 @@
+interface:
+  display_name: "LLM Wiki Ops"
+  short_description: "Maintain repo-local LLM Wiki for codex-webui"
+  default_prompt: "Use $codex-webui-llm-wiki-maintenance to ingest new repo knowledge, promote reusable answers into docs/, or lint the repo-local wiki."

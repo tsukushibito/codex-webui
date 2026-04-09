@@ -44,4 +44,5 @@ Directory-specific responsibilities, document policies, and workflow details bel
 - Keep Project items and issue bodies aligned with the maintained documents, and prefer links or short summaries over duplicating detailed specification text
 - Do not delete Projects, issues, or project items unless the user explicitly asks for deletion
 - If GitHub Projects workflow details are needed, prefer the repo skill under `.agents/skills/codex-webui-github-projects/` rather than expanding this root file
+- If repo-local LLM Wiki maintenance workflow details are needed, prefer the repo skill under `.agents/skills/codex-webui-llm-wiki-maintenance/` rather than expanding this root file
 - If completion retrospective workflow details are needed, prefer the repo skill under `.agents/skills/codex-webui-completion-retrospective/` rather than expanding this root file

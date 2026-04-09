@@ -70,3 +70,24 @@ Notes:
 - formalized minimum `ingest`, `query`, and `lint` expectations for repo agents
 - made `index.md` and `log.md` part of the expected wiki update flow
 - kept the workflow lightweight and documentation-first, without adding search tooling
+
+## [2026-04-09] restructure | repo-local LLM Wiki maintenance skill
+
+Source:
+
+- user request to package the `ingest`, `query`, and `lint` workflow as a repo skill
+- `AGENTS.md`
+- `docs/README.md`
+
+Updated:
+
+- `.agents/skills/codex-webui-llm-wiki-maintenance/SKILL.md`
+- `.agents/skills/codex-webui-llm-wiki-maintenance/agents/openai.yaml`
+- `AGENTS.md`
+- `docs/log.md`
+
+Notes:
+
+- added a repo-local skill for repeated wiki maintenance work
+- kept `docs/README.md` and `AGENTS.md` as the source of truth for the workflow rules
+- did not add separate scripts or a second tracking structure for wiki operations
