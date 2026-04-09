@@ -17,6 +17,7 @@ Treat responsibilities as follows:
 - `artifacts/` holds evidence such as logs, outputs, and judgment notes
 
 This skill owns the local `tasks/` workflow and the package-lifecycle updates to the linked Issue `Execution` section. Use `codex-webui-github-projects` for Project fields, broader Issue tracking changes, PR merge/completion work, and final execution-state cleanup after the work reaches `main`.
+Use `codex-webui-pre-push-validation` before archive-oriented, push-oriented, or merge-oriented handoff whenever a locally complete slice has not yet passed the dedicated validator gate.
 
 When `codex-webui-execution-orchestrator` selects task-package creation, resumption, reconciliation, or archive work as the next step, this skill is the required path for that package-state change.
 
@@ -49,6 +50,7 @@ If the work package is tied to a specific area, read the nearest relevant `READM
 - Link the task package and the Issue to each other
 - Keep task-package detail in `tasks/`, not in the Issue body beyond a short execution summary and links
 - Before archiving a completed package or closing its Issue, run `codex-webui-completion-retrospective`
+- Do not archive a locally complete package until the dedicated `codex-webui-pre-push-validation` gate passes
 - Archive completed work packages under `tasks/archive/` before marking the execution slice done on the Issue
 - Before closing an Issue or setting Project `Status` to `Done`, verify the work is reachable on `main`
 - Under the default workflow this means the PR is merged to `main`; under an approved direct-to-`main` exception this means the commits are pushed to `origin/main`
@@ -133,13 +135,14 @@ After the worktree is created, create or edit the task-package files from that w
 ### Finish an execution slice
 
 1. Confirm the package exit criteria were met
-2. Run `codex-webui-completion-retrospective` and update `Status / handoff notes`, using `artifacts/` only if the review needs more than a short summary
-3. Move the package to `tasks/archive/issue-<number>-<work_id>/` once the slice is locally complete
-4. Replace the Issue's active-package link with an archived-package link and keep the active branch, active worktree, and active PR visible until the work reaches `main`
-5. If more work remains on the Issue, leave it open and keep Project `Status` in execution until the current slice reaches `main`
-6. Hand off PR squash merge, parent-checkout `main` sync, worktree cleanup, Project-field updates, and final completion tracking to `codex-webui-github-projects`
-7. If the PR is still open, the branch is not yet on `main`, an approved direct-to-`main` exception is not yet pushed, or the required worktree cleanup is not yet complete, stop after the archive/update steps and keep GitHub tracking active
-8. Do not close the Issue or set Project `Status` to `Done` from this skill; final completion belongs to `codex-webui-github-projects`
+2. Confirm the dedicated `codex-webui-pre-push-validation` gate already passed for this locally complete slice; if not, stop and hand off there first
+3. Run `codex-webui-completion-retrospective` and update `Status / handoff notes`, using `artifacts/` only if the review needs more than a short summary
+4. Move the package to `tasks/archive/issue-<number>-<work_id>/` once the slice is locally complete and the pre-push gate has passed
+5. Replace the Issue's active-package link with an archived-package link and keep the active branch, active worktree, and active PR visible until the work reaches `main`
+6. If more work remains on the Issue, leave it open and keep Project `Status` in execution until the current slice reaches `main`
+7. Hand off PR squash merge, parent-checkout `main` sync, worktree cleanup, Project-field updates, and final completion tracking to `codex-webui-github-projects`
+8. If the PR is still open, the branch is not yet on `main`, an approved direct-to-`main` exception is not yet pushed, or the required worktree cleanup is not yet complete, stop after the archive/update steps and keep GitHub tracking active
+9. Do not close the Issue or set Project `Status` to `Done` from this skill; final completion belongs to `codex-webui-github-projects`
 
 ### Resume work on an existing Issue
 
@@ -160,6 +163,7 @@ After the worktree is created, create or edit the task-package files from that w
 - Do not store raw evidence in the package directory unless the user explicitly wants that exception
 - Do not delete archived packages unless the user explicitly asks
 - Do not treat package archive alone as sufficient evidence for Issue close or Project `Done`
+- Do not archive a locally complete package before the dedicated pre-push validation gate passes
 - Do not let Issue close or Project `Done` happen while a PR remains open, the branch is not yet on `main`, an approved direct-to-`main` exception is unpushed, the required worktree cleanup is incomplete, or the local repo is dirty
 - Do not perform PR merge or worktree cleanup from this skill; hand that part to `codex-webui-github-projects`
 - Do not silently change GitHub Project fields from this skill; use `codex-webui-github-projects`

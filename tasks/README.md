@@ -57,7 +57,9 @@ Each active task package `README.md` must include at least the following section
 ## Completion Flow
 
 - Finish the work described by the active package and update its handoff/evidence notes first
-- Move the completed package to `tasks/archive/` once the execution slice is locally complete and the handoff notes are updated
+- Treat sprint approval as local completion only, not as the final publish gate
+- Before any push-oriented, merge-oriented, or archive-oriented handoff, run the dedicated pre-push validation step
+- Move the completed package to `tasks/archive/` only after the execution slice is locally complete, the pre-push validation step passed, and the handoff notes are updated
 - If the default branch workflow is being used, keep the linked Issue and Project in execution state until the PR is merged to `main`, the parent checkout is synced, and the active worktree has been removed
 - If an approved direct-to-`main` exception is being used, do not mark the work complete until the commits are pushed to `origin/main`
 - After the work is reachable on `main`, update the linked Issue and Project status
