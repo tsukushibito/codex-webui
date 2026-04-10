@@ -73,6 +73,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Archived Task Packages
 
+- [issue-135-read-only-fallback-rules](./archive/issue-135-read-only-fallback-rules/README.md)
 - [issue-134-orchestrator-run-semantics](./archive/issue-134-orchestrator-run-semantics/README.md)
 - [issue-133-orchestration-log-summaries](./archive/issue-133-orchestration-log-summaries/README.md)
 - [app_server_behavior_validation](./archive/app_server_behavior_validation/README.md)

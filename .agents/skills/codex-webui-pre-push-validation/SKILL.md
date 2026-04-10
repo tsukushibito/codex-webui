@@ -12,6 +12,7 @@ Use this skill to run the dedicated pre-push validation gate after local complet
 This skill exists outside the default sprint loop. A sprint may be evaluator-approved and still not be ready for push, merge, package archive, or completion tracking until this gate passes.
 
 The gate uses the read-only `validator` agent for procedural command execution and evidence capture only. It does not replace `evaluator`, and it does not approve scope changes.
+Validator output is evidence only. It must not judge approval, decide whether the slice should merge, or convert expected diagnostic findings into automatic gate failures.
 
 ## When To Use
 
@@ -47,9 +48,10 @@ Read `README.md`, `AGENTS.md`, `tasks/README.md`, and the active task package `R
 2. Identify the exact pre-push validation commands that should run now. Prefer commands already named by the planner, task package, or source-of-truth docs, plus any narrow read-only inspections needed to explain failures. For changes under `apps/frontend-bff` or `apps/codex-runtime` that are covered by the app-local Biome scripts, include each touched app's local `npm run check` as a required Biome lint/style gate before any push-oriented handoff.
 3. Spawn the read-only `validator` agent and explicitly tell it that this is the dedicated pre-push validation gate, not part of the default sprint loop.
 4. In the validator prompt, require read-only command execution, faithful evidence capture, and no approval judgment, file edits, commits, pushes, or tracking mutations.
-5. Review the validator result locally for command coverage, pass/fail status, and any blocked commands.
-6. If the validator finds failures, missing prerequisites, or commands that cannot run, stop the publish-oriented path and report the gate as failed.
-7. If the validator evidence is complete and the required commands pass, report the gate as passed and hand back the evidence summary for the next publish-oriented skill.
+5. Review the validator result locally for command coverage, pass/fail status, expected diagnostic findings, and any blocked commands.
+6. Treat pre-declared expected diagnostic findings as evidence, not as automatic gate failures. Wrong-command or wrong-run-id framing errors with no side effects are recoverable rerun cases with corrected expected-output framing.
+7. If the validator finds real failures, missing prerequisites, or commands that cannot run after any recoverable rerun, stop the publish-oriented path and report the gate as failed.
+8. If the validator evidence is complete and the required commands pass or match the pre-declared expected diagnostic findings, report the gate as passed and hand back the evidence summary for the next publish-oriented skill.
 
 ## Required Validator Prompt Content
 
@@ -60,10 +62,11 @@ Every validator prompt for this skill must include all of the following:
 - an explicit prohibition on editing files, creating commits, pushing branches, or mutating GitHub/task state
 - the exact commands to run and the exact worktree to inspect
 - an explicit instruction to return evidence only and not judge approval
+- any pre-declared expected diagnostic findings that should be treated as read-only evidence rather than as gate failures
 
 Minimum acceptable pattern:
 
-> This is the dedicated `codex-webui` pre-push validation gate. Stay read-only. Do not edit files, create commits, push branches, or mutate GitHub/task state. Run only these commands in `<worktree>`, capture their outcomes faithfully, and return evidence only without judging approval.
+> This is the dedicated `codex-webui` pre-push validation gate. Stay read-only. Do not edit files, create commits, push branches, or mutate GitHub/task state. Run only these commands in `<worktree>`, capture their outcomes faithfully, treat the declared expected diagnostic findings as evidence only, and return evidence only without judging approval.
 
 ## Output Contract
 
@@ -87,6 +90,8 @@ If the gate passes, `Next handoff` should name the publish-oriented skill or wor
 - Do not treat sprint approval as a substitute for this gate when publish-oriented handoff is next
 - Do not let `validator` edit files, create commits, push, merge, or update tracking state
 - Do not let `validator` decide whether the slice is approved or complete
+- Do not treat pre-declared expected diagnostic findings from read-only checker commands as automatic gate failures
+- Do not treat wrong-command or wrong-run-id framing errors with no side effects as anything other than recoverable rerun cases
 - Do not broaden pre-push validation beyond the commands needed for the current handoff without saying so explicitly
 - Do not continue to push-oriented, merge-oriented, or archive-oriented handoff when the gate has failing or missing evidence
 
