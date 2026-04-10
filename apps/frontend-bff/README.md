@@ -52,6 +52,23 @@ Run Biome lint/style checks:
 npm run check
 ```
 
+Run TypeScript-only validation before the full Next.js build:
+
+```bash
+node ./node_modules/typescript/bin/tsc --noEmit --pretty false
+```
+
+Recommended local validation order for routine changes:
+
+```bash
+npm run check
+node ./node_modules/typescript/bin/tsc --noEmit --pretty false
+npm test
+npm run build
+```
+
+Prefer this order over starting with `npm run build` so lint/style and TypeScript failures surface before the heavier Next.js build step.
+
 Apply Biome formatting:
 
 ```bash

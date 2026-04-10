@@ -39,6 +39,16 @@ Run Biome lint/style checks:
 npm run check
 ```
 
+Recommended local validation order for routine changes:
+
+```bash
+npm run check
+npm test
+npm run build
+```
+
+In this app `npm run build` already runs TypeScript-only validation with `tsc --noEmit`, so it should usually come after the faster Biome and targeted test steps rather than first.
+
 Apply Biome formatting:
 
 ```bash
