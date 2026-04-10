@@ -96,6 +96,35 @@ Token usage notes:
 - `aggregate_total_token_usage` is the sum of the current thread and known direct subagents at snapshot time
 - when the current thread or session log cannot be resolved, the snapshot still records `available: false` with an `unavailable_reason`
 
+## Run Inspection Helper
+
+Use `scripts/summarize_run_log.py` when you need a read-only operational view of an existing run log instead of manually inspecting raw NDJSON.
+
+Default concise summary:
+
+```bash
+python .agents/skills/codex-webui-orchestration-log/scripts/summarize_run_log.py \
+  --run-id 2026-04-09T14-30-02Z-issue-127-close
+```
+
+Anomaly-only view:
+
+```bash
+python .agents/skills/codex-webui-orchestration-log/scripts/summarize_run_log.py \
+  --run-id 2026-04-09T14-30-02Z-issue-127-close \
+  --anomalies
+```
+
+Basic consistency checks:
+
+```bash
+python .agents/skills/codex-webui-orchestration-log/scripts/summarize_run_log.py \
+  --run-id 2026-04-09T14-30-02Z-issue-127-close \
+  --check
+```
+
+The check view reports invalid JSON lines, duplicated sequence values, missing or multiple terminal events, and mismatched `handoff_started` / `handoff_completed` counts. It is intentionally read-only and does not repair log files.
+
 ## Guardrails
 
 - Do not write ad hoc orchestration logs outside `artifacts/execution_orchestrator/`
