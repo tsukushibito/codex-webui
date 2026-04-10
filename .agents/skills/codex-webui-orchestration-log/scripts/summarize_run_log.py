@@ -10,8 +10,6 @@ from typing import Any
 
 
 TERMINAL_EVENTS = {"run_completed", "run_blocked"}
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Read an orchestration run log and print concise operational views."
@@ -200,6 +198,88 @@ def handoff_mismatches(events: list[dict[str, Any]]) -> list[str]:
     return mismatches
 
 
+def event_ref(event: dict[str, Any], fallback_index: int) -> str:
+    sequence = event.get("sequence")
+    if isinstance(sequence, int):
+        return f"seq {sequence}"
+    return f"event {fallback_index}"
+
+
+def segment_boundary_findings(events: list[dict[str, Any]]) -> list[str]:
+    findings: list[str] = []
+    if not events:
+        return findings
+
+    segment_start_index: int | None = None
+    terminal_event: tuple[int, dict[str, Any]] | None = None
+
+    for index, event in enumerate(events, start=1):
+        event_type = event.get("event_type")
+        current_ref = event_ref(event, index)
+
+        if segment_start_index is None:
+            if event_type != "run_started":
+                findings.append(
+                    f"run_resumed boundary violation: first segment must start with "
+                    f"run_started, saw {current_ref} {event_type}"
+                )
+                segment_start_index = index
+            else:
+                segment_start_index = index
+            if event_type in TERMINAL_EVENTS:
+                terminal_event = (index, event)
+            continue
+
+        if terminal_event is not None:
+            terminal_index, terminal = terminal_event
+            terminal_ref = event_ref(terminal, terminal_index)
+            terminal_type = terminal.get("event_type")
+            if event_type != "run_resumed":
+                findings.append(
+                    f"run_resumed boundary violation: expected run_resumed after "
+                    f"{terminal_ref} {terminal_type}, saw {current_ref} {event_type}"
+                )
+                if event_type in TERMINAL_EVENTS:
+                    findings.append(
+                        f"terminal event violation: segment starting at "
+                        f"{event_ref(events[segment_start_index - 1], segment_start_index)} "
+                        f"contains multiple terminal events including "
+                        f"{terminal_ref} {terminal_type} and {current_ref} {event_type}"
+                    )
+                    terminal_event = (index, event)
+                continue
+
+            terminal_event = None
+            segment_start_index = index
+            continue
+
+        if event_type == "run_started":
+            findings.append(
+                f"run_resumed boundary violation: later segments must start with "
+                f"run_resumed, saw {current_ref} run_started"
+            )
+            segment_start_index = index
+            terminal_event = None
+            continue
+
+        if event_type == "run_resumed":
+            findings.append(
+                f"run_resumed boundary violation: {current_ref} run_resumed appears "
+                "before a terminal event closes the current segment"
+            )
+            segment_start_index = index
+            terminal_event = None
+            continue
+
+        if event_type in TERMINAL_EVENTS:
+            terminal_event = (index, event)
+
+    if terminal_event is None:
+        findings.append("missing terminal event: expected run_completed or run_blocked")
+
+    return findings
+
+
 def print_check(events: list[dict[str, Any]], invalid_lines: list[str]) -> None:
     findings: list[str] = []
 
@@ -212,15 +292,7 @@ def print_check(events: list[dict[str, Any]], invalid_lines: list[str]) -> None:
             "duplicate sequence values: " + ", ".join(str(sequence) for sequence in duplicates)
         )
 
-    terminals = [event for event in events if event.get("event_type") in TERMINAL_EVENTS]
-    if not terminals:
-        findings.append("missing terminal event: expected run_completed or run_blocked")
-    elif len(terminals) > 1:
-        terminal_refs = ", ".join(
-            f"seq {event_value(event, 'sequence')} {event_value(event, 'event_type')}"
-            for event in terminals
-        )
-        findings.append(f"multiple terminal events: {terminal_refs}")
+    findings.extend(segment_boundary_findings(events))
 
     for mismatch in handoff_mismatches(events):
         findings.append(f"handoff started/completed mismatch: {mismatch}")

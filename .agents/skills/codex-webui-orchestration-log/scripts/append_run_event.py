@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import re
@@ -12,6 +13,8 @@ from typing import Any
 
 
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+TERMINAL_EVENTS = {"run_completed", "run_blocked"}
+SEGMENT_START_EVENTS = {"run_started", "run_resumed"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -83,13 +86,6 @@ def parse_details(raw: str | None) -> dict | None:
     return value
 
 
-def next_sequence(events_path: Path) -> int:
-    if not events_path.exists():
-        return 1
-    with events_path.open("r", encoding="utf-8") as handle:
-        return sum(1 for _ in handle) + 1
-
-
 def validate_args(args: argparse.Namespace) -> None:
     if not RUN_ID_PATTERN.match(args.run_id):
         raise SystemExit(
@@ -110,6 +106,99 @@ def parse_jsonl_line(raw_line: str) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         return None
     return value
+
+
+def read_existing_events(events_path: Path) -> list[dict[str, Any]]:
+    if not events_path.exists():
+        return []
+
+    events: list[dict[str, Any]] = []
+    with events_path.open("r", encoding="utf-8") as handle:
+        for raw_line in handle:
+            record = parse_jsonl_line(raw_line)
+            if record is not None:
+                events.append(record)
+    return events
+
+
+def next_sequence(events: list[dict[str, Any]]) -> int:
+    sequences = [
+        event.get("sequence")
+        for event in events
+        if isinstance(event.get("sequence"), int)
+    ]
+    if not sequences:
+        return 1
+    return max(sequences) + 1
+
+
+def event_ref(event: dict[str, Any]) -> str:
+    sequence = event.get("sequence")
+    if isinstance(sequence, int):
+        return f"seq {sequence}"
+    return "existing event"
+
+
+def validate_transition(event_type: str, events: list[dict[str, Any]]) -> None:
+    if not events:
+        if event_type != "run_started":
+            raise SystemExit(
+                "cannot append event: first event in a run must be run_started."
+            )
+        return
+
+    last_event = events[-1]
+    last_event_type = last_event.get("event_type")
+
+    if last_event_type in TERMINAL_EVENTS and event_type != "run_resumed":
+        raise SystemExit(
+            "cannot append event after terminal event "
+            f"{event_ref(last_event)} {last_event_type}: "
+            "append run_resumed to open a new segment."
+        )
+
+    if event_type == "run_started":
+        raise SystemExit(
+            "cannot append run_started after the first segment: "
+            "use run_resumed only after a terminal event."
+        )
+
+    if event_type == "run_resumed":
+        if last_event_type not in TERMINAL_EVENTS:
+            raise SystemExit(
+                "cannot append run_resumed before a terminal event closes "
+                f"the current segment; last event is {event_ref(last_event)} "
+                f"{last_event_type}."
+            )
+        return
+
+    seen_terminal = any(event.get("event_type") in TERMINAL_EVENTS for event in events)
+    if not seen_terminal:
+        return
+
+    last_segment_start_index = None
+    for index in range(len(events) - 1, -1, -1):
+        event = events[index]
+        if event.get("event_type") in SEGMENT_START_EVENTS:
+            last_segment_start_index = index
+            break
+
+    if last_segment_start_index is None:
+        raise SystemExit(
+            "cannot append event: run history is missing a segment start "
+            "event (run_started or run_resumed)."
+        )
+
+    terminal_count = sum(
+        1
+        for event in events[last_segment_start_index:]
+        if event.get("event_type") in TERMINAL_EVENTS
+    )
+    if terminal_count > 1:
+        raise SystemExit(
+            "cannot append event: current segment already contains multiple "
+            "terminal events; append-only history must be repaired manually."
+        )
 
 
 def find_session_file(root: Path, thread_id: str) -> Path | None:
@@ -312,10 +401,17 @@ def main() -> int:
     run_dir = root / "runs" / args.run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     events_path = run_dir / "events.ndjson"
+    lock_path = run_dir / ".events.lock"
 
-    event = build_event(args, next_sequence(events_path), details)
-    with events_path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+    with lock_path.open("a+", encoding="utf-8") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        events = read_existing_events(events_path)
+        validate_transition(args.event_type, events)
+        event = build_event(args, next_sequence(events), details)
+        with events_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
 
     print(events_path)
     return 0

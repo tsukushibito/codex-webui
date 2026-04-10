@@ -29,6 +29,16 @@ artifacts/execution_orchestrator/
 - Prefer structured fields such as `issue`, `skill`, `target`, and `details` over long prose
 - Do not copy full command transcripts, secrets, or large outputs into the log
 
+## Run segment contract
+
+- The first segment in a run starts with `run_started`
+- Each later segment starts with `run_resumed`
+- `run_resumed` is allowed only after a prior `run_completed` or `run_blocked`
+- After `run_completed` or `run_blocked`, the next appended event must be `run_resumed`
+- Each closed segment ends with exactly one terminal event: `run_completed` or `run_blocked`
+
+Use `.agents/skills/codex-webui-orchestration-log/scripts/append_run_event.py` to enforce this contract during append, and use `.agents/skills/codex-webui-orchestration-log/scripts/summarize_run_log.py --check` to detect boundary violations in existing logs.
+
 ## Minimum event schema
 
 Each event should include at least:
