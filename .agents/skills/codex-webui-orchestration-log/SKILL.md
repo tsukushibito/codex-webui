@@ -42,6 +42,16 @@ The helper script also appends a token-usage snapshot under `details.token_usage
 - Prefer `YYYY-MM-DDTHH-mm-ssZ-<goal-slug>`
 - Keep the slug short and path-safe
 
+## Run Segment Contract
+
+- The first segment in a run must start with `run_started`
+- Later segments must start with `run_resumed`
+- `run_resumed` is valid only after an earlier segment ended with `run_completed` or `run_blocked`
+- After `run_completed` or `run_blocked`, no further event may be appended until `run_resumed` opens the next segment
+- Each closed segment ends with exactly one terminal event: `run_completed` or `run_blocked`
+
+The append helper enforces this contract on write, and `scripts/summarize_run_log.py --check` reports boundary violations in existing logs without repairing them.
+
 ## Event Coverage
 
 At minimum, log these events when they happen:
@@ -123,7 +133,7 @@ python .agents/skills/codex-webui-orchestration-log/scripts/summarize_run_log.py
   --check
 ```
 
-The check view reports invalid JSON lines, duplicated sequence values, missing or multiple terminal events, and mismatched `handoff_started` / `handoff_completed` counts. It is intentionally read-only and does not repair log files.
+The check view reports invalid JSON lines, duplicated sequence values, missing terminal events, segment terminal violations, `run_resumed` boundary violations, and mismatched `handoff_started` / `handoff_completed` counts. It is intentionally read-only and does not repair log files.
 
 ## Guardrails
 
