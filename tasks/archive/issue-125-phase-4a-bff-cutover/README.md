@@ -77,10 +77,11 @@
 
 ## Status / handoff notes
 
-- Status: `in_progress`
+- Status: `merged`
 - Notes: Runtime issue `#126` is already merged to `main`, so this package continues from the v0.9 internal thread/request runtime surface. This recovery slice is limited to proving the existing frontend-bff cutover candidate is evaluator-ready within the approved write scope. Focused validation targets only the v0.9 REST routes and helpers listed above, and that bounded scope was evaluator-approved.
 - Pre-push cleanup note: the attempted `#138` legacy-surface unblock found no failing state on a clean `#138` branch. Remaining format-only diagnostics existed in this `#125` integration worktree, so they were handled as `#125` pre-push cleanup.
 - 2026-04-11 publish validation after rebasing onto `origin/main`: focused Biome passed from the repository root; `npm test -- tests/routes.test.ts` passed with 20 tests; `node ./node_modules/typescript/bin/tsc --noEmit --pretty false` passed after adding the missing `@types/react-dom` dev dependency required by existing React DOM tests; `NEXT_TELEMETRY_DISABLED=1 npm run build` passed; whole-app `npm run check` passed; `git diff --check` passed.
+- Completion retrospective: boundary is Issue #125 package archive after PR #142 reached `main`. Contract check is satisfied by merged v0.9 thread/request REST routes, public shaping helpers, and focused route coverage. The main workflow problem was stale local worktree state that left publish-ready work unpushed; future recovery should reconcile GitHub active PR/package fields before closure automation can close an Issue ahead of local cleanup. No durable skill update is required.
 
 ## Archive conditions
 
