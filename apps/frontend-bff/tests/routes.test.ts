@@ -6,9 +6,19 @@ import {
   getApproval,
   getApprovalStream,
   getHome,
+  getPendingRequest,
+  getRequestDetail,
   getSessionStream,
+  getThread,
+  getThreadView,
+  getTimeline,
   listEvents,
+  listThreads,
   listWorkspaces,
+  postRequestResponse,
+  postThreadInput,
+  postThreadInterrupt,
+  postWorkspaceInput,
   stopSession,
 } from "../src/handlers";
 
@@ -152,6 +162,697 @@ describe("frontend-bff route handlers", () => {
       ],
       pending_approval_count: 2,
       updated_at: "2026-03-27T05:22:00Z",
+    });
+  });
+
+  it("maps workspace thread list responses to v0.9 thread_list_item", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        items: [
+          {
+            thread_id: "thread_001",
+            workspace_id: "ws_alpha",
+            title: "Investigate build",
+            created_at: "2026-03-27T05:12:34Z",
+            updated_at: "2026-03-27T05:22:00Z",
+            native_status: {
+              thread_status: "active",
+              active_flags: ["waitingOnApproval"],
+              latest_turn_status: "inProgress",
+            },
+            derived_hints: {
+              accepting_user_input: false,
+              has_pending_request: true,
+              blocked_reason: "pending_request",
+            },
+          },
+        ],
+        next_cursor: null,
+        has_more: false,
+      }),
+    );
+
+    const response = await listThreads(
+      new Request("http://localhost/api/v1/workspaces/ws_alpha/threads?sort=-updated_at"),
+      "ws_alpha",
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:3001/api/v1/workspaces/ws_alpha/threads?sort=-updated_at",
+      expect.objectContaining({
+        cache: "no-store",
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      items: [
+        {
+          thread_id: "thread_001",
+          workspace_id: "ws_alpha",
+          native_status: {
+            thread_status: "active",
+            active_flags: ["waitingOnApproval"],
+            latest_turn_status: "inProgress",
+          },
+          updated_at: "2026-03-27T05:22:00Z",
+          current_activity: {
+            kind: "waiting_on_approval",
+            label: "Approval required",
+          },
+          badge: {
+            kind: "approval_required",
+            label: "Approval required",
+          },
+          blocked_cue: {
+            kind: "approval_required",
+            label: "Needs your response",
+          },
+          resume_cue: {
+            reason_kind: "waiting_on_approval",
+            priority_band: "highest",
+            label: "Resume here first",
+          },
+        },
+      ],
+      next_cursor: null,
+      has_more: false,
+    });
+  });
+
+  it("maps thread snapshots to the public thread facade", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        thread_id: "thread_001",
+        workspace_id: "ws_alpha",
+        title: "Investigate build",
+        created_at: "2026-03-27T05:12:34Z",
+        updated_at: "2026-03-27T05:22:00Z",
+        native_status: {
+          thread_status: "idle",
+          active_flags: [],
+          latest_turn_status: "completed",
+        },
+        derived_hints: {
+          accepting_user_input: true,
+          has_pending_request: false,
+          blocked_reason: null,
+        },
+      }),
+    );
+
+    const response = await getThread(
+      new Request("http://localhost/api/v1/threads/thread_001"),
+      "thread_001",
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:3001/api/v1/threads/thread_001",
+      expect.objectContaining({
+        cache: "no-store",
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      thread_id: "thread_001",
+      workspace_id: "ws_alpha",
+      native_status: {
+        thread_status: "idle",
+        active_flags: [],
+        latest_turn_status: "completed",
+      },
+      updated_at: "2026-03-27T05:22:00Z",
+    });
+  });
+
+  it("forwards workspace input requests and maps accepted results to the public shape", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          thread: {
+            thread_id: "thread_002",
+            workspace_id: "ws_alpha",
+            title: "Investigate build",
+            created_at: "2026-03-27T05:12:34Z",
+            updated_at: "2026-03-27T05:22:00Z",
+            native_status: {
+              thread_status: "active",
+              active_flags: [],
+              latest_turn_status: "inProgress",
+            },
+            derived_hints: {
+              accepting_user_input: false,
+              has_pending_request: false,
+              blocked_reason: null,
+            },
+          },
+        },
+        202,
+      ),
+    );
+
+    const response = await postWorkspaceInput(
+      new Request("http://localhost/api/v1/workspaces/ws_alpha/inputs", {
+        method: "POST",
+        body: JSON.stringify({
+          client_request_id: "input_001",
+          content: "Please investigate the build failure.",
+        }),
+      }),
+      "ws_alpha",
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:3001/api/v1/workspaces/ws_alpha/inputs",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          client_request_id: "input_001",
+          content: "Please investigate the build failure.",
+        }),
+      }),
+    );
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({
+      accepted: {
+        thread_id: "thread_002",
+        turn_id: null,
+        input_item_id: null,
+      },
+      thread: {
+        thread_id: "thread_002",
+        workspace_id: "ws_alpha",
+        native_status: {
+          thread_status: "active",
+          active_flags: [],
+          latest_turn_status: "inProgress",
+        },
+        updated_at: "2026-03-27T05:22:00Z",
+      },
+    });
+  });
+
+  it("forwards thread input requests and maps accepted results to the public shape", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          thread: {
+            thread_id: "thread_001",
+            workspace_id: "ws_alpha",
+            title: "Investigate build",
+            created_at: "2026-03-27T05:12:34Z",
+            updated_at: "2026-03-27T05:23:00Z",
+            native_status: {
+              thread_status: "active",
+              active_flags: [],
+              latest_turn_status: "inProgress",
+            },
+            derived_hints: {
+              accepting_user_input: false,
+              has_pending_request: false,
+              blocked_reason: null,
+            },
+          },
+          accepted_input: {
+            message_id: "msg_001",
+            session_id: "thread_001",
+            role: "user",
+            content: "Show me the root cause.",
+            created_at: "2026-03-27T05:23:00Z",
+            source_item_type: "user_message",
+          },
+        },
+        202,
+      ),
+    );
+
+    const response = await postThreadInput(
+      new Request("http://localhost/api/v1/threads/thread_001/inputs", {
+        method: "POST",
+        body: JSON.stringify({
+          client_request_id: "input_002",
+          content: "Show me the root cause.",
+        }),
+      }),
+      "thread_001",
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:3001/api/v1/threads/thread_001/inputs",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          client_request_id: "input_002",
+          content: "Show me the root cause.",
+        }),
+      }),
+    );
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({
+      accepted: {
+        thread_id: "thread_001",
+        turn_id: null,
+        input_item_id: "msg_001",
+      },
+      thread: {
+        thread_id: "thread_001",
+        workspace_id: "ws_alpha",
+        native_status: {
+          thread_status: "active",
+          active_flags: [],
+          latest_turn_status: "inProgress",
+        },
+        updated_at: "2026-03-27T05:23:00Z",
+      },
+    });
+  });
+
+  it("forwards thread interrupts and maps runtime thread wrappers to the public thread facade", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        thread: {
+          thread_id: "thread_001",
+          workspace_id: "ws_alpha",
+          title: "Investigate build",
+          created_at: "2026-03-27T05:12:34Z",
+          updated_at: "2026-03-27T05:24:00Z",
+          native_status: {
+            thread_status: "idle",
+            active_flags: [],
+            latest_turn_status: "interrupted",
+          },
+          derived_hints: {
+            accepting_user_input: true,
+            has_pending_request: false,
+            blocked_reason: null,
+          },
+        },
+      }),
+    );
+
+    const response = await postThreadInterrupt(
+      new Request("http://localhost/api/v1/threads/thread_001/interrupt", {
+        method: "POST",
+      }),
+      "thread_001",
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:3001/api/v1/threads/thread_001/interrupt",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      thread_id: "thread_001",
+      workspace_id: "ws_alpha",
+      native_status: {
+        thread_status: "idle",
+        active_flags: [],
+        latest_turn_status: "interrupted",
+      },
+      updated_at: "2026-03-27T05:24:00Z",
+    });
+  });
+
+  it("forwards request responses and maps resolved request results to the public action shape", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        request: {
+          request_id: "req_001",
+          thread_id: "thread_001",
+          turn_id: "turn_001",
+          item_id: "item_001",
+          request_kind: "approval",
+          status: "resolved",
+          decision: "approved",
+          risk_classification: "external_side_effect",
+          operation_summary: "git push origin main",
+          reason: "Codex requests permission to push changes to remote.",
+          summary: "Run git push",
+          requested_at: "2026-03-27T05:20:00Z",
+          responded_at: "2026-03-27T05:21:00Z",
+          context: null,
+        },
+        thread: {
+          thread_id: "thread_001",
+          workspace_id: "ws_alpha",
+          title: "Investigate build",
+          created_at: "2026-03-27T05:12:34Z",
+          updated_at: "2026-03-27T05:21:00Z",
+          native_status: {
+            thread_status: "active",
+            active_flags: [],
+            latest_turn_status: "inProgress",
+          },
+          derived_hints: {
+            accepting_user_input: false,
+            has_pending_request: false,
+            blocked_reason: "turn_in_progress",
+          },
+        },
+      }),
+    );
+
+    const response = await postRequestResponse(
+      new Request("http://localhost/api/v1/requests/req_001/response", {
+        method: "POST",
+        body: JSON.stringify({
+          client_response_id: "resp_001",
+          decision: "approved",
+        }),
+      }),
+      "req_001",
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:3001/api/v1/requests/req_001/response",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          client_response_id: "resp_001",
+          decision: "approved",
+        }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      request: {
+        request_id: "req_001",
+        status: "resolved",
+        decision: "approved",
+        responded_at: "2026-03-27T05:21:00Z",
+      },
+      thread: {
+        thread_id: "thread_001",
+        workspace_id: "ws_alpha",
+        native_status: {
+          thread_status: "active",
+          active_flags: [],
+          latest_turn_status: "inProgress",
+        },
+        updated_at: "2026-03-27T05:21:00Z",
+      },
+    });
+  });
+
+  it("passes through request response conflict envelopes unchanged", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          error: {
+            code: "idempotency_conflict",
+            message: "request response id conflicts with an existing decision",
+            details: {
+              request_id: "req_001",
+              client_response_id: "resp_001",
+            },
+          },
+        },
+        409,
+      ),
+    );
+
+    const response = await postRequestResponse(
+      new Request("http://localhost/api/v1/requests/req_001/response", {
+        method: "POST",
+        body: JSON.stringify({
+          client_response_id: "resp_001",
+          decision: "denied",
+        }),
+      }),
+      "req_001",
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "idempotency_conflict",
+        message: "request response id conflicts with an existing decision",
+        details: {
+          request_id: "req_001",
+          client_response_id: "resp_001",
+        },
+      },
+    });
+  });
+
+  it("preserves pending_request null semantics", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        thread_id: "thread_001",
+        pending_request: null,
+        latest_resolved_request: null,
+        checked_at: "2026-03-27T05:22:00Z",
+      }),
+    );
+
+    const response = await getPendingRequest(
+      new Request("http://localhost/api/v1/threads/thread_001/pending_request"),
+      "thread_001",
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:3001/api/v1/threads/thread_001/pending_request",
+      expect.objectContaining({
+        cache: "no-store",
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      thread_id: "thread_001",
+      pending_request: null,
+      latest_resolved_request: null,
+      checked_at: "2026-03-27T05:22:00Z",
+    });
+  });
+
+  it("maps thread_view helper responses to the public aggregate", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          thread: {
+            thread_id: "thread_001",
+            workspace_id: "ws_alpha",
+            title: "Investigate build",
+            created_at: "2026-03-27T05:12:34Z",
+            updated_at: "2026-03-27T05:22:00Z",
+            native_status: {
+              thread_status: "idle",
+              active_flags: [],
+              latest_turn_status: "completed",
+            },
+            derived_hints: {
+              accepting_user_input: true,
+              has_pending_request: false,
+              blocked_reason: null,
+            },
+          },
+          pending_request: null,
+          latest_resolved_request: null,
+          checked_at: "2026-03-27T05:22:00Z",
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            {
+              timeline_item_id: "evt_001",
+              thread_id: "thread_001",
+              sequence: 42,
+              item_kind: "message.user",
+              occurred_at: "2026-03-27T05:22:10Z",
+              summary: "user input accepted",
+              request_id: null,
+            },
+          ],
+          next_cursor: null,
+          has_more: false,
+        }),
+      );
+
+    const response = await getThreadView(
+      new Request("http://localhost/api/v1/threads/thread_001/view"),
+      "thread_001",
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "http://127.0.0.1:3001/api/v1/threads/thread_001/view",
+      expect.objectContaining({
+        cache: "no-store",
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "http://127.0.0.1:3001/api/v1/threads/thread_001/timeline",
+      expect.objectContaining({
+        cache: "no-store",
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      thread: {
+        thread_id: "thread_001",
+        workspace_id: "ws_alpha",
+        native_status: {
+          thread_status: "idle",
+          active_flags: [],
+          latest_turn_status: "completed",
+        },
+        updated_at: "2026-03-27T05:22:00Z",
+      },
+      current_activity: {
+        kind: "waiting_on_user_input",
+        label: "Waiting for your input",
+      },
+      pending_request: null,
+      latest_resolved_request: null,
+      composer: {
+        accepting_user_input: true,
+        interrupt_available: false,
+        blocked_by_request: false,
+      },
+      timeline: {
+        items: [
+          {
+            timeline_item_id: "evt_001",
+            thread_id: "thread_001",
+            turn_id: null,
+            item_id: null,
+            sequence: 42,
+            occurred_at: "2026-03-27T05:22:10Z",
+            kind: "message.user",
+            payload: {
+              summary: "user input accepted",
+            },
+          },
+        ],
+        next_cursor: null,
+        has_more: false,
+      },
+    });
+  });
+
+  it("maps thread timeline responses to public timeline_item projections", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        items: [
+          {
+            timeline_item_id: "evt_001",
+            thread_id: "thread_001",
+            sequence: 42,
+            item_kind: "request.started",
+            occurred_at: "2026-03-27T05:22:10Z",
+            summary: "approval requested",
+            request_id: "req_001",
+          },
+        ],
+        next_cursor: null,
+        has_more: false,
+      }),
+    );
+
+    const response = await getTimeline(
+      new Request("http://localhost/api/v1/threads/thread_001/timeline?sort=-sequence"),
+      "thread_001",
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:3001/api/v1/threads/thread_001/timeline?sort=-sequence",
+      expect.objectContaining({
+        cache: "no-store",
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      items: [
+        {
+          timeline_item_id: "evt_001",
+          thread_id: "thread_001",
+          turn_id: null,
+          item_id: null,
+          sequence: 42,
+          occurred_at: "2026-03-27T05:22:10Z",
+          kind: "request.started",
+          payload: {
+            summary: "approval requested",
+            request_id: "req_001",
+          },
+        },
+      ],
+      next_cursor: null,
+      has_more: false,
+    });
+  });
+
+  it("maps request detail responses to the public helper facade", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        request_id: "req_001",
+        thread_id: "thread_001",
+        turn_id: "turn_001",
+        item_id: "item_001",
+        request_kind: "approval",
+        status: "pending",
+        decision: null,
+        risk_classification: "external_side_effect",
+        operation_summary: "git push origin main",
+        reason: "Codex requests permission to push changes to remote.",
+        summary: "Run git push",
+        requested_at: "2026-03-27T05:20:00Z",
+        responded_at: null,
+        context: {
+          repo: "tsukushibito/codex-webui",
+        },
+      }),
+    );
+
+    const response = await getRequestDetail(
+      new Request("http://localhost/api/v1/requests/req_001"),
+      "req_001",
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:3001/api/v1/requests/req_001",
+      expect.objectContaining({
+        cache: "no-store",
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      request_id: "req_001",
+      thread_id: "thread_001",
+      turn_id: "turn_001",
+      item_id: "item_001",
+      request_kind: "approval",
+      status: "pending",
+      risk_category: "external_side_effect",
+      summary: "Run git push",
+      reason: "Codex requests permission to push changes to remote.",
+      operation_summary: "git push origin main",
+      requested_at: "2026-03-27T05:20:00Z",
+      responded_at: null,
+      decision: null,
+      decision_options: {
+        policy_scope_supported: false,
+        default_policy_scope: "once",
+      },
+      context: {
+        repo: "tsukushibito/codex-webui",
+      },
     });
   });
 

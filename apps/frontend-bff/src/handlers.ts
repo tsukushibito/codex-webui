@@ -11,9 +11,17 @@ import {
   mapEventList,
   mapMessage,
   mapMessageList,
+  mapPendingRequestView,
+  mapRequestDetail,
+  mapRequestResponseResult,
   mapSession,
   mapSessionList,
   mapStopResult,
+  mapThread,
+  mapThreadInputAcceptedResponse,
+  mapThreadList,
+  mapThreadView,
+  mapTimeline,
   mapWorkspace,
   mapWorkspaceList,
 } from "./mappings";
@@ -26,9 +34,17 @@ import type {
   RuntimeApprovalStreamEventProjection,
   RuntimeApprovalSummary,
   RuntimeMessageProjection,
+  RuntimeRequestDetailView,
+  RuntimeRequestResponseResult,
   RuntimeSessionEventProjection,
   RuntimeSessionSummary,
   RuntimeStopResult,
+  RuntimeThreadInputAcceptedResponse,
+  RuntimeThreadInterruptResponse,
+  RuntimeThreadPendingRequestView,
+  RuntimeThreadSummary,
+  RuntimeThreadViewHelper,
+  RuntimeTimelineItem,
   RuntimeWorkspaceSummary,
 } from "./runtime-types";
 
@@ -285,6 +301,189 @@ export async function getWorkspace(_request: Request, workspaceId: string) {
     }
 
     return jsonResponse(result.status, mapWorkspace(result.body));
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function listThreads(request: Request, workspaceId: string) {
+  try {
+    const result = await runtimeClient.requestJson<ListResponse<RuntimeThreadSummary>>(
+      `/api/v1/workspaces/${workspaceId}/threads${forwardSearch(request)}`,
+    );
+
+    if (isErrorEnvelope(result.body)) {
+      return passthroughRuntimeError(result.status, result.body);
+    }
+
+    return jsonResponse(result.status, mapThreadList(result.body));
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function getThread(_request: Request, threadId: string) {
+  try {
+    const result = await runtimeClient.requestJson<RuntimeThreadSummary>(
+      `/api/v1/threads/${threadId}`,
+    );
+
+    if (isErrorEnvelope(result.body)) {
+      return passthroughRuntimeError(result.status, result.body);
+    }
+
+    return jsonResponse(result.status, mapThread(result.body));
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function getPendingRequest(_request: Request, threadId: string) {
+  try {
+    const result = await runtimeClient.requestJson<RuntimeThreadPendingRequestView>(
+      `/api/v1/threads/${threadId}/pending_request`,
+    );
+
+    if (isErrorEnvelope(result.body)) {
+      return passthroughRuntimeError(result.status, result.body);
+    }
+
+    return jsonResponse(result.status, mapPendingRequestView(result.body));
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function getRequestDetail(_request: Request, requestId: string) {
+  try {
+    const result = await runtimeClient.requestJson<RuntimeRequestDetailView>(
+      `/api/v1/requests/${requestId}`,
+    );
+
+    if (isErrorEnvelope(result.body)) {
+      return passthroughRuntimeError(result.status, result.body);
+    }
+
+    return jsonResponse(result.status, mapRequestDetail(result.body));
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function getThreadView(_request: Request, threadId: string) {
+  try {
+    const [viewResult, timelineResult] = await Promise.all([
+      runtimeClient.requestJson<RuntimeThreadViewHelper>(`/api/v1/threads/${threadId}/view`),
+      runtimeClient.requestJson<ListResponse<RuntimeTimelineItem>>(
+        `/api/v1/threads/${threadId}/timeline`,
+      ),
+    ]);
+
+    if (isErrorEnvelope(viewResult.body)) {
+      return passthroughRuntimeError(viewResult.status, viewResult.body);
+    }
+
+    if (isErrorEnvelope(timelineResult.body)) {
+      return passthroughRuntimeError(timelineResult.status, timelineResult.body);
+    }
+
+    return jsonResponse(viewResult.status, mapThreadView(viewResult.body, timelineResult.body));
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function getTimeline(request: Request, threadId: string) {
+  try {
+    const result = await runtimeClient.requestJson<ListResponse<RuntimeTimelineItem>>(
+      `/api/v1/threads/${threadId}/timeline${forwardSearch(request)}`,
+    );
+
+    if (isErrorEnvelope(result.body)) {
+      return passthroughRuntimeError(result.status, result.body);
+    }
+
+    return jsonResponse(result.status, mapTimeline(result.body));
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function postWorkspaceInput(request: Request, workspaceId: string) {
+  try {
+    const result = await runtimeClient.requestJson<RuntimeThreadInputAcceptedResponse>(
+      `/api/v1/workspaces/${workspaceId}/inputs`,
+      {
+        method: "POST",
+        body: await readJsonBody(request),
+      },
+    );
+
+    if (isErrorEnvelope(result.body)) {
+      return passthroughRuntimeError(result.status, result.body);
+    }
+
+    return jsonResponse(result.status, mapThreadInputAcceptedResponse(result.body));
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function postThreadInput(request: Request, threadId: string) {
+  try {
+    const result = await runtimeClient.requestJson<RuntimeThreadInputAcceptedResponse>(
+      `/api/v1/threads/${threadId}/inputs`,
+      {
+        method: "POST",
+        body: await readJsonBody(request),
+      },
+    );
+
+    if (isErrorEnvelope(result.body)) {
+      return passthroughRuntimeError(result.status, result.body);
+    }
+
+    return jsonResponse(result.status, mapThreadInputAcceptedResponse(result.body));
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function postThreadInterrupt(_request: Request, threadId: string) {
+  try {
+    const result = await runtimeClient.requestJson<RuntimeThreadInterruptResponse>(
+      `/api/v1/threads/${threadId}/interrupt`,
+      {
+        method: "POST",
+        body: {},
+      },
+    );
+
+    if (isErrorEnvelope(result.body)) {
+      return passthroughRuntimeError(result.status, result.body);
+    }
+
+    return jsonResponse(result.status, mapThread(result.body.thread));
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function postRequestResponse(request: Request, requestId: string) {
+  try {
+    const result = await runtimeClient.requestJson<RuntimeRequestResponseResult>(
+      `/api/v1/requests/${requestId}/response`,
+      {
+        method: "POST",
+        body: await readJsonBody(request),
+      },
+    );
+
+    if (isErrorEnvelope(result.body)) {
+      return passthroughRuntimeError(result.status, result.body);
+    }
+
+    return jsonResponse(result.status, mapRequestResponseResult(result.body));
   } catch (error) {
     return toErrorResponse(error);
   }
