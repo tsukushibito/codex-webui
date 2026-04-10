@@ -1,6 +1,6 @@
 ---
 name: codex-webui-execution-orchestrator
-description: Coordinate multi-Issue execution in `codex-webui` by delegating read-only intake to the custom `intake` agent, choosing one current target, and routing to the next existing repo skill. Use when the main agent should decide which Issue to work on next across multiple active or candidate Issues, including whether a broad target must be split before execution.
+description: Coordinate multi-Issue execution in `codex-webui` by running main-orchestrator intake with `codex-webui-work-intake`, choosing one current target, and routing to the next existing repo skill. Use when the main agent should decide which Issue to work on next across multiple active or candidate Issues, including whether a broad target must be split before execution.
 ---
 
 # Codex WebUI Execution Orchestrator
@@ -13,7 +13,7 @@ This skill is routing-only. It does not replace the existing single-Issue skills
 
 Responsibilities:
 
-- use delegated intake to inspect Project / Issue / PR / worktree / `tasks/` state
+- run main-orchestrator intake to inspect Project / Issue / PR / worktree / `tasks/` state
 - open and append one run-scoped orchestration log through `codex-webui-orchestration-log`
 - choose exactly one current execution target
 - park the remaining Issues explicitly
@@ -24,7 +24,7 @@ Responsibilities:
 - own the cross-skill continuation loop when the user asked to keep going until a concrete end-state is reached
 - route to `codex-webui-execution-handoff` before stopping when the requested work cannot be completed in the current session but resumable follow-up is still required
 
-The main agent should remain an orchestrator. Planning, implementation, sprint evaluation, and pre-push validation should be delegated to the repo's sub-agents through the selected handoff skill instead of being executed directly by the main agent.
+The main agent should remain an orchestrator. Intake is critical-path routing work and stays in the main orchestrator. Planning, implementation, sprint evaluation, and pre-push validation should be delegated to the repo's sub-agents through the selected handoff skill instead of being executed directly by the main agent.
 
 This skill does not directly mutate GitHub Projects, Issues, or local task packages.
 
@@ -61,20 +61,20 @@ Follow this order every time.
 
 1. Read top-level repo guidance and roadmap docs.
 2. Invoke `$codex-webui-orchestration-log` to open or continue one run-scoped log under `artifacts/execution_orchestrator/`, then append `run_started` or `run_resumed` with the current routing goal.
-3. Delegate intake to the custom read-only `intake` agent defined in `.codex/config.toml`, explicitly instructing it to use `$codex-webui-work-intake` for the intake pass.
-4. Use the intake summary to select one current target.
+3. Run `$codex-webui-work-intake` in the main orchestrator for the intake pass, keeping the pass read-only and routing-only.
+4. Use the main intake result to select one current target.
 5. Check whether tracking drift blocks execution.
 6. Check whether the current target must be split into SubIssues before execution.
 7. Select exactly one next handoff skill.
 8. Append a routing event for the selected handoff or any blocking drift before continuing.
 9. If the user asked to proceed with work in the current turn, invoke that selected handoff skill in the same turn instead of stopping after the routing brief.
-10. If the user asked to continue until a concrete end-state, treat steps 3-9 as one iteration, then re-run intake after the invoked handoff skill returns instead of stopping after the first handoff.
+10. If the user asked to continue until a concrete end-state, treat steps 3-9 as one iteration, then rerun main intake after the invoked handoff skill returns instead of stopping after the first handoff.
 11. If the requested end-state cannot be reached in the current session and resumable follow-up is the correct outcome, invoke `codex-webui-execution-handoff` once before ending the turn.
 12. Append `run_completed` or `run_blocked` after the final handoff outcome is known.
 13. Stop only when the requested end-state is reached, or execution is hard blocked and the required handoff outcome has been produced or has itself failed.
 14. Park the other Issues explicitly.
 
-Do not skip delegated intake in this workflow.
+Do not skip main intake in this workflow.
 
 If the user explicitly asked only for routing, target selection, or a next-skill recommendation, the workflow may stop after the routing brief.
 In that routing-only case, do not force a resumable handoff doc unless the user explicitly asked for one.
@@ -98,8 +98,8 @@ Append events at minimum for:
 
 Append an `anomaly` event immediately when any of the following happens:
 
-- delegated intake violates the read-only boundary
-- delegated intake times out, fails to complete, or returns an unusable result
+- main intake cannot produce enough verified routing evidence to choose a next step
+- a downstream delegated handoff role times out, fails to complete, mutates outside its role boundary, or returns an unusable result
 - a support command fails during routing or handoff coordination
 - a selected handoff skill fails to complete cleanly
 - the logger script itself fails
@@ -124,13 +124,13 @@ When a resumable stop requires `codex-webui-execution-handoff`, log the failed o
 
 Use concise structured entries. Do not dump long transcripts into the run log.
 
-## Delegated Intake
+## Main Intake
 
-The delegated intake agent is the first execution step for this skill.
+Main intake is the first routing step for this skill after the run log is opened.
 
-The orchestrator must explicitly tell the delegated agent to use `$codex-webui-work-intake` before doing any intake work. Do not rely on the agent to infer that skill on its own.
+The orchestrator must use `$codex-webui-work-intake` directly in the main thread before selecting a current target. Do not spawn or delegate to a dedicated intake agent.
 
-Its job is to inspect:
+The intake pass inspects:
 
 - GitHub Project state
 - open linked Issues, dependencies, and active PRs
@@ -138,9 +138,9 @@ Its job is to inspect:
 - source-of-truth docs and nearest relevant README for the candidate target
 - local implementation state only after execution tracking is understood, inspecting the tracked active worktree explicitly for normal branch/PR work instead of relying only on parent-checkout scans
 
-The orchestrator should consume the intake result as a concise routing summary, not as a long audit transcript.
+Keep the result as a concise routing summary, not as a long audit transcript.
 
-Delegated intake is strictly read-only.
+Main intake is strictly read-only.
 
 It must not:
 
@@ -148,22 +148,21 @@ It must not:
 - edit GitHub Issues, Project items, or Project fields
 - implement code or documents for the chosen Issue
 
-If intake detects tracking drift, it reports that drift back to the orchestrator for routing; it does not correct the drift itself.
+If intake detects tracking drift, record the drift for routing; do not correct the drift from the intake step itself.
 
-If delegated intake violates the read-only boundary, do not silently trust the result. Append an `anomaly` event, report the violation concretely, and route the next step based on the now-dirty state instead of pretending intake stayed read-only.
+If the main intake pass reveals that state is already dirty or ambiguous, append an `anomaly` event when the dirty state affects routing, report it concretely, and route based on verified state instead of assuming clean inputs.
 
-## Required Intake Prompt Content
+## Downstream Read-Only Prompt Content
 
-Every delegated intake message must include all of the following, in plain terms:
+When this workflow delegates downstream read-only work, every delegated prompt must include all of the following, in plain terms:
 
-- an explicit instruction to use `$codex-webui-work-intake`
 - an explicit statement that the task is read-only
 - an explicit prohibition on editing files, GitHub state, task packages, or running implementation/server commands
-- the current routing goal, such as selecting one current target or reassessing after a handoff
+- the current handoff goal, expected output shape, and any command framing required by the selected skill
 
 Minimum acceptable pattern:
 
-> Use `$codex-webui-work-intake` for this intake pass. This is read-only routing work. Do not edit files, mutate GitHub/Project/task state, or start servers. Inspect Project, issues, tasks, worktree, and relevant docs, then return a concise routing summary with one recommended current target.
+> This is read-only handoff work. Do not edit files, mutate GitHub/Project/task state, or start servers. Run only the requested inspection or validation commands, then return concise evidence in the requested output shape.
 
 Reusable fallback clause for delegated read-only roles:
 
@@ -173,7 +172,6 @@ Reusable fallback clause for delegated read-only roles:
 
 Apply these observed-state rules before selecting the next step:
 
-- `delegated_intake_timeout`, failed intake, or unusable intake with no verified side effects: `continue`
 - planner wrong-shape output with `observed_side_effects: none_beyond_reads`: `continue` with tighter prompt and retry
 - validator wrong-command or wrong-run-id framing error with no mutation: `continue` with corrected expected-output framing
 - isolated unexpected side effects such as a stray `.tmp` handoff output, with verified repo/task/GitHub state otherwise clean: `quarantine`
@@ -222,7 +220,7 @@ Before selecting a normal next-step handoff, ask whether execution can still con
 When the user asked to proceed with execution, do not stop after naming the next handoff skill. Invoke exactly one selected handoff skill in the same turn.
 Treat this as exactly one handoff per iteration, not necessarily one handoff for the entire user request.
 
-When the user asked to continue until a concrete end-state, return to delegated intake after the invoked handoff skill finishes and route again until one of the following happens:
+When the user asked to continue until a concrete end-state, rerun main intake after the invoked handoff skill finishes and route again until one of the following happens:
 
 - the requested end-state is reached, such as an Issue close, PR merge plus cleanup, or Project `Done`
 - execution is hard blocked and requires user input
@@ -285,10 +283,9 @@ If the run ends by creating a resumable handoff, `Next handoff` should report th
 
 - Do not replace `codex-webui-work-intake`; keep it usable as a standalone intake skill
 - Do not skip `codex-webui-orchestration-log` when the workflow is actively coordinating execution
-- Do not delegate intake without explicitly naming `$codex-webui-work-intake` in the intake prompt
+- Do not delegate intake to a dedicated intake agent; run `$codex-webui-work-intake` in the main orchestrator
 - Do not implement the chosen Issue from this skill
 - Do not update GitHub Projects, Issues, or `tasks/` directly from this skill
-- Do not let delegated intake mutate GitHub state, local task-package state, or implementation files
 - Do not silently ignore read-only violations, incomplete delegated work, handoff failures, or command failures; append an `anomaly` event and surface the problem
 - Do not produce a backlog dump or queue report as the final answer
 - Do not recommend parallel execution of multiple Issues as the default path

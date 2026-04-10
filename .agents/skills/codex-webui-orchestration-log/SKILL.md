@@ -27,8 +27,8 @@ Read the helper script only when you need to change its behavior:
 Follow this order every time.
 
 1. Choose one run id for the current orchestration request or continuation loop.
-2. Append a `run_started` event before delegated intake or any handoff work begins.
-3. Append an event before and after each delegated intake or selected handoff.
+2. Append a `run_started` event before main intake or any handoff work begins.
+3. Append an event before and after each main intake pass or selected handoff.
 4. Append an `anomaly` event immediately when routing work hits a workflow problem.
 5. Append a terminal event such as `run_completed` or `run_blocked` before ending the turn.
 
@@ -94,7 +94,7 @@ python .agents/skills/codex-webui-orchestration-log/scripts/append_run_event.py 
   --event-type intake_started \
   --stage intake \
   --status info \
-  --summary "Delegated read-only intake for current target selection." \
+  --summary "Main-orchestrator intake for current target selection." \
   --actor orchestrator \
   --routing-goal "Select one current target and next handoff"
 ```
@@ -104,7 +104,7 @@ Useful optional flags:
 - `--target issue-130`
 - `--skill codex-webui-sprint-cycle`
 - `--issue 130`
-- `--details-json '{"timeout_seconds": 30, "agent": "intake"}'`
+- `--details-json '{"evidence_scope": "main_intake"}'`
 - `--token-thread-id 019d728a-253b-7550-ab46-eb5bb727b0e9` to inspect a different Codex thread than `CODEX_THREAD_ID`
 - `--sessions-root /custom/sessions/root` when testing against a different Codex sessions tree
 - `--no-token-usage` to skip the automatic token snapshot

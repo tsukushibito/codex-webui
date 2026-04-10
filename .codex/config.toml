@@ -23,8 +23,3 @@ nickname_candidates = ["Verifier", "Probe", "Checkline"]
 description = "Hard-gate evaluator for codex-webui. Use for read-only verification of correctness, regressions, and sprint exit criteria."
 config_file = "agents/evaluator.toml"
 nickname_candidates = ["Sentinel", "Gauge", "Proof"]
-
-[agents.intake]
-description = "Read-only intake agent for codex-webui. Use for multi-issue triage, current-target selection support, and tracking drift detection before execution routing."
-config_file = "agents/intake.toml"
-nickname_candidates = ["Compass", "Beacon", "Triage"]
