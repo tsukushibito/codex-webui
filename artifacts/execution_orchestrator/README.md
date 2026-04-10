@@ -78,6 +78,18 @@ Record an `anomaly` event when any of the following happens:
 - a logger invocation fails
 - the orchestration loop stops on a concrete hard block
 
+Each `anomaly` event must include these structured `details` fields:
+
+- `failed_agent_role`
+- `failure_kind`
+- `observed_side_effects`
+- `fallback_class`
+- `remediation`
+- exactly one outcome field: `continued`, `quarantined`, or `stopped`
+
+Use `fallback_class` values `continue`, `quarantine`, `hard_stop_recoverable`, or `hard_stop_terminal`.
+Set the outcome field from verified state and the orchestrator decision, not from delegated self-report.
+
 ## Usage note
 
 Use `.agents/skills/codex-webui-orchestration-log/scripts/append_run_event.py` to append events instead of writing `events.ndjson` manually.

@@ -105,6 +105,21 @@ Append an `anomaly` event immediately when any of the following happens:
 - the logger script itself fails
 - execution hits a real hard block and the loop must stop
 
+## Delegated Failure Fallback Classes
+
+Classify delegated-role failures from verified state, not from the delegated agent's self-report.
+Check observed side effects, dirty state, and repo/task/GitHub drift before deciding how to continue.
+
+Use exactly one fallback class:
+
+- `continue`: no verified mutation and no blocking drift; rerun or proceed with a tighter prompt or corrected command framing
+- `quarantine`: unexpected side effects are isolated and non-blocking; log them, exclude the contaminated output from routing judgment, and continue from verified clean inputs
+- `hard_stop_recoverable`: verified repo/task/GitHub mutation or ambiguous dirty state requires explicit cleanup or user-visible recovery before the loop can continue
+- `hard_stop_terminal`: verified mutation or state damage is severe enough that the current loop must stop and hand back a terminal blocker instead of attempting more routing
+
+Do not classify a failure as `continue` only because the delegated agent said it was read-only or harmless.
+The orchestrator owns the classification after checking verified state.
+
 When a resumable stop requires `codex-webui-execution-handoff`, log the failed or blocked condition first, then log the selected handoff and its result. Include the created `.tmp/` handoff path in `details` when available.
 
 Use concise structured entries. Do not dump long transcripts into the run log.
@@ -149,6 +164,25 @@ Every delegated intake message must include all of the following, in plain terms
 Minimum acceptable pattern:
 
 > Use `$codex-webui-work-intake` for this intake pass. This is read-only routing work. Do not edit files, mutate GitHub/Project/task state, or start servers. Inspect Project, issues, tasks, worktree, and relevant docs, then return a concise routing summary with one recommended current target.
+
+Reusable fallback clause for delegated read-only roles:
+
+> If you cannot complete the read-only task cleanly, stop and report only verified observations: what you checked, whether `observed_side_effects` are `none_beyond_reads` or concrete mutations, and what output is unusable. Do not classify the fallback yourself, do not repair drift, and do not create handoff files or other side effects unless explicitly asked.
+
+## Delegated Failure Mapping
+
+Apply these observed-state rules before selecting the next step:
+
+- `delegated_intake_timeout`, failed intake, or unusable intake with no verified side effects: `continue`
+- planner wrong-shape output with `observed_side_effects: none_beyond_reads`: `continue` with tighter prompt and retry
+- validator wrong-command or wrong-run-id framing error with no mutation: `continue` with corrected expected-output framing
+- isolated unexpected side effects such as a stray `.tmp` handoff output, with verified repo/task/GitHub state otherwise clean: `quarantine`
+- verified repo/task/GitHub mutations, or ambiguous dirty state that might hide mutations: `hard_stop_recoverable` unless the damage makes the current run unsafe to resume
+- severe verified state damage or a mutation path that makes safe recovery impossible in the current run: `hard_stop_terminal`
+
+For `continue`, rerun only after tightening the prompt or correcting command framing.
+For `quarantine`, log the side effect explicitly, ignore the contaminated delegated output for routing judgment, and continue from verified clean state.
+For `hard_stop_recoverable` and `hard_stop_terminal`, log the blocker, stop the loop, and route only the recovery or handoff outcome that matches the verified state.
 
 ## Routing Rules
 

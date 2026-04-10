@@ -73,6 +73,17 @@ Use `anomaly` for problems such as:
 - the logger script failing
 - a hard block that stops the continue-until loop
 
+Every `anomaly` event must record structured fallback details in `details`:
+
+- `failed_agent_role`
+- `failure_kind`
+- `observed_side_effects`
+- `fallback_class`
+- `remediation`
+- exactly one outcome field: `continued`, `quarantined`, or `stopped`
+
+Prefer short enumerated values over prose. Base `fallback_class` on verified side effects and state drift, not on the delegated agent's own claim.
+
 ## Helper Script
 
 Append events with:
@@ -105,6 +116,19 @@ Token usage notes:
 - when direct subagent sessions are discoverable from the local Codex session logs, they are included under `details.token_usage_snapshot.direct_subagents`
 - `aggregate_total_token_usage` is the sum of the current thread and known direct subagents at snapshot time
 - when the current thread or session log cannot be resolved, the snapshot still records `available: false` with an `unavailable_reason`
+
+For anomaly events, expand `--details-json` to include the required fallback fields. Minimum shape:
+
+```bash
+--details-json '{
+  "failed_agent_role": "validator",
+  "failure_kind": "wrong_command_framing",
+  "observed_side_effects": "none_beyond_reads",
+  "fallback_class": "continue",
+  "remediation": "rerun with corrected expected-output framing",
+  "continued": true
+}'
+```
 
 ## Run Inspection Helper
 
