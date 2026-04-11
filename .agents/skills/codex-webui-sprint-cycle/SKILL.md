@@ -11,6 +11,8 @@ Use this skill to run one bounded sprint through the repo-local `planner`, `work
 
 Treat one sprint as one planner-defined implementation slice. A sprint is complete only when `evaluator` returns `approved`.
 
+Use the non-lite `planner` and `worker` by default. If the current sprint target is clearly simple and low-risk, prefer `planner-lite` and `worker-lite` instead. If a sprint has already been attempted with the lite agents and it failed, was blocked, or required replanning, the next sprint for that same target must use the non-lite `planner` and `worker`.
+
 Treat evaluator approval as implementation approval, not as permission to close Issues or mark Project work `Done`; those tracking transitions still require the work to be reachable on `main`.
 Treat dedicated pre-push validation as a later gate that runs only after the slice is locally complete and before any push-oriented or merge-oriented handoff.
 For normal branch/PR work, run implementation from the active worktree rather than from the parent checkout. Only approved direct-to-`main` exceptions may use the parent checkout for implementation.
@@ -48,9 +50,9 @@ Do not use this skill when:
 ## Workflow
 
 1. Read the active task package and linked source-of-truth docs when the sprint is tied to a tracked Issue, then spawn `planner` and explicitly tell it to use `$codex-webui-sprint-planner`, stay read-only, avoid edits, and return a plan only with the planner sections, not an implementation summary, patch description, or completion report.
-2. Review the planner output locally. If the sprint slice is still too large or unclear, or if the result is implementation-shaped instead of plan-only, ask `planner` to tighten it before implementation starts.
+2. Review the planner output locally. If the sprint slice is still too large or unclear, or if the result is implementation-shaped instead of plan-only, ask `planner` to tighten it before implementation starts. If the target is clearly simple and low-risk, reroute the planning pass to `planner-lite`; otherwise keep using `planner`.
 3. If `planner` violates the read-only instruction and mutates files anyway, do not ask it to continue editing. Treat the resulting worktree state as the effective `worker` output for this sprint and pass that implementation candidate to `evaluator`.
-4. Otherwise, spawn `worker` to execute only that sprint slice in the active worktree for normal branch/PR work, or in the parent checkout only for an approved direct-to-`main` exception.
+4. Otherwise, spawn `worker` to execute only that sprint slice in the active worktree for normal branch/PR work, or in the parent checkout only for an approved direct-to-`main` exception. Use `worker-lite` for clearly simple, low-risk slices; if the current target already failed in a previous lite sprint, use the non-lite `worker` instead.
 5. When `worker` returns, verify locally that it produced a real implementation candidate for this sprint. If the user asked for implementation and the result is design-only, analysis-only, or otherwise leaves the write scope unchanged, do not treat that as sprint progress; tighten the instructions with concrete target files, write scope, and expected API or behavior shape, then send `worker` back to implementation instead of proceeding to validation.
 6. Treat `files changed: none`, `exact file paths changed: none`, or missing implementation evidence for an implementation-requested sprint as a blocked or incomplete worker pass, not as a completed sprint result.
 7. Review the worker-supplied targeted validation evidence locally. If required checks are missing, too weak, or unrelated to the acceptance criteria, send `worker` back for the minimum additional implementation-side validation needed for this sprint. When the sprint edits files under `apps/frontend-bff` or `apps/codex-runtime` that are covered by the app-local Biome scripts, require the worker to run the touched app's local `npm run check` immediately after implementation and include that evidence before evaluator handoff.
@@ -85,8 +87,11 @@ Design-only worker output, no-op worker output, or implementation output without
 - `planner` is read-only and defines the sprint slice
 - `worker` is the only role allowed to edit files
 - `evaluator` is read-only and acts as a hard gate over planner criteria plus worker-supplied implementation and targeted validation evidence
+- Use `planner-lite` and `worker-lite` only when the current sprint target is clearly simple and low-risk
+- If a lite sprint for the same target has already failed or been replanned, escalate the next sprint to the non-lite `planner` and `worker`
 - Always tell `planner` to use `$codex-webui-sprint-planner`
 - Always tell `evaluator` to use `$codex-webui-sprint-evaluator`
+- When using the lite variants, tell them to follow the same read-only or write-only role boundaries as the non-lite versions
 - Always tell `planner` and `evaluator` in their spawn prompts that they are read-only and must not edit files or run mutating commands
 - Always tell `planner` to return a sprint plan only, using the planner role sections, and not to claim files changed, tests run, or work completed
 - Always tell `evaluator` not to create handoff files, not to route next steps, and to return only the formal evaluator output shape
