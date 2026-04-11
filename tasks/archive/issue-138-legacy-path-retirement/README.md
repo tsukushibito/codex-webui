@@ -45,6 +45,7 @@
 
 - Status: `locally complete`
 - Notes: Browser-facing `Home` and `Chat` now use `threads`, `thread_view`, `requests`, and thread/notifications stream endpoints only. `/approvals` now redirects to Home, and the unused browser approval client/data/view files were removed. Legacy session/approval route handlers remain in `app/api/` and `src/handlers.ts`, but no browser-critical page or client code depends on them.
+- Retrospective: Completion boundary is package archive, not Issue close. Contract evidence is local `check`, `tsc`, `test`, and `build` plus direct `rg` confirmation that browser pages and clients no longer call session/approval endpoints. No new repo skill was needed; the main workflow gap was that the dedicated validator-agent gate was not available in this session, so equivalent evidence was gathered locally before archive.
 
 ## Archive conditions
 
