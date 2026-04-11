@@ -40,6 +40,10 @@ function workspaceChatHref(workspaceId: string, sessionId?: string) {
   return `/chat?${params.toString()}`;
 }
 
+function formatResumeLabel(label: string) {
+  return label.replaceAll("_", " ");
+}
+
 export function HomeView({
   home,
   errorMessage,
@@ -58,12 +62,12 @@ export function HomeView({
             <p className="eyebrow">codex-webui</p>
             <h1>Home</h1>
             <p className="hero-copy">
-              Manage workspaces, see active sessions, and jump toward Chat or Approval from a
-              smartphone-first shell.
+              Manage workspaces, see active sessions, and resume the threads that need attention
+              from a smartphone-first shell.
             </p>
             <div className="hero-metrics">
               <span className="metric-chip">
-                Pending approvals: {home?.pending_approval_count ?? 0}
+                Resume candidates: {home?.resume_candidates.length ?? 0}
               </span>
               <span className="metric-chip">Workspaces: {home?.workspaces.length ?? 0}</span>
               <span className="metric-chip">
@@ -114,6 +118,52 @@ export function HomeView({
         </section>
 
         {errorMessage ? <p className="error-banner">{errorMessage}</p> : null}
+
+        <section className="workspace-grid">
+          {home?.resume_candidates.map((thread) => (
+            <article className="workspace-card" key={thread.thread_id}>
+              <header>
+                <div className="workspace-meta-row">
+                  <p className="eyebrow">Resume candidate</p>
+                  <span className="status-badge warning">
+                    {formatResumeLabel(thread.current_activity.label)}
+                  </span>
+                </div>
+                <h2>{thread.thread_id}</h2>
+                <p className="workspace-meta">Updated {formatTimestamp(thread.updated_at)}</p>
+              </header>
+
+              <p className="workspace-status">
+                {thread.blocked_cue?.label ?? thread.current_activity.label}
+                {thread.resume_cue ? ` ${thread.resume_cue.label}.` : null}
+              </p>
+
+              <div className="hero-metrics">
+                <span className="metric-chip">Workspace: {thread.workspace_id}</span>
+                <span className="metric-chip">
+                  Priority: {thread.resume_cue?.priority_band ?? "none"}
+                </span>
+              </div>
+
+              <div className="workspace-actions">
+                <Link className="primary-link" href={workspaceChatHref(thread.workspace_id)}>
+                  Resume in Chat
+                </Link>
+                <Link className="secondary-link" href="/approvals">
+                  Review approvals
+                </Link>
+              </div>
+            </article>
+          ))}
+
+          {!isLoading && home && home.resume_candidates.length === 0 ? (
+            <article className="workspace-card">
+              <p className="empty-state">
+                No resume candidates right now. Pick a workspace below to start or continue work.
+              </p>
+            </article>
+          ) : null}
+        </section>
 
         <section className="workspace-grid">
           {isLoading && !home ? (

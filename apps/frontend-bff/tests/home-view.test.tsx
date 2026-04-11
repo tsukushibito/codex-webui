@@ -40,7 +40,35 @@ describe("HomeView", () => {
               pending_approval_count: 2,
             },
           ],
-          pending_approval_count: 3,
+          resume_candidates: [
+            {
+              thread_id: "thread_approval",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "active",
+                active_flags: ["waitingOnApproval"],
+                latest_turn_status: "inProgress",
+              },
+              updated_at: "2026-03-27T05:23:00Z",
+              current_activity: {
+                kind: "waiting_on_approval",
+                label: "Approval required",
+              },
+              badge: {
+                kind: "approval_required",
+                label: "Approval required",
+              },
+              blocked_cue: {
+                kind: "approval_required",
+                label: "Needs your response",
+              },
+              resume_cue: {
+                reason_kind: "waiting_on_approval",
+                priority_band: "highest",
+                label: "Resume here first",
+              },
+            },
+          ],
           updated_at: "2026-03-27T05:22:00Z",
         }}
         isLoading={false}
@@ -52,7 +80,9 @@ describe("HomeView", () => {
       />,
     );
 
-    expect(markup).toContain("Pending approvals: 3");
+    expect(markup).toContain("Resume candidates: 1");
+    expect(markup).toContain("Resume in Chat");
+    expect(markup).toContain("Needs your response");
     expect(markup).toContain("alpha");
     expect(markup).toContain("Go to Chat");
     expect(markup).toContain("Review approvals");

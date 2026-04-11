@@ -20,6 +20,7 @@ import {
   mapThread,
   mapThreadInputAcceptedResponse,
   mapThreadList,
+  mapThreadListItem,
   mapThreadView,
   mapTimeline,
   mapWorkspace,
@@ -32,7 +33,6 @@ import type {
   RuntimeApprovalProjection,
   RuntimeApprovalResolveResult,
   RuntimeApprovalStreamEventProjection,
-  RuntimeApprovalSummary,
   RuntimeMessageProjection,
   RuntimeRequestDetailView,
   RuntimeRequestResponseResult,
@@ -47,11 +47,42 @@ import type {
   RuntimeTimelineItem,
   RuntimeWorkspaceSummary,
 } from "./runtime-types";
+import type { PublicThreadListItem } from "./thread-types";
 
 const runtimeClient = new RuntimeClient();
 
 function latestTimestamp(values: string[]) {
-  return values.reduce((latest, value) => (value > latest ? value : latest));
+  return values.reduce((latest, value) => (value > latest ? value : latest), "");
+}
+
+function homeResumePriority(item: PublicThreadListItem) {
+  switch (item.current_activity.kind) {
+    case "waiting_on_approval":
+      return 0;
+    case "system_error":
+      return 1;
+    case "latest_turn_failed":
+      return 2;
+    default:
+      return item.resume_cue?.reason_kind === "active_thread" ? 3 : 4;
+  }
+}
+
+function compareHomeResumeCandidates(left: PublicThreadListItem, right: PublicThreadListItem) {
+  const priorityDifference = homeResumePriority(left) - homeResumePriority(right);
+  if (priorityDifference !== 0) {
+    return priorityDifference;
+  }
+
+  if (left.updated_at !== right.updated_at) {
+    return right.updated_at.localeCompare(left.updated_at);
+  }
+
+  if (left.workspace_id !== right.workspace_id) {
+    return left.workspace_id.localeCompare(right.workspace_id);
+  }
+
+  return left.thread_id.localeCompare(right.thread_id);
 }
 
 function forwardSearch(request: Request) {
@@ -242,28 +273,41 @@ export async function listWorkspaces(request: Request) {
 
 export async function getHome(_request: Request) {
   try {
-    const [workspaceResult, approvalSummaryResult] = await Promise.all([
-      runtimeClient.requestJson<ListResponse<RuntimeWorkspaceSummary>>("/api/v1/workspaces"),
-      runtimeClient.requestJson<RuntimeApprovalSummary>("/api/v1/approvals/summary"),
-    ]);
+    const workspaceResult =
+      await runtimeClient.requestJson<ListResponse<RuntimeWorkspaceSummary>>("/api/v1/workspaces");
 
     if (isErrorEnvelope(workspaceResult.body)) {
       return passthroughRuntimeError(workspaceResult.status, workspaceResult.body);
     }
 
-    if (isErrorEnvelope(approvalSummaryResult.body)) {
-      return passthroughRuntimeError(approvalSummaryResult.status, approvalSummaryResult.body);
+    const workspaces = workspaceResult.body.items.map(mapWorkspace);
+    const threadResults = await Promise.all(
+      workspaceResult.body.items.map((workspace) =>
+        runtimeClient.requestJson<ListResponse<RuntimeThreadSummary>>(
+          `/api/v1/workspaces/${workspace.workspace_id}/threads?sort=-updated_at`,
+        ),
+      ),
+    );
+
+    const runtimeThreadError = threadResults.find((result) => isErrorEnvelope(result.body));
+    if (runtimeThreadError && isErrorEnvelope(runtimeThreadError.body)) {
+      return passthroughRuntimeError(runtimeThreadError.status, runtimeThreadError.body);
     }
 
-    const workspaces = workspaceResult.body.items.map(mapWorkspace);
+    const resumeCandidates = threadResults
+      .flatMap((result) => result.body.items)
+      .map(mapThreadListItem)
+      .filter((thread) => thread.resume_cue !== null)
+      .sort(compareHomeResumeCandidates);
+
     const updatedAt = latestTimestamp([
-      approvalSummaryResult.body.updated_at,
       ...workspaces.map((workspace) => workspace.updated_at),
+      ...resumeCandidates.map((thread) => thread.updated_at),
     ]);
 
     const response: HomeResponse = {
       workspaces,
-      pending_approval_count: approvalSummaryResult.body.pending_approval_count,
+      resume_candidates: resumeCandidates,
       updated_at: updatedAt,
     };
 
