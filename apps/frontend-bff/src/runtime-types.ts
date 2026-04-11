@@ -182,6 +182,13 @@ export interface RuntimeSessionEventProjection {
   native_event_name: string | null;
 }
 
+export interface RuntimeNotificationEvent {
+  thread_id: string;
+  event_type: string;
+  occurred_at: string;
+  high_priority: boolean;
+}
+
 export interface RuntimeApprovalProjection {
   approval_id: string;
   session_id: string;

@@ -5,6 +5,7 @@ import type {
   RuntimeApprovalStreamEventProjection,
   RuntimeLatestResolvedRequestSummary,
   RuntimeMessageProjection,
+  RuntimeNotificationEvent,
   RuntimePendingRequestSummary,
   RuntimeRequestDetailView,
   RuntimeRequestResponseResult,
@@ -402,6 +403,17 @@ export function mapEventList(response: ListResponse<RuntimeSessionEventProjectio
   };
 }
 
+export function mapThreadStreamEvent(event: RuntimeSessionEventProjection) {
+  return {
+    event_id: event.event_id,
+    thread_id: event.session_id,
+    event_type: event.event_type,
+    sequence: event.sequence,
+    occurred_at: event.occurred_at,
+    payload: event.payload,
+  };
+}
+
 export function mapApprovalSummary(approval: RuntimeApprovalProjection) {
   return {
     approval_id: approval.approval_id,
@@ -451,6 +463,15 @@ export function mapApprovalStreamEvent(event: RuntimeApprovalStreamEventProjecti
     event_type: event.event_type,
     occurred_at: event.occurred_at,
     payload,
+  };
+}
+
+export function mapNotificationEvent(event: RuntimeNotificationEvent) {
+  return {
+    thread_id: event.thread_id,
+    event_type: event.event_type,
+    occurred_at: event.occurred_at,
+    high_priority: event.high_priority,
   };
 }
 
