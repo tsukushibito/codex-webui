@@ -105,7 +105,15 @@ devtunnel create
 devtunnel port create <tunnel-id> -p 3000 --protocol http
 ```
 
-The current launcher expects an existing persistent tunnel ID.
+The current non-interactive launcher expects an existing persistent tunnel ID.
+
+For an interactive launch, run:
+
+```bash
+scripts/start-codex-webui.sh --interactive
+```
+
+This prompts before startup so you can choose whether to host through Dev Tunnel at all. If you choose to host, the launcher lets you pick an existing tunnel or create a new one before the server processes start. When the selected tunnel does not have port `3000`, the launcher offers to create it.
 
 ### 5.2 Start the full WebUI stack
 
@@ -120,7 +128,11 @@ By default the launcher does the following:
 - starts `codex-runtime` on port `3001`
 - starts `frontend-bff` on port `3000`
 - points the BFF at `http://127.0.0.1:3001`
+- enables the runtime app-server bridge for real thread execution
+- clears test-only `CODEX_APP_SERVER_*` overrides by default and runs `codex app-server`
 - hosts the BFF through `devtunnel`
+
+For a launch that decides about Dev Tunnel usage at runtime, use `scripts/start-codex-webui.sh --interactive` instead.
 
 The launcher also creates the runtime workspace/data directories under `apps/codex-runtime/var/` when needed.
 
@@ -138,11 +150,13 @@ The public URL comes from the configured Dev Tunnel.
 The main variables used by `scripts/start-codex-webui.sh` are:
 
 - `CODEX_WEBUI_DEVTUNNEL_ID`: required persistent Dev Tunnel ID
+  - required for the non-interactive tunnel-hosted path
 - `CODEX_WEBUI_RUNTIME_PORT`: defaults to `3001`
 - `CODEX_WEBUI_FRONTEND_PORT`: defaults to `3000`
 - `CODEX_WEBUI_WORKSPACE_ROOT`: optional override for the runtime workspace root
 - `CODEX_WEBUI_DATABASE_PATH`: optional override for the runtime SQLite path
 - `CODEX_WEBUI_RUNTIME_BASE_URL`: optional override for the BFF runtime base URL
+- `CODEX_WEBUI_APP_SERVER_BRIDGE_ENABLED`: optional override for the runtime bridge flag
 - `CODEX_WEBUI_DEVTUNNEL_HOST_ARGS`: optional extra args for `devtunnel host`
 
 ## 7. Direct Docker usage
@@ -170,6 +184,7 @@ docker compose up -d --build dev
 ### 8.2 `CODEX_WEBUI_DEVTUNNEL_ID` is missing
 
 Create a persistent tunnel first, then export the tunnel ID before starting `scripts/start-codex-webui.sh`.
+If you want to decide at launch time instead, use `scripts/start-codex-webui.sh --interactive`.
 
 ### 8.3 The launcher says port `3000` is missing on the tunnel
 
