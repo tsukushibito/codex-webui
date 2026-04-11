@@ -206,7 +206,7 @@ export function ChatView({
                 </button>
               </div>
 
-              <div className="session-list">
+              <div className="thread-list">
                 {isLoadingThreads ? <p className="workspace-status">Loading threads...</p> : null}
 
                 {!isLoadingThreads && threads.length === 0 ? (
@@ -219,8 +219,8 @@ export function ChatView({
                   <button
                     className={
                       selectedThreadId === thread.thread_id
-                        ? "session-summary-card active"
-                        : "session-summary-card"
+                        ? "thread-summary-card active"
+                        : "thread-summary-card"
                     }
                     key={thread.thread_id}
                     onClick={() => onSelectThread(thread.thread_id)}
@@ -260,7 +260,7 @@ export function ChatView({
               </header>
 
               {selectedThreadView?.pending_request ? (
-                <div className="approval-detail-card">
+                <div className="request-detail-card">
                   <div className="workspace-meta-row">
                     <strong>Pending request</strong>
                     <span className={requestBadgeClass(selectedRequestDetail)}>
@@ -302,7 +302,7 @@ export function ChatView({
                   </div>
                 </div>
               ) : selectedThreadView?.latest_resolved_request ? (
-                <p className="approval-signal">
+                <p className="request-signal">
                   Latest request: {selectedThreadView.latest_resolved_request.decision}
                 </p>
               ) : null}

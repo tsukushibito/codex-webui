@@ -81,12 +81,12 @@ describe("HomeView", () => {
     );
 
     expect(markup).toContain("Resume candidates: 1");
-    expect(markup).toContain("Resume in Chat");
+    expect(markup).toContain("Resume thread");
     expect(markup).toContain("Needs your response");
     expect(markup).toContain("alpha");
-    expect(markup).toContain("Go to Chat");
-    expect(markup).toContain("Open Chat shell");
-    expect(markup).toContain("Pending requests: 2");
+    expect(markup).toContain("Open thread");
+    expect(markup).toContain("Open thread shell");
+    expect(markup).toContain("Request queue: 2");
     expect(markup).toContain("Create workspace");
   });
 });
