@@ -25,7 +25,35 @@ describe("home data access", () => {
             pending_approval_count: 0,
           },
         ],
-        pending_approval_count: 1,
+        resume_candidates: [
+          {
+            thread_id: "thread_approval",
+            workspace_id: "ws_alpha",
+            native_status: {
+              thread_status: "active",
+              active_flags: ["waitingOnApproval"],
+              latest_turn_status: "inProgress",
+            },
+            updated_at: "2026-03-27T05:23:00Z",
+            current_activity: {
+              kind: "waiting_on_approval",
+              label: "Approval required",
+            },
+            badge: {
+              kind: "approval_required",
+              label: "Approval required",
+            },
+            blocked_cue: {
+              kind: "approval_required",
+              label: "Needs your response",
+            },
+            resume_cue: {
+              reason_kind: "waiting_on_approval",
+              priority_band: "highest",
+              label: "Resume here first",
+            },
+          },
+        ],
         updated_at: "2026-03-27T05:22:00Z",
       }),
     );
@@ -38,7 +66,7 @@ describe("home data access", () => {
         accept: "application/json",
       },
     });
-    expect(result.pending_approval_count).toBe(1);
+    expect(result.resume_candidates).toHaveLength(1);
     expect(result.workspaces[0]?.workspace_name).toBe("alpha");
   });
 

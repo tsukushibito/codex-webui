@@ -1,3 +1,5 @@
+import type { PublicThreadListItem } from "./thread-types";
+
 export interface RuntimeWorkspaceSummary {
   workspace_id: string;
   workspace_name: string;
@@ -237,7 +239,7 @@ export interface HomeResponse {
     } | null;
     pending_approval_count: number;
   }>;
-  pending_approval_count: number;
+  resume_candidates: PublicThreadListItem[];
   updated_at: string;
 }
 
