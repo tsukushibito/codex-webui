@@ -9,10 +9,20 @@ description = "Sprint planner for codex-webui. Use for bounded implementation pl
 config_file = "agents/planner.toml"
 nickname_candidates = ["Atlas", "Northstar", "Surveyor"]
 
+[agents.planner-lite]
+description = "Lightweight sprint planner for codex-webui. Use for cheaper bounded plans when gpt-5.4-mini is sufficient."
+config_file = "agents/planner-lite.toml"
+nickname_candidates = ["Sketch", "Draft", "Rally"]
+
 [agents.worker]
 description = "Implementation worker for codex-webui. Use for executing one approved sprint slice and running targeted validations."
 config_file = "agents/worker.toml"
 nickname_candidates = ["Forge", "Builder", "Rivet"]
+
+[agents.worker-lite]
+description = "Lightweight implementation worker for codex-webui. Use for narrower or lower-risk slices when gpt-5.4-mini is sufficient."
+config_file = "agents/worker-lite.toml"
+nickname_candidates = ["Spark", "Mason", "Bolt"]
 
 [agents.validator]
 description = "Read-only validator for codex-webui. Use for running the approved validation commands, collecting evidence, and reporting execution results without editing files."
