@@ -1,11 +1,13 @@
-import type {
-  PublicListResponse,
-  PublicMessage,
-  PublicSessionEvent,
-  PublicSessionSummary,
-  PublicStopResult,
-} from "./chat-types";
+import type { PublicListResponse } from "./chat-types";
 import { isErrorEnvelope } from "./errors";
+import type {
+  PublicRequestDetail,
+  PublicRequestResponseResult,
+  PublicThread,
+  PublicThreadInputAcceptedResponse,
+  PublicThreadListItem,
+  PublicThreadView,
+} from "./thread-types";
 
 type FetchLike = typeof fetch;
 
@@ -23,117 +25,72 @@ async function readJson<T>(response: Response) {
   return payload as T;
 }
 
-export async function listWorkspaceSessions(workspaceId: string, fetchImpl: FetchLike = fetch) {
-  const response = await fetchImpl(`/api/v1/workspaces/${workspaceId}/sessions?sort=-updated_at`, {
+export async function listWorkspaceThreads(workspaceId: string, fetchImpl: FetchLike = fetch) {
+  const response = await fetchImpl(`/api/v1/workspaces/${workspaceId}/threads?sort=-updated_at`, {
     cache: "no-store",
     headers: {
       accept: "application/json",
     },
   });
 
-  return readJson<PublicListResponse<PublicSessionSummary>>(response);
+  return readJson<PublicListResponse<PublicThreadListItem>>(response);
 }
 
-export async function createSessionFromChat(
+export async function startThreadFromChat(
   workspaceId: string,
-  title: string,
-  fetchImpl: FetchLike = fetch,
-) {
-  const response = await fetchImpl(`/api/v1/workspaces/${workspaceId}/sessions`, {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({ title }),
-  });
-
-  return readJson<PublicSessionSummary>(response);
-}
-
-export async function startSessionFromChat(sessionId: string, fetchImpl: FetchLike = fetch) {
-  const response = await fetchImpl(`/api/v1/sessions/${sessionId}/start`, {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({}),
-  });
-
-  return readJson<PublicSessionSummary>(response);
-}
-
-export async function getSessionDetails(sessionId: string, fetchImpl: FetchLike = fetch) {
-  const response = await fetchImpl(`/api/v1/sessions/${sessionId}`, {
-    cache: "no-store",
-    headers: {
-      accept: "application/json",
-    },
-  });
-
-  return readJson<PublicSessionSummary>(response);
-}
-
-export async function listSessionMessages(sessionId: string, fetchImpl: FetchLike = fetch) {
-  const response = await fetchImpl(`/api/v1/sessions/${sessionId}/messages?sort=created_at`, {
-    cache: "no-store",
-    headers: {
-      accept: "application/json",
-    },
-  });
-
-  return readJson<PublicListResponse<PublicMessage>>(response);
-}
-
-export async function listSessionEvents(sessionId: string, fetchImpl: FetchLike = fetch) {
-  const response = await fetchImpl(`/api/v1/sessions/${sessionId}/events?sort=occurred_at`, {
-    cache: "no-store",
-    headers: {
-      accept: "application/json",
-    },
-  });
-
-  return readJson<PublicListResponse<PublicSessionEvent>>(response);
-}
-
-export async function loadChatSessionBundle(sessionId: string, fetchImpl: FetchLike = fetch) {
-  const [session, messages, events] = await Promise.all([
-    getSessionDetails(sessionId, fetchImpl),
-    listSessionMessages(sessionId, fetchImpl),
-    listSessionEvents(sessionId, fetchImpl),
-  ]);
-
-  return {
-    session,
-    messages: messages.items,
-    events: events.items,
-  };
-}
-
-export async function sendSessionMessage(
-  sessionId: string,
   content: string,
-  clientMessageId: string,
+  clientRequestId: string,
   fetchImpl: FetchLike = fetch,
 ) {
-  const response = await fetchImpl(`/api/v1/sessions/${sessionId}/messages`, {
+  const response = await fetchImpl(`/api/v1/workspaces/${workspaceId}/inputs`, {
     method: "POST",
     headers: {
       accept: "application/json",
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      client_message_id: clientMessageId,
+      client_request_id: clientRequestId,
       content,
     }),
   });
 
-  return readJson<PublicMessage>(response);
+  return readJson<PublicThreadInputAcceptedResponse>(response);
 }
 
-export async function stopSessionFromChat(sessionId: string, fetchImpl: FetchLike = fetch) {
-  const response = await fetchImpl(`/api/v1/sessions/${sessionId}/stop`, {
+export async function getThreadView(threadId: string, fetchImpl: FetchLike = fetch) {
+  const response = await fetchImpl(`/api/v1/threads/${threadId}/view`, {
+    cache: "no-store",
+    headers: {
+      accept: "application/json",
+    },
+  });
+
+  return readJson<PublicThreadView>(response);
+}
+
+export async function sendThreadInput(
+  threadId: string,
+  content: string,
+  clientRequestId: string,
+  fetchImpl: FetchLike = fetch,
+) {
+  const response = await fetchImpl(`/api/v1/threads/${threadId}/inputs`, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      client_request_id: clientRequestId,
+      content,
+    }),
+  });
+
+  return readJson<PublicThreadInputAcceptedResponse>(response);
+}
+
+export async function interruptThreadFromChat(threadId: string, fetchImpl: FetchLike = fetch) {
+  const response = await fetchImpl(`/api/v1/threads/${threadId}/interrupt`, {
     method: "POST",
     headers: {
       accept: "application/json",
@@ -142,5 +99,49 @@ export async function stopSessionFromChat(sessionId: string, fetchImpl: FetchLik
     body: JSON.stringify({}),
   });
 
-  return readJson<PublicStopResult>(response);
+  return readJson<PublicThread>(response);
+}
+
+export async function getRequestDetail(requestId: string, fetchImpl: FetchLike = fetch) {
+  const response = await fetchImpl(`/api/v1/requests/${requestId}`, {
+    cache: "no-store",
+    headers: {
+      accept: "application/json",
+    },
+  });
+
+  return readJson<PublicRequestDetail>(response);
+}
+
+export async function respondToPendingRequest(
+  requestId: string,
+  decision: "approved" | "denied",
+  clientResponseId: string,
+  fetchImpl: FetchLike = fetch,
+) {
+  const response = await fetchImpl(`/api/v1/requests/${requestId}/response`, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      client_response_id: clientResponseId,
+      decision,
+    }),
+  });
+
+  return readJson<PublicRequestResponseResult>(response);
+}
+
+export async function loadChatThreadBundle(threadId: string, fetchImpl: FetchLike = fetch) {
+  const view = await getThreadView(threadId, fetchImpl);
+  const pendingRequestDetail = view.pending_request
+    ? await getRequestDetail(view.pending_request.request_id, fetchImpl)
+    : null;
+
+  return {
+    view,
+    pendingRequestDetail,
+  };
 }

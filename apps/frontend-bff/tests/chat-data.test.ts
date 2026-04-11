@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  createSessionFromChat,
-  listWorkspaceSessions,
-  loadChatSessionBundle,
-  sendSessionMessage,
+  getRequestDetail,
+  interruptThreadFromChat,
+  listWorkspaceThreads,
+  loadChatThreadBundle,
+  respondToPendingRequest,
+  sendThreadInput,
+  startThreadFromChat,
 } from "../src/chat-data";
 
 function jsonResponse(body: unknown, status = 200) {
@@ -17,23 +20,26 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 describe("chat data access", () => {
-  it("loads workspace sessions from the public API", async () => {
+  it("loads workspace threads from the v0.9 public API", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
       jsonResponse({
         items: [
           {
-            session_id: "thread_001",
+            thread_id: "thread_001",
             workspace_id: "ws_alpha",
-            title: "Fix build error",
-            status: "waiting_input",
-            created_at: "2026-03-27T05:12:34Z",
+            native_status: {
+              thread_status: "active",
+              active_flags: [],
+              latest_turn_status: "inProgress",
+            },
             updated_at: "2026-03-27T05:22:00Z",
-            started_at: "2026-03-27T05:13:00Z",
-            last_message_at: "2026-03-27T05:21:40Z",
-            active_approval_id: null,
-            can_send_message: true,
-            can_start: false,
-            can_stop: true,
+            current_activity: {
+              kind: "in_progress",
+              label: "In progress",
+            },
+            badge: null,
+            blocked_cue: null,
+            resume_cue: null,
           },
         ],
         next_cursor: null,
@@ -41,116 +47,223 @@ describe("chat data access", () => {
       }),
     );
 
-    const result = await listWorkspaceSessions("ws_alpha", fetchMock);
+    const result = await listWorkspaceThreads("ws_alpha", fetchMock);
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/workspaces/ws_alpha/sessions?sort=-updated_at",
-      {
-        cache: "no-store",
-        headers: {
-          accept: "application/json",
-        },
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/workspaces/ws_alpha/threads?sort=-updated_at", {
+      cache: "no-store",
+      headers: {
+        accept: "application/json",
       },
-    );
-    expect(result.items[0]?.session_id).toBe("thread_001");
+    });
+    expect(result.items[0]?.thread_id).toBe("thread_001");
   });
 
-  it("creates sessions and sends messages through the public API", async () => {
+  it("starts a thread from first input and sends follow-up input through thread endpoints", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
         jsonResponse(
           {
-            session_id: "thread_002",
-            workspace_id: "ws_alpha",
-            title: "Review docs",
-            status: "created",
-            created_at: "2026-03-27T05:12:34Z",
-            updated_at: "2026-03-27T05:12:34Z",
-            started_at: null,
-            last_message_at: null,
-            active_approval_id: null,
-            can_send_message: false,
-            can_start: true,
-            can_stop: false,
+            accepted: {
+              thread_id: "thread_002",
+              turn_id: "turn_001",
+              input_item_id: "item_001",
+            },
+            thread: {
+              thread_id: "thread_002",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "active",
+                active_flags: [],
+                latest_turn_status: "inProgress",
+              },
+              updated_at: "2026-03-27T05:15:00Z",
+            },
           },
-          201,
+          202,
         ),
       )
       .mockResolvedValueOnce(
         jsonResponse(
           {
-            message_id: "msg_user_001",
-            session_id: "thread_002",
-            role: "user",
-            content: "Please explain the changes.",
-            created_at: "2026-03-27T05:15:00Z",
+            accepted: {
+              thread_id: "thread_002",
+              turn_id: "turn_002",
+              input_item_id: "item_002",
+            },
+            thread: {
+              thread_id: "thread_002",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "active",
+                active_flags: [],
+                latest_turn_status: "inProgress",
+              },
+              updated_at: "2026-03-27T05:16:00Z",
+            },
           },
           202,
         ),
       );
 
-    const session = await createSessionFromChat("ws_alpha", "Review docs", fetchMock);
-    const message = await sendSessionMessage(
+    const started = await startThreadFromChat(
+      "ws_alpha",
+      "Review docs",
+      "input_start_001",
+      fetchMock,
+    );
+    const reply = await sendThreadInput(
       "thread_002",
       "Please explain the changes.",
-      "msgclient_001",
+      "input_followup_001",
       fetchMock,
     );
 
-    expect(session.title).toBe("Review docs");
-    expect(message.message_id).toBe("msg_user_001");
+    expect(started.thread.thread_id).toBe("thread_002");
+    expect(reply.accepted.input_item_id).toBe("item_002");
   });
 
-  it("loads session, messages, and events in parallel for a chat refresh", async () => {
+  it("loads thread view and pending request detail for chat refresh", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
         jsonResponse({
-          session_id: "thread_001",
-          workspace_id: "ws_alpha",
-          title: "Fix build error",
-          status: "waiting_input",
-          created_at: "2026-03-27T05:12:34Z",
-          updated_at: "2026-03-27T05:22:00Z",
-          started_at: "2026-03-27T05:13:00Z",
-          last_message_at: "2026-03-27T05:21:40Z",
-          active_approval_id: null,
-          can_send_message: true,
-          can_start: false,
-          can_stop: true,
-        }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          items: [],
-          next_cursor: null,
-          has_more: false,
-        }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          items: [
-            {
-              event_id: "evt_001",
-              session_id: "thread_001",
-              event_type: "session.status_changed",
-              sequence: 1,
-              occurred_at: "2026-03-27T05:13:00Z",
-              payload: {
-                from_status: "created",
-                to_status: "running",
-              },
+          thread: {
+            thread_id: "thread_001",
+            workspace_id: "ws_alpha",
+            native_status: {
+              thread_status: "active",
+              active_flags: ["waitingOnApproval"],
+              latest_turn_status: "inProgress",
             },
-          ],
-          next_cursor: null,
-          has_more: false,
+            updated_at: "2026-03-27T05:22:00Z",
+          },
+          current_activity: {
+            kind: "waiting_on_approval",
+            label: "Approval required",
+          },
+          pending_request: {
+            request_id: "req_001",
+            thread_id: "thread_001",
+            turn_id: "turn_001",
+            item_id: "item_001",
+            request_kind: "approval",
+            status: "pending",
+            risk_category: "external_side_effect",
+            summary: "Run git push",
+            requested_at: "2026-03-27T05:20:00Z",
+          },
+          latest_resolved_request: null,
+          composer: {
+            accepting_user_input: false,
+            interrupt_available: true,
+            blocked_by_request: true,
+          },
+          timeline: {
+            items: [],
+            next_cursor: null,
+            has_more: false,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          request_id: "req_001",
+          thread_id: "thread_001",
+          turn_id: "turn_001",
+          item_id: "item_001",
+          request_kind: "approval",
+          status: "pending",
+          risk_category: "external_side_effect",
+          summary: "Run git push",
+          reason: "Codex requests permission to push changes to remote.",
+          operation_summary: "git push origin main",
+          requested_at: "2026-03-27T05:20:00Z",
+          responded_at: null,
+          decision: null,
+          decision_options: {
+            policy_scope_supported: false,
+            default_policy_scope: "once",
+          },
+          context: null,
         }),
       );
 
-    const bundle = await loadChatSessionBundle("thread_001", fetchMock);
+    const bundle = await loadChatThreadBundle("thread_001", fetchMock);
 
-    expect(bundle.session.session_id).toBe("thread_001");
-    expect(bundle.events[0]?.event_type).toBe("session.status_changed");
+    expect(bundle.view.thread.thread_id).toBe("thread_001");
+    expect(bundle.pendingRequestDetail?.request_id).toBe("req_001");
+  });
+
+  it("loads request detail, submits a request response, and interrupts a thread", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          request_id: "req_001",
+          thread_id: "thread_001",
+          turn_id: "turn_001",
+          item_id: "item_001",
+          request_kind: "approval",
+          status: "pending",
+          risk_category: "external_side_effect",
+          summary: "Run git push",
+          reason: "Codex requests permission to push changes to remote.",
+          operation_summary: "git push origin main",
+          requested_at: "2026-03-27T05:20:00Z",
+          responded_at: null,
+          decision: null,
+          decision_options: {
+            policy_scope_supported: false,
+            default_policy_scope: "once",
+          },
+          context: null,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          request: {
+            request_id: "req_001",
+            status: "resolved",
+            decision: "approved",
+            responded_at: "2026-03-27T05:21:00Z",
+          },
+          thread: {
+            thread_id: "thread_001",
+            workspace_id: "ws_alpha",
+            native_status: {
+              thread_status: "active",
+              active_flags: [],
+              latest_turn_status: "inProgress",
+            },
+            updated_at: "2026-03-27T05:21:00Z",
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          thread_id: "thread_001",
+          workspace_id: "ws_alpha",
+          native_status: {
+            thread_status: "idle",
+            active_flags: [],
+            latest_turn_status: "interrupted",
+          },
+          updated_at: "2026-03-27T05:22:00Z",
+        }),
+      );
+
+    const detail = await getRequestDetail("req_001", fetchMock);
+    const response = await respondToPendingRequest(
+      "req_001",
+      "approved",
+      "response_001",
+      fetchMock,
+    );
+    const interrupted = await interruptThreadFromChat("thread_001", fetchMock);
+
+    expect(detail.request_id).toBe("req_001");
+    expect(response.request.decision).toBe("approved");
+    expect(interrupted.thread_id).toBe("thread_001");
   });
 });

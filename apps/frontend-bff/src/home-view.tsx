@@ -28,13 +28,13 @@ function formatTimestamp(value: string | null) {
   }).format(new Date(value));
 }
 
-function workspaceChatHref(workspaceId: string, sessionId?: string) {
+function workspaceChatHref(workspaceId: string, threadId?: string) {
   const params = new URLSearchParams({
     workspaceId,
   });
 
-  if (sessionId) {
-    params.set("sessionId", sessionId);
+  if (threadId) {
+    params.set("threadId", threadId);
   }
 
   return `/chat?${params.toString()}`;
@@ -62,8 +62,8 @@ export function HomeView({
             <p className="eyebrow">codex-webui</p>
             <h1>Home</h1>
             <p className="hero-copy">
-              Manage workspaces, see active sessions, and resume the threads that need attention
-              from a smartphone-first shell.
+              Manage workspaces, see active threads, and resume the threads that need attention from
+              a smartphone-first shell.
             </p>
             <div className="hero-metrics">
               <span className="metric-chip">
@@ -75,11 +75,11 @@ export function HomeView({
               </span>
             </div>
             <div className="hero-actions">
-              <Link className="primary-link" href="/approvals">
-                Open Approval queue
-              </Link>
-              <Link className="secondary-link" href="/chat">
+              <Link className="primary-link" href="/chat">
                 Open Chat shell
+              </Link>
+              <Link className="secondary-link" href="/">
+                Refresh Home
               </Link>
             </div>
           </div>
@@ -146,11 +146,14 @@ export function HomeView({
               </div>
 
               <div className="workspace-actions">
-                <Link className="primary-link" href={workspaceChatHref(thread.workspace_id)}>
+                <Link
+                  className="primary-link"
+                  href={workspaceChatHref(thread.workspace_id, thread.thread_id)}
+                >
                   Resume in Chat
                 </Link>
-                <Link className="secondary-link" href="/approvals">
-                  Review approvals
+                <Link className="secondary-link" href="/">
+                  Back to Home
                 </Link>
               </div>
             </article>
@@ -201,15 +204,15 @@ export function HomeView({
 
                 <p className="workspace-status">
                   {activeSession
-                    ? `Active session ${activeSession.session_id} last moved at ${formatTimestamp(
+                    ? `Active thread ${activeSession.session_id} last moved at ${formatTimestamp(
                         activeSession.last_message_at,
                       )}.`
-                    : "This workspace is ready for its first session."}
+                    : "This workspace is ready for its first thread."}
                 </p>
 
                 <div className="hero-metrics">
                   <span className="metric-chip">
-                    Local approvals: {workspace.pending_approval_count}
+                    Pending requests: {workspace.pending_approval_count}
                   </span>
                   <span className="metric-chip">ID: {workspace.workspace_id}</span>
                 </div>
@@ -221,8 +224,8 @@ export function HomeView({
                   >
                     Go to Chat
                   </Link>
-                  <Link className="secondary-link" href="/approvals">
-                    Review approvals
+                  <Link className="secondary-link" href="/">
+                    Stay on Home
                   </Link>
                 </div>
               </article>

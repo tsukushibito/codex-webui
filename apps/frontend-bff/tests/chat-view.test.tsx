@@ -21,131 +21,188 @@ vi.mock("next/link", () => ({
 }));
 
 describe("ChatView", () => {
-  it("renders the chat transcript, activity log, and approval waiting signal", () => {
+  it("renders thread context, pending request controls, and timeline state", () => {
     const markup = renderToStaticMarkup(
       <ChatView
         connectionState="live"
-        createSessionTitle=""
-        draftAssistantMessages={[
-          {
-            message_id: "draft_001",
-            content: "Streaming update",
-          },
-        ]}
+        draftAssistantMessages={{
+          draft_001: "Streaming update",
+        }}
         errorMessage={null}
-        events={[
+        isCreatingThread={false}
+        isInterruptingThread={false}
+        isLoadingThread={false}
+        isLoadingThreads={false}
+        isRespondingToRequest={false}
+        isSendingMessage={false}
+        messageDraft=""
+        newThreadInput=""
+        onApproveRequest={() => {}}
+        onCreateThread={() => {}}
+        onDenyRequest={() => {}}
+        onInterruptThread={() => {}}
+        onMessageDraftChange={() => {}}
+        onNewThreadInputChange={() => {}}
+        onSelectThread={() => {}}
+        onSendMessage={() => {}}
+        selectedRequestDetail={{
+          request_id: "req_001",
+          thread_id: "thread_001",
+          turn_id: "turn_001",
+          item_id: "item_001",
+          request_kind: "approval",
+          status: "pending",
+          risk_category: "external_side_effect",
+          summary: "Run git push",
+          reason: "Codex requests permission to push changes to remote.",
+          operation_summary: "git push origin main",
+          requested_at: "2026-03-27T05:20:00Z",
+          responded_at: null,
+          decision: null,
+          decision_options: {
+            policy_scope_supported: false,
+            default_policy_scope: "once",
+          },
+          context: null,
+        }}
+        selectedThreadId="thread_001"
+        selectedThreadView={{
+          thread: {
+            thread_id: "thread_001",
+            workspace_id: "ws_alpha",
+            native_status: {
+              thread_status: "active",
+              active_flags: ["waitingOnApproval"],
+              latest_turn_status: "inProgress",
+            },
+            updated_at: "2026-03-27T05:22:00Z",
+          },
+          current_activity: {
+            kind: "waiting_on_approval",
+            label: "Approval required",
+          },
+          pending_request: {
+            request_id: "req_001",
+            thread_id: "thread_001",
+            turn_id: "turn_001",
+            item_id: "item_001",
+            request_kind: "approval",
+            status: "pending",
+            risk_category: "external_side_effect",
+            summary: "Run git push",
+            requested_at: "2026-03-27T05:20:00Z",
+          },
+          latest_resolved_request: null,
+          composer: {
+            accepting_user_input: false,
+            interrupt_available: true,
+            blocked_by_request: true,
+          },
+          timeline: {
+            items: [
+              {
+                timeline_item_id: "evt_001",
+                thread_id: "thread_001",
+                turn_id: null,
+                item_id: null,
+                sequence: 1,
+                occurred_at: "2026-03-27T05:14:00Z",
+                kind: "message.user",
+                payload: {
+                  summary: "Please explain the diff.",
+                },
+              },
+            ],
+            next_cursor: null,
+            has_more: false,
+          },
+        }}
+        statusMessage="Request pending."
+        streamEvents={[
           {
-            event_id: "evt_001",
-            session_id: "thread_001",
+            event_id: "evt_stream_001",
+            thread_id: "thread_001",
             event_type: "approval.requested",
-            sequence: 3,
+            sequence: 2,
             occurred_at: "2026-03-27T05:18:00Z",
             payload: {
-              approval_id: "apr_001",
-              title: "Run git push",
+              summary: "Run git push",
             },
           },
         ]}
-        isCreatingSession={false}
-        isLoadingSession={false}
-        isLoadingSessions={false}
-        isSendingMessage={false}
-        isStartingSession={false}
-        isStoppingSession={false}
-        messageDraft=""
-        messages={[
+        threads={[
           {
-            message_id: "msg_user_001",
-            session_id: "thread_001",
-            role: "user",
-            content: "Please explain the diff.",
-            created_at: "2026-03-27T05:14:00Z",
-          },
-        ]}
-        onCreateSession={() => {}}
-        onCreateSessionTitleChange={() => {}}
-        onMessageDraftChange={() => {}}
-        onSelectSession={() => {}}
-        onSendMessage={() => {}}
-        onStartSession={() => {}}
-        onStopSession={() => {}}
-        selectedSession={{
-          session_id: "thread_001",
-          workspace_id: "ws_alpha",
-          title: "Fix build error",
-          status: "waiting_approval",
-          created_at: "2026-03-27T05:12:34Z",
-          updated_at: "2026-03-27T05:22:00Z",
-          started_at: "2026-03-27T05:13:00Z",
-          last_message_at: "2026-03-27T05:21:40Z",
-          active_approval_id: "apr_001",
-          can_send_message: false,
-          can_start: false,
-          can_stop: true,
-        }}
-        selectedSessionId="thread_001"
-        sessions={[
-          {
-            session_id: "thread_001",
+            thread_id: "thread_001",
             workspace_id: "ws_alpha",
-            title: "Fix build error",
-            status: "waiting_approval",
-            created_at: "2026-03-27T05:12:34Z",
+            native_status: {
+              thread_status: "active",
+              active_flags: ["waitingOnApproval"],
+              latest_turn_status: "inProgress",
+            },
             updated_at: "2026-03-27T05:22:00Z",
-            started_at: "2026-03-27T05:13:00Z",
-            last_message_at: "2026-03-27T05:21:40Z",
-            active_approval_id: "apr_001",
-            can_send_message: false,
-            can_start: false,
-            can_stop: true,
+            current_activity: {
+              kind: "waiting_on_approval",
+              label: "Approval required",
+            },
+            badge: null,
+            blocked_cue: {
+              kind: "approval_required",
+              label: "Needs your response",
+            },
+            resume_cue: {
+              reason_kind: "waiting_on_approval",
+              priority_band: "highest",
+              label: "Resume here first",
+            },
           },
         ]}
-        statusMessage="Approval requested."
         workspaceId="ws_alpha"
       />,
     );
 
-    expect(markup).toContain("Fix build error");
-    expect(markup).toContain("Approval waiting: apr_001");
+    expect(markup).toContain("thread_001");
+    expect(markup).toContain("Approval required");
+    expect(markup).toContain("Approve request");
     expect(markup).toContain("Please explain the diff.");
     expect(markup).toContain("Streaming update");
     expect(markup).toContain("approval.requested");
   });
 
-  it("renders transient feedback in a dedicated layout row before the chat panels", () => {
+  it("renders transient feedback above the chat panels", () => {
     const markup = renderToStaticMarkup(
       <ChatView
         connectionState="live"
-        createSessionTitle=""
-        draftAssistantMessages={[]}
-        errorMessage="Failed to stop the session."
-        events={[]}
-        isCreatingSession={false}
-        isLoadingSession={false}
-        isLoadingSessions={false}
+        draftAssistantMessages={{}}
+        errorMessage="Failed to interrupt the thread."
+        isCreatingThread={false}
+        isInterruptingThread={false}
+        isLoadingThread={false}
+        isLoadingThreads={false}
+        isRespondingToRequest={false}
         isSendingMessage={false}
-        isStartingSession={false}
-        isStoppingSession={false}
         messageDraft=""
-        messages={[]}
-        onCreateSession={() => {}}
-        onCreateSessionTitleChange={() => {}}
+        newThreadInput=""
+        onApproveRequest={() => {}}
+        onCreateThread={() => {}}
+        onDenyRequest={() => {}}
+        onInterruptThread={() => {}}
         onMessageDraftChange={() => {}}
-        onSelectSession={() => {}}
+        onNewThreadInputChange={() => {}}
+        onSelectThread={() => {}}
         onSendMessage={() => {}}
-        onStartSession={() => {}}
-        onStopSession={() => {}}
-        selectedSession={null}
-        selectedSessionId={null}
-        sessions={[]}
-        statusMessage="Session started."
+        selectedRequestDetail={null}
+        selectedThreadId={null}
+        selectedThreadView={null}
+        statusMessage="Thread started."
+        streamEvents={[]}
+        threads={[]}
         workspaceId="ws_alpha"
       />,
     );
 
     expect(markup).toContain("chat-feedback-stack");
-    expect(markup).toContain("Session started.");
-    expect(markup).toContain("Failed to stop the session.");
+    expect(markup).toContain("Thread started.");
+    expect(markup).toContain("Failed to interrupt the thread.");
     expect(markup.indexOf("chat-feedback-stack")).toBeLessThan(
       markup.indexOf("chat-panel create-card"),
     );
