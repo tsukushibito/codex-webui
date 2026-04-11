@@ -13,7 +13,7 @@ export interface HomeViewProps {
   onCreateWorkspace: () => void;
 }
 
-function formatSessionStatus(status: string) {
+function formatThreadStatus(status: string) {
   return status.replaceAll("_", " ");
 }
 
@@ -76,7 +76,7 @@ export function HomeView({
             </div>
             <div className="hero-actions">
               <Link className="primary-link" href="/chat">
-                Open Chat shell
+                Open thread shell
               </Link>
               <Link className="secondary-link" href="/">
                 Refresh Home
@@ -90,7 +90,7 @@ export function HomeView({
             <p className="eyebrow">Create workspace</p>
             <h2>Start from Home</h2>
             <p className="field-hint">
-              Create a workspace, then move into Chat when a session is ready.
+              Create a workspace, then move into Chat when the first thread is ready.
             </p>
           </header>
           <div className="create-form">
@@ -150,10 +150,10 @@ export function HomeView({
                   className="primary-link"
                   href={workspaceChatHref(thread.workspace_id, thread.thread_id)}
                 >
-                  Resume in Chat
+                  Resume thread
                 </Link>
                 <Link className="secondary-link" href="/">
-                  Back to Home
+                  Refresh Home
                 </Link>
               </div>
             </article>
@@ -184,8 +184,8 @@ export function HomeView({
           ) : null}
 
           {home?.workspaces.map((workspace) => {
-            const activeSession = workspace.active_session_summary;
-            const statusClassName = activeSession ? "status-badge success" : "status-badge warning";
+            const activeThread = workspace.active_session_summary;
+            const statusClassName = activeThread ? "status-badge success" : "status-badge warning";
 
             return (
               <article className="workspace-card" key={workspace.workspace_id}>
@@ -193,9 +193,7 @@ export function HomeView({
                   <div className="workspace-meta-row">
                     <p className="eyebrow">Workspace</p>
                     <span className={statusClassName}>
-                      {activeSession
-                        ? formatSessionStatus(activeSession.status)
-                        : "No active session"}
+                      {activeThread ? formatThreadStatus(activeThread.status) : "No active thread"}
                     </span>
                   </div>
                   <h2>{workspace.workspace_name}</h2>
@@ -203,16 +201,16 @@ export function HomeView({
                 </header>
 
                 <p className="workspace-status">
-                  {activeSession
-                    ? `Active thread ${activeSession.session_id} last moved at ${formatTimestamp(
-                        activeSession.last_message_at,
+                  {activeThread
+                    ? `Active thread ${activeThread.session_id} last moved at ${formatTimestamp(
+                        activeThread.last_message_at,
                       )}.`
                     : "This workspace is ready for its first thread."}
                 </p>
 
                 <div className="hero-metrics">
                   <span className="metric-chip">
-                    Pending requests: {workspace.pending_approval_count}
+                    Request queue: {workspace.pending_approval_count}
                   </span>
                   <span className="metric-chip">ID: {workspace.workspace_id}</span>
                 </div>
@@ -220,9 +218,9 @@ export function HomeView({
                 <div className="workspace-actions">
                   <Link
                     className="primary-link"
-                    href={workspaceChatHref(workspace.workspace_id, activeSession?.session_id)}
+                    href={workspaceChatHref(workspace.workspace_id, activeThread?.session_id)}
                   >
-                    Go to Chat
+                    Open thread
                   </Link>
                   <Link className="secondary-link" href="/">
                     Stay on Home
