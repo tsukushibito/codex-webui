@@ -1,7 +1,7 @@
-import { ApprovalPageClient } from "@/src/approval-page-client";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default function ApprovalPage() {
-  return <ApprovalPageClient />;
+  redirect("/");
 }

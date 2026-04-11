@@ -146,3 +146,19 @@ export interface PublicRequestResponseResult {
   request: PublicRequestActionSummary;
   thread: PublicThread;
 }
+
+export interface PublicThreadStreamEvent {
+  event_id: string;
+  thread_id: string;
+  event_type:
+    | "session.status_changed"
+    | "message.user"
+    | "message.assistant.delta"
+    | "message.assistant.completed"
+    | "approval.requested"
+    | "approval.resolved"
+    | "error.raised";
+  sequence: number;
+  occurred_at: string;
+  payload: Record<string, unknown>;
+}

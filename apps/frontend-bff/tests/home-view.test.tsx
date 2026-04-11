@@ -85,7 +85,8 @@ describe("HomeView", () => {
     expect(markup).toContain("Needs your response");
     expect(markup).toContain("alpha");
     expect(markup).toContain("Go to Chat");
-    expect(markup).toContain("Review approvals");
+    expect(markup).toContain("Open Chat shell");
+    expect(markup).toContain("Pending requests: 2");
     expect(markup).toContain("Create workspace");
   });
 });

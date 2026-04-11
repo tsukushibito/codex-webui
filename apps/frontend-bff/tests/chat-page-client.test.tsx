@@ -5,20 +5,26 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PublicMessage, PublicSessionEvent, PublicSessionSummary } from "../src/chat-types";
+import type {
+  PublicRequestDetail,
+  PublicThreadInputAcceptedResponse,
+  PublicThreadListItem,
+  PublicThreadStreamEvent,
+  PublicThreadView,
+} from "../src/thread-types";
 
 const searchParams = new URLSearchParams({
-  sessionId: "thread_001",
+  threadId: "thread_001",
   workspaceId: "ws_alpha",
 });
 
 const chatDataMocks = vi.hoisted(() => ({
-  createSessionFromChat: vi.fn(),
-  listWorkspaceSessions: vi.fn(),
-  loadChatSessionBundle: vi.fn(),
-  sendSessionMessage: vi.fn(),
-  startSessionFromChat: vi.fn(),
-  stopSessionFromChat: vi.fn(),
+  interruptThreadFromChat: vi.fn(),
+  listWorkspaceThreads: vi.fn(),
+  loadChatThreadBundle: vi.fn(),
+  respondToPendingRequest: vi.fn(),
+  sendThreadInput: vi.fn(),
+  startThreadFromChat: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -42,56 +48,127 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("../src/chat-data", () => ({
-  createSessionFromChat: chatDataMocks.createSessionFromChat,
-  listWorkspaceSessions: chatDataMocks.listWorkspaceSessions,
-  loadChatSessionBundle: chatDataMocks.loadChatSessionBundle,
-  sendSessionMessage: chatDataMocks.sendSessionMessage,
-  startSessionFromChat: chatDataMocks.startSessionFromChat,
-  stopSessionFromChat: chatDataMocks.stopSessionFromChat,
+  interruptThreadFromChat: chatDataMocks.interruptThreadFromChat,
+  listWorkspaceThreads: chatDataMocks.listWorkspaceThreads,
+  loadChatThreadBundle: chatDataMocks.loadChatThreadBundle,
+  respondToPendingRequest: chatDataMocks.respondToPendingRequest,
+  sendThreadInput: chatDataMocks.sendThreadInput,
+  startThreadFromChat: chatDataMocks.startThreadFromChat,
 }));
 
 import { ChatPageClient } from "../src/chat-page-client";
 
-function buildSession(overrides: Partial<PublicSessionSummary> = {}): PublicSessionSummary {
+function buildThreadListItem(overrides: Partial<PublicThreadListItem> = {}): PublicThreadListItem {
   return {
-    session_id: "thread_001",
+    thread_id: "thread_001",
     workspace_id: "ws_alpha",
-    title: "Fix build error",
-    status: "waiting_input",
-    created_at: "2026-03-27T05:12:34Z",
+    native_status: {
+      thread_status: "active",
+      active_flags: [],
+      latest_turn_status: "inProgress",
+    },
     updated_at: "2026-03-27T05:22:00Z",
-    started_at: "2026-03-27T05:13:00Z",
-    last_message_at: "2026-03-27T05:21:40Z",
-    active_approval_id: null,
-    can_send_message: true,
-    can_start: false,
-    can_stop: true,
+    current_activity: {
+      kind: "in_progress",
+      label: "In progress",
+    },
+    badge: null,
+    blocked_cue: null,
+    resume_cue: null,
     ...overrides,
   };
 }
 
-function buildEvent(overrides: Partial<PublicSessionEvent> = {}): PublicSessionEvent {
+function buildThreadView(overrides: Partial<PublicThreadView> = {}): PublicThreadView {
   return {
-    event_id: "evt_001",
-    session_id: "thread_001",
-    event_type: "session.status_changed",
-    sequence: 1,
-    occurred_at: "2026-03-27T05:13:00Z",
-    payload: {
-      from_status: "created",
-      to_status: "running",
+    thread: {
+      thread_id: "thread_001",
+      workspace_id: "ws_alpha",
+      native_status: {
+        thread_status: "active",
+        active_flags: [],
+        latest_turn_status: "inProgress",
+      },
+      updated_at: "2026-03-27T05:22:00Z",
+    },
+    current_activity: {
+      kind: "waiting_on_user_input",
+      label: "Waiting for your input",
+    },
+    pending_request: null,
+    latest_resolved_request: null,
+    composer: {
+      accepting_user_input: true,
+      interrupt_available: true,
+      blocked_by_request: false,
+    },
+    timeline: {
+      items: [
+        {
+          timeline_item_id: "evt_001",
+          thread_id: "thread_001",
+          turn_id: null,
+          item_id: null,
+          sequence: 1,
+          occurred_at: "2026-03-27T05:22:00Z",
+          kind: "message.user",
+          payload: {
+            summary: "user input accepted",
+          },
+        },
+      ],
+      next_cursor: null,
+      has_more: false,
     },
     ...overrides,
   };
 }
 
-function buildMessage(overrides: Partial<PublicMessage> = {}): PublicMessage {
+function buildPendingRequestDetail(
+  overrides: Partial<PublicRequestDetail> = {},
+): PublicRequestDetail {
   return {
-    message_id: "msg_user_001",
-    session_id: "thread_001",
-    role: "user",
-    content: "Please explain the changes.",
-    created_at: "2026-03-27T05:15:00Z",
+    request_id: "req_001",
+    thread_id: "thread_001",
+    turn_id: "turn_001",
+    item_id: "item_001",
+    request_kind: "approval",
+    status: "pending",
+    risk_category: "external_side_effect",
+    summary: "Run git push",
+    reason: "Codex requests permission to push changes to remote.",
+    operation_summary: "git push origin main",
+    requested_at: "2026-03-27T05:20:00Z",
+    responded_at: null,
+    decision: null,
+    decision_options: {
+      policy_scope_supported: false,
+      default_policy_scope: "once",
+    },
+    context: null,
+    ...overrides,
+  };
+}
+
+function buildAcceptedInputResponse(
+  overrides: Partial<PublicThreadInputAcceptedResponse> = {},
+): PublicThreadInputAcceptedResponse {
+  return {
+    accepted: {
+      thread_id: "thread_001",
+      turn_id: "turn_001",
+      input_item_id: "item_001",
+    },
+    thread: {
+      thread_id: "thread_001",
+      workspace_id: "ws_alpha",
+      native_status: {
+        thread_status: "active",
+        active_flags: [],
+        latest_turn_status: "inProgress",
+      },
+      updated_at: "2026-03-27T05:23:00Z",
+    },
     ...overrides,
   };
 }
@@ -101,6 +178,7 @@ class MockEventSource {
 
   onerror: ((event: Event) => void) | null = null;
   onmessage: ((event: MessageEvent<string>) => void) | null = null;
+  onopen: (() => void) | null = null;
   readonly close = vi.fn();
 
   constructor(readonly url: string) {
@@ -130,12 +208,12 @@ describe("ChatPageClient", () => {
     root = createRoot(container);
     MockEventSource.instances = [];
 
-    chatDataMocks.listWorkspaceSessions.mockReset();
-    chatDataMocks.createSessionFromChat.mockReset();
-    chatDataMocks.loadChatSessionBundle.mockReset();
-    chatDataMocks.sendSessionMessage.mockReset();
-    chatDataMocks.startSessionFromChat.mockReset();
-    chatDataMocks.stopSessionFromChat.mockReset();
+    chatDataMocks.interruptThreadFromChat.mockReset();
+    chatDataMocks.listWorkspaceThreads.mockReset();
+    chatDataMocks.loadChatThreadBundle.mockReset();
+    chatDataMocks.respondToPendingRequest.mockReset();
+    chatDataMocks.sendThreadInput.mockReset();
+    chatDataMocks.startThreadFromChat.mockReset();
   });
 
   afterEach(async () => {
@@ -149,88 +227,26 @@ describe("ChatPageClient", () => {
     vi.useRealTimers();
   });
 
-  it("recovers visible transcript and event-log updates after a missed stream send flow", async () => {
-    chatDataMocks.listWorkspaceSessions.mockResolvedValue({
-      items: [buildSession()],
+  it("loads the selected thread from v0.9 endpoints and sends follow-up input", async () => {
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [buildThreadListItem()],
       next_cursor: null,
       has_more: false,
     });
-    chatDataMocks.loadChatSessionBundle
-      .mockResolvedValueOnce({
-        session: buildSession(),
-        messages: [],
-        events: [buildEvent()],
-      })
-      .mockResolvedValueOnce({
-        session: buildSession({
-          status: "waiting_input",
-          updated_at: "2026-03-27T05:15:03Z",
-          last_message_at: "2026-03-27T05:15:00Z",
-        }),
-        messages: [buildMessage()],
-        events: [
-          buildEvent(),
-          buildEvent({
-            event_id: "evt_002",
-            event_type: "message.user",
-            sequence: 2,
-            occurred_at: "2026-03-27T05:15:02Z",
-            payload: {
-              content: "Please explain the changes.",
-              message_id: "msg_user_001",
-            },
-          }),
-          buildEvent({
-            event_id: "evt_003",
-            sequence: 3,
-            occurred_at: "2026-03-27T05:15:03Z",
-            payload: {
-              from_status: "running",
-              to_status: "waiting_input",
-            },
-          }),
-        ],
-      })
-      .mockResolvedValueOnce({
-        session: buildSession({
-          status: "waiting_input",
-          updated_at: "2026-03-27T05:15:04Z",
-          last_message_at: "2026-03-27T05:15:04Z",
-        }),
-        messages: [
-          buildMessage(),
-          buildMessage({
-            message_id: "msg_asst_001",
-            role: "assistant",
-            content: "Here is the explanation.",
-            created_at: "2026-03-27T05:15:04Z",
-          }),
-        ],
-        events: [
-          buildEvent(),
-          buildEvent({
-            event_id: "evt_002",
-            event_type: "message.assistant.completed",
-            sequence: 2,
-            occurred_at: "2026-03-27T05:15:04Z",
-            payload: {
-              content: "Here is the explanation.",
-              created_at: "2026-03-27T05:15:04Z",
-              message_id: "msg_asst_001",
-            },
-          }),
-        ],
-      });
-    chatDataMocks.sendSessionMessage.mockResolvedValue(buildMessage());
+    chatDataMocks.loadChatThreadBundle.mockResolvedValue({
+      view: buildThreadView(),
+      pendingRequestDetail: null,
+    });
+    chatDataMocks.sendThreadInput.mockResolvedValue(buildAcceptedInputResponse());
 
     await act(async () => {
       root.render(<ChatPageClient />);
     });
     await flushUi();
 
-    expect(container.textContent).toContain("Fix build error");
-    expect(container.textContent).toContain("No chat messages yet.");
-    expect(MockEventSource.instances[0]?.url).toBe("/api/v1/sessions/thread_001/stream");
+    expect(container.textContent).toContain("thread_001");
+    expect(container.textContent).toContain("Waiting for your input");
+    expect(MockEventSource.instances[0]?.url).toBe("/api/v1/threads/thread_001/stream");
 
     const textarea = container.querySelector("#message-input");
     expect(textarea).not.toBeNull();
@@ -241,64 +257,80 @@ describe("ChatPageClient", () => {
         "value",
       )?.set;
 
-      setTextareaValue?.call(textarea as HTMLTextAreaElement, "Please explain the changes.");
+      setTextareaValue?.call(textarea as HTMLTextAreaElement, "Continue with the fix.");
       textarea!.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await flushUi();
 
     const sendButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Send message",
+      (button) => button.textContent === "Send reply",
     );
     expect(sendButton).not.toBeUndefined();
-    expect((sendButton as HTMLButtonElement).disabled).toBe(false);
 
     await act(async () => {
       sendButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await flushUi();
 
-    expect(chatDataMocks.sendSessionMessage).toHaveBeenCalledWith(
+    expect(chatDataMocks.sendThreadInput).toHaveBeenCalledWith(
       "thread_001",
-      "Please explain the changes.",
-      expect.any(String),
+      "Continue with the fix.",
+      expect.stringMatching(/^input_followup_/),
     );
-    expect(container.textContent).toContain("Message accepted. Waiting for stream updates.");
-    expect(container.textContent).toContain("Please explain the changes.");
-    expect(container.textContent).not.toContain("Here is the explanation.");
-
-    await act(async () => {
-      vi.advanceTimersByTime(1500);
-    });
-    await flushUi();
-
-    expect(chatDataMocks.loadChatSessionBundle).toHaveBeenCalledTimes(2);
-    expect(vi.getTimerCount()).toBe(1);
-    expect(container.textContent).toContain("Please explain the changes.");
-    expect(container.textContent).not.toContain("Here is the explanation.");
-    expect(container.textContent).toContain("message.user");
-    expect(container.textContent).not.toContain("message.assistant.completed");
-
-    await act(async () => {
-      vi.advanceTimersByTime(1500);
-    });
-    await flushUi();
-
-    expect(chatDataMocks.loadChatSessionBundle).toHaveBeenCalledTimes(3);
-    expect(container.textContent).toContain("Here is the explanation.");
-    expect(container.textContent).toContain("message.assistant.completed");
-    expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("reflects approval wait-state without reload when approval is requested", async () => {
-    chatDataMocks.listWorkspaceSessions.mockResolvedValue({
-      items: [buildSession()],
+  it("responds to a pending request from thread context instead of the approvals page", async () => {
+    const pendingRequestDetail = buildPendingRequestDetail();
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [
+        buildThreadListItem({
+          blocked_cue: {
+            kind: "approval_required",
+            label: "Needs your response",
+          },
+          resume_cue: {
+            reason_kind: "waiting_on_approval",
+            priority_band: "highest",
+            label: "Resume here first",
+          },
+        }),
+      ],
       next_cursor: null,
       has_more: false,
     });
-    chatDataMocks.loadChatSessionBundle.mockResolvedValue({
-      session: buildSession(),
-      messages: [],
-      events: [buildEvent()],
+    chatDataMocks.loadChatThreadBundle.mockResolvedValue({
+      view: buildThreadView({
+        pending_request: {
+          request_id: "req_001",
+          thread_id: "thread_001",
+          turn_id: "turn_001",
+          item_id: "item_001",
+          request_kind: "approval",
+          status: "pending",
+          risk_category: "external_side_effect",
+          summary: "Run git push",
+          requested_at: "2026-03-27T05:20:00Z",
+        },
+      }),
+      pendingRequestDetail,
+    });
+    chatDataMocks.respondToPendingRequest.mockResolvedValue({
+      request: {
+        request_id: "req_001",
+        status: "resolved",
+        decision: "approved",
+        responded_at: "2026-03-27T05:21:00Z",
+      },
+      thread: {
+        thread_id: "thread_001",
+        workspace_id: "ws_alpha",
+        native_status: {
+          thread_status: "active",
+          active_flags: [],
+          latest_turn_status: "inProgress",
+        },
+        updated_at: "2026-03-27T05:21:00Z",
+      },
     });
 
     await act(async () => {
@@ -306,54 +338,63 @@ describe("ChatPageClient", () => {
     });
     await flushUi();
 
-    const stream = MockEventSource.instances[0];
-    expect(stream).toBeDefined();
+    expect(container.textContent).toContain("Run git push");
+    expect(container.textContent).toContain("Codex requests permission to push changes to remote.");
+
+    const approveButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Approve request",
+    );
+    expect(approveButton).not.toBeUndefined();
 
     await act(async () => {
-      stream?.onmessage?.(
+      approveButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushUi();
+
+    expect(chatDataMocks.respondToPendingRequest).toHaveBeenCalledWith(
+      "req_001",
+      "approved",
+      expect.stringMatching(/^response_/),
+    );
+  });
+
+  it("refreshes thread state after a thread stream event arrives", async () => {
+    const streamEvent: PublicThreadStreamEvent = {
+      event_id: "evt_002",
+      thread_id: "thread_001",
+      event_type: "approval.requested",
+      sequence: 2,
+      occurred_at: "2026-03-27T05:20:00Z",
+      payload: {
+        summary: "Run git push",
+      },
+    };
+
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [buildThreadListItem()],
+      next_cursor: null,
+      has_more: false,
+    });
+    chatDataMocks.loadChatThreadBundle.mockResolvedValue({
+      view: buildThreadView(),
+      pendingRequestDetail: null,
+    });
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    await act(async () => {
+      MockEventSource.instances[0]?.onmessage?.(
         new MessageEvent("message", {
-          data: JSON.stringify(
-            buildEvent({
-              event_id: "evt_approval_status",
-              event_type: "session.status_changed",
-              sequence: 2,
-              occurred_at: "2026-03-27T05:16:00Z",
-              payload: {
-                from_status: "running",
-                to_status: "waiting_approval",
-              },
-            }),
-          ),
-        }),
-      );
-      stream?.onmessage?.(
-        new MessageEvent("message", {
-          data: JSON.stringify(
-            buildEvent({
-              event_id: "evt_approval_requested",
-              event_type: "approval.requested",
-              sequence: 3,
-              occurred_at: "2026-03-27T05:16:00Z",
-              payload: {
-                approval_id: "apr_001",
-                workspace_id: "ws_alpha",
-                approval_category: "external_side_effect",
-                summary: "Run git push",
-              },
-            }),
-          ),
+          data: JSON.stringify(streamEvent),
         }),
       );
     });
     await flushUi();
 
-    expect(container.textContent).toContain("Approval waiting: apr_001");
-    expect(container.textContent).toContain("waiting approval");
-
-    const sendMessageButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Send message",
-    );
-    expect(sendMessageButton).not.toBeUndefined();
-    expect((sendMessageButton as HTMLButtonElement).disabled).toBe(true);
+    expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain("Request pending. Respond from the current thread.");
   });
 });

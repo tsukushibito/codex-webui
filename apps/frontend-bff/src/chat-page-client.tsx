@@ -4,50 +4,34 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import {
-  createSessionFromChat,
-  listWorkspaceSessions,
-  loadChatSessionBundle,
-  sendSessionMessage,
-  startSessionFromChat,
-  stopSessionFromChat,
+  interruptThreadFromChat,
+  listWorkspaceThreads,
+  loadChatThreadBundle,
+  respondToPendingRequest,
+  sendThreadInput,
+  startThreadFromChat,
 } from "./chat-data";
-import {
-  type ChatSessionSnapshot,
-  createMissedStreamRecoveryController,
-  createSendRecoveryBaseline,
-} from "./chat-send-recovery";
-import type { PublicMessage, PublicSessionEvent, PublicSessionSummary } from "./chat-types";
 import { ChatView } from "./chat-view";
 import { logLiveChatDebug } from "./debug";
-import { applySessionStatus } from "./session-status";
+import type {
+  PublicRequestDetail,
+  PublicThreadListItem,
+  PublicThreadStreamEvent,
+  PublicThreadView,
+} from "./thread-types";
 
-function createClientMessageId() {
+function createClientId(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
+    return `${prefix}_${crypto.randomUUID()}`;
   }
 
-  return `msgclient_${Date.now()}`;
+  return `${prefix}_${Date.now()}`;
 }
 
-function upsertSession(sessions: PublicSessionSummary[], nextSession: PublicSessionSummary) {
-  const remaining = sessions.filter((session) => session.session_id !== nextSession.session_id);
-
-  return [nextSession, ...remaining];
-}
-
-function upsertMessage(messages: PublicMessage[], nextMessage: PublicMessage) {
-  const existingIndex = messages.findIndex(
-    (message) => message.message_id === nextMessage.message_id,
-  );
-
-  if (existingIndex < 0) {
-    return [...messages, nextMessage];
-  }
-
-  return messages.map((message, index) => (index === existingIndex ? nextMessage : message));
-}
-
-function upsertEvent(events: PublicSessionEvent[], nextEvent: PublicSessionEvent) {
+function upsertStreamEvent(
+  events: PublicThreadStreamEvent[],
+  nextEvent: PublicThreadStreamEvent,
+): PublicThreadStreamEvent[] {
   const existingIndex = events.findIndex((event) => event.event_id === nextEvent.event_id);
 
   if (existingIndex < 0) {
@@ -60,287 +44,181 @@ function upsertEvent(events: PublicSessionEvent[], nextEvent: PublicSessionEvent
 export function ChatPageClient() {
   const searchParams = useSearchParams();
   const workspaceId = searchParams.get("workspaceId");
-  const initialSessionId = searchParams.get("sessionId");
-  const [sessions, setSessions] = useState<PublicSessionSummary[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(initialSessionId);
-  const [selectedSession, setSelectedSession] = useState<PublicSessionSummary | null>(null);
-  const [messages, setMessages] = useState<PublicMessage[]>([]);
-  const [events, setEvents] = useState<PublicSessionEvent[]>([]);
+  const initialThreadId = searchParams.get("threadId");
+  const [threads, setThreads] = useState<PublicThreadListItem[]>([]);
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(initialThreadId);
+  const [selectedThreadView, setSelectedThreadView] = useState<PublicThreadView | null>(null);
+  const [selectedRequestDetail, setSelectedRequestDetail] = useState<PublicRequestDetail | null>(
+    null,
+  );
+  const [streamEvents, setStreamEvents] = useState<PublicThreadStreamEvent[]>([]);
   const [draftAssistantMessages, setDraftAssistantMessages] = useState<Record<string, string>>({});
-  const [createSessionTitle, setCreateSessionTitle] = useState("");
+  const [newThreadInput, setNewThreadInput] = useState("");
   const [messageDraft, setMessageDraft] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
-  const [isLoadingSession, setIsLoadingSession] = useState(false);
-  const [isCreatingSession, setIsCreatingSession] = useState(false);
-  const [isStartingSession, setIsStartingSession] = useState(false);
+  const [isLoadingThreads, setIsLoadingThreads] = useState(false);
+  const [isLoadingThread, setIsLoadingThread] = useState(false);
+  const [isCreatingThread, setIsCreatingThread] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
-  const [isStoppingSession, setIsStoppingSession] = useState(false);
+  const [isInterruptingThread, setIsInterruptingThread] = useState(false);
+  const [isRespondingToRequest, setIsRespondingToRequest] = useState(false);
   const [connectionState, setConnectionState] = useState<"idle" | "live" | "reconnecting">("idle");
   const [streamVersion, setStreamVersion] = useState(0);
   const reconnectTimerRef = useRef<number | null>(null);
-  const latestSnapshotRef = useRef<ChatSessionSnapshot>({
-    session: null,
-    messages: [],
-    events: [],
-  });
-  const missedStreamRecoveryRef = useRef(createMissedStreamRecoveryController());
 
-  useEffect(() => {
-    latestSnapshotRef.current = {
-      session: selectedSession,
-      messages,
-      events,
-    };
-  }, [selectedSession, messages, events]);
-
-  async function refreshSessions(preferredSessionId?: string | null) {
+  async function refreshThreads(preferredThreadId?: string | null) {
     if (!workspaceId) {
-      setSessions([]);
-      setSelectedSessionId(null);
+      setThreads([]);
+      setSelectedThreadId(null);
       return;
     }
 
-    setIsLoadingSessions(true);
+    setIsLoadingThreads(true);
     setErrorMessage(null);
 
     try {
-      const response = await listWorkspaceSessions(workspaceId);
-      setSessions(response.items);
+      const response = await listWorkspaceThreads(workspaceId);
+      setThreads(response.items);
 
-      const nextSelectedId =
-        preferredSessionId && response.items.some((item) => item.session_id === preferredSessionId)
-          ? preferredSessionId
-          : selectedSessionId &&
-              response.items.some((item) => item.session_id === selectedSessionId)
-            ? selectedSessionId
-            : initialSessionId &&
-                response.items.some((item) => item.session_id === initialSessionId)
-              ? initialSessionId
-              : (response.items[0]?.session_id ?? null);
+      const nextSelectedThreadId =
+        preferredThreadId && response.items.some((thread) => thread.thread_id === preferredThreadId)
+          ? preferredThreadId
+          : selectedThreadId &&
+              response.items.some((thread) => thread.thread_id === selectedThreadId)
+            ? selectedThreadId
+            : initialThreadId &&
+                response.items.some((thread) => thread.thread_id === initialThreadId)
+              ? initialThreadId
+              : (response.items[0]?.thread_id ?? null);
 
-      setSelectedSessionId(nextSelectedId);
+      setSelectedThreadId(nextSelectedThreadId);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to load sessions.");
+      setErrorMessage(error instanceof Error ? error.message : "Failed to load threads.");
     } finally {
-      setIsLoadingSessions(false);
+      setIsLoadingThreads(false);
     }
   }
 
-  async function refreshSelectedSession(sessionId: string) {
-    setIsLoadingSession(true);
+  async function refreshSelectedThread(threadId: string) {
+    setIsLoadingThread(true);
     setErrorMessage(null);
-    logLiveChatDebug("chat-refresh", "refreshing selected session bundle", {
-      session_id: sessionId,
+    logLiveChatDebug("chat-refresh", "refreshing selected thread bundle", {
+      thread_id: threadId,
     });
 
     try {
-      const bundle = await loadChatSessionBundle(sessionId);
-      setSelectedSession(bundle.session);
-      setMessages(bundle.messages);
-      setEvents(bundle.events);
+      const bundle = await loadChatThreadBundle(threadId);
+      setSelectedThreadView(bundle.view);
+      setSelectedRequestDetail(bundle.pendingRequestDetail);
       setDraftAssistantMessages({});
-      setSessions((currentSessions) => upsertSession(currentSessions, bundle.session));
-      latestSnapshotRef.current = {
-        session: bundle.session,
-        messages: bundle.messages,
-        events: bundle.events,
-      };
-      logLiveChatDebug("chat-refresh", "loaded selected session bundle", {
-        session_id: bundle.session.session_id,
-        status: bundle.session.status,
-        message_count: bundle.messages.length,
-        event_count: bundle.events.length,
-        active_approval_id: bundle.session.active_approval_id,
-      });
       return bundle;
     } catch (error) {
-      logLiveChatDebug("chat-refresh", "failed to load selected session bundle", {
-        session_id: sessionId,
+      logLiveChatDebug("chat-refresh", "failed to load selected thread bundle", {
+        thread_id: threadId,
         error: error instanceof Error ? error.message : String(error),
       });
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to load the selected session.",
+        error instanceof Error ? error.message : "Failed to load the selected thread.",
       );
       return null;
     } finally {
-      setIsLoadingSession(false);
+      setIsLoadingThread(false);
     }
   }
 
-  useEffect(() => {
-    void refreshSessions(initialSessionId);
-  }, [workspaceId, initialSessionId]);
+  async function refreshSelectedThreadAndList(threadId: string) {
+    await Promise.all([refreshSelectedThread(threadId), refreshThreads(threadId)]);
+  }
 
   useEffect(() => {
-    missedStreamRecoveryRef.current.cancel();
+    void refreshThreads(initialThreadId);
+  }, [workspaceId, initialThreadId]);
 
-    if (!selectedSessionId) {
-      setSelectedSession(null);
-      setMessages([]);
-      setEvents([]);
+  useEffect(() => {
+    if (!selectedThreadId) {
+      setSelectedThreadView(null);
+      setSelectedRequestDetail(null);
+      setStreamEvents([]);
       setDraftAssistantMessages({});
       setConnectionState("idle");
       return;
     }
 
-    void refreshSelectedSession(selectedSessionId);
-  }, [selectedSessionId]);
+    setStreamEvents([]);
+    setDraftAssistantMessages({});
+    void refreshSelectedThread(selectedThreadId);
+  }, [selectedThreadId]);
 
   useEffect(() => {
     return () => {
-      missedStreamRecoveryRef.current.cancel();
+      if (reconnectTimerRef.current !== null) {
+        window.clearTimeout(reconnectTimerRef.current);
+      }
     };
   }, []);
 
   useEffect(() => {
-    if (!selectedSessionId) {
+    if (!selectedThreadId) {
       return;
     }
 
-    const stream = new EventSource(`/api/v1/sessions/${selectedSessionId}/stream`);
+    const stream = new EventSource(`/api/v1/threads/${selectedThreadId}/stream`);
     setConnectionState("live");
     stream.onopen = () => {
-      logLiveChatDebug("chat-stream", "event source opened", {
-        session_id: selectedSessionId,
+      logLiveChatDebug("chat-stream", "thread stream opened", {
+        thread_id: selectedThreadId,
       });
     };
 
     stream.onmessage = (messageEvent) => {
-      const event = JSON.parse(messageEvent.data) as PublicSessionEvent;
-      logLiveChatDebug("chat-stream", "received session stream event", {
-        session_id: event.session_id,
-        event_type: event.event_type,
-        sequence: event.sequence,
-      });
-      setEvents((currentEvents) => upsertEvent(currentEvents, event));
-
-      if (event.event_type === "session.status_changed") {
-        const toStatus = event.payload.to_status;
-        if (typeof toStatus === "string") {
-          setSelectedSession((currentSession) =>
-            currentSession
-              ? applySessionStatus(
-                  currentSession,
-                  toStatus as PublicSessionSummary["status"],
-                  event.occurred_at,
-                )
-              : currentSession,
-          );
-          setSessions((currentSessions) =>
-            currentSessions.map((session) =>
-              session.session_id === selectedSessionId
-                ? applySessionStatus(
-                    session,
-                    toStatus as PublicSessionSummary["status"],
-                    event.occurred_at,
-                  )
-                : session,
-            ),
-          );
-        }
-      }
-
-      if (event.event_type === "message.user") {
-        const messageId = event.payload.message_id;
-        const content = event.payload.content;
-        if (typeof messageId === "string" && typeof content === "string") {
-          setMessages((currentMessages) =>
-            upsertMessage(currentMessages, {
-              message_id: messageId,
-              session_id: event.session_id,
-              role: "user",
-              content,
-              created_at: event.occurred_at,
-            }),
-          );
-        }
-      }
+      const event = JSON.parse(messageEvent.data) as PublicThreadStreamEvent;
+      setStreamEvents((currentEvents) => upsertStreamEvent(currentEvents, event));
 
       if (event.event_type === "message.assistant.delta") {
         const messageId = event.payload.message_id;
         const delta = event.payload.delta;
+
         if (typeof messageId === "string" && typeof delta === "string") {
           setDraftAssistantMessages((currentDrafts) => ({
             ...currentDrafts,
             [messageId]: `${currentDrafts[messageId] ?? ""}${delta}`,
           }));
         }
+
+        return;
       }
 
       if (event.event_type === "message.assistant.completed") {
         const messageId = event.payload.message_id;
-        const content = event.payload.content;
-        const createdAt = event.payload.created_at;
-        if (
-          typeof messageId === "string" &&
-          typeof content === "string" &&
-          typeof createdAt === "string"
-        ) {
+        if (typeof messageId === "string") {
           setDraftAssistantMessages((currentDrafts) => {
             const nextDrafts = { ...currentDrafts };
             delete nextDrafts[messageId];
             return nextDrafts;
           });
-          setMessages((currentMessages) =>
-            upsertMessage(currentMessages, {
-              message_id: messageId,
-              session_id: event.session_id,
-              role: "assistant",
-              content,
-              created_at: createdAt,
-            }),
-          );
         }
       }
 
       if (event.event_type === "approval.requested") {
-        const approvalId = event.payload.approval_id;
-        setStatusMessage("Approval requested. Review the pending action when needed.");
-        if (typeof approvalId === "string") {
-          setSelectedSession((currentSession) =>
-            currentSession
-              ? applySessionStatus(currentSession, "waiting_approval", event.occurred_at, {
-                  active_approval_id: approvalId,
-                })
-              : currentSession,
-          );
-          setSessions((currentSessions) =>
-            currentSessions.map((session) =>
-              session.session_id === selectedSessionId
-                ? applySessionStatus(session, "waiting_approval", event.occurred_at, {
-                    active_approval_id: approvalId,
-                  })
-                : session,
-            ),
-          );
-        }
+        setStatusMessage("Request pending. Respond from the current thread.");
       }
 
       if (event.event_type === "approval.resolved") {
-        setStatusMessage("Approval resolved.");
-        setSelectedSession((currentSession) =>
-          currentSession
-            ? {
-                ...currentSession,
-                active_approval_id: null,
-              }
-            : currentSession,
-        );
+        setStatusMessage("Request resolved. Thread state refreshed.");
       }
+
+      void refreshSelectedThreadAndList(selectedThreadId);
     };
 
     stream.onerror = () => {
-      logLiveChatDebug("chat-stream", "event source error; entering recovery", {
-        session_id: selectedSessionId,
-      });
       stream.close();
       setConnectionState("reconnecting");
-      void refreshSelectedSession(selectedSessionId).finally(() => {
+      void refreshSelectedThreadAndList(selectedThreadId).finally(() => {
         if (reconnectTimerRef.current !== null) {
           window.clearTimeout(reconnectTimerRef.current);
         }
+
         reconnectTimerRef.current = window.setTimeout(() => {
           setStreamVersion((currentValue) => currentValue + 1);
         }, 1000);
@@ -353,64 +231,47 @@ export function ChatPageClient() {
         window.clearTimeout(reconnectTimerRef.current);
       }
     };
-  }, [selectedSessionId, streamVersion]);
+  }, [selectedThreadId, streamVersion]);
 
-  async function handleCreateSession() {
+  async function handleCreateThread() {
     if (!workspaceId) {
+      setErrorMessage("Choose a workspace from Home before starting a thread.");
       return;
     }
 
-    const trimmedTitle = createSessionTitle.trim();
-    if (trimmedTitle.length === 0) {
+    const trimmedInput = newThreadInput.trim();
+    if (trimmedInput.length === 0) {
       return;
     }
 
-    setIsCreatingSession(true);
+    setIsCreatingThread(true);
     setErrorMessage(null);
     setStatusMessage(null);
 
     try {
-      const nextSession = await createSessionFromChat(workspaceId, trimmedTitle);
-      setCreateSessionTitle("");
-      setSessions((currentSessions) => upsertSession(currentSessions, nextSession));
-      setSelectedSessionId(nextSession.session_id);
-      setStatusMessage(`Session "${trimmedTitle}" created.`);
+      const result = await startThreadFromChat(
+        workspaceId,
+        trimmedInput,
+        createClientId("input_start"),
+      );
+      setNewThreadInput("");
+      setStatusMessage(`Started thread ${result.thread.thread_id}.`);
+      await refreshThreads(result.thread.thread_id);
+      setSelectedThreadId(result.thread.thread_id);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to create a session.");
+      setErrorMessage(error instanceof Error ? error.message : "Failed to start a new thread.");
     } finally {
-      setIsCreatingSession(false);
-    }
-  }
-
-  async function handleStartSession() {
-    if (!selectedSessionId) {
-      return;
-    }
-
-    setIsStartingSession(true);
-    setErrorMessage(null);
-    setStatusMessage(null);
-
-    try {
-      const nextSession = await startSessionFromChat(selectedSessionId);
-      setSelectedSession(nextSession);
-      setSessions((currentSessions) => upsertSession(currentSessions, nextSession));
-      await refreshSelectedSession(selectedSessionId);
-      setStatusMessage("Session started.");
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to start the session.");
-    } finally {
-      setIsStartingSession(false);
+      setIsCreatingThread(false);
     }
   }
 
   async function handleSendMessage() {
-    if (!selectedSessionId) {
+    if (!selectedThreadId) {
       return;
     }
 
-    const trimmedMessage = messageDraft.trim();
-    if (trimmedMessage.length === 0) {
+    const trimmedDraft = messageDraft.trim();
+    if (trimmedDraft.length === 0) {
       return;
     }
 
@@ -419,136 +280,92 @@ export function ChatPageClient() {
     setStatusMessage(null);
 
     try {
-      const recoveryBaseline = createSendRecoveryBaseline(latestSnapshotRef.current);
-      const message = await sendSessionMessage(
-        selectedSessionId,
-        trimmedMessage,
-        createClientMessageId(),
-      );
-      logLiveChatDebug("chat-send", "message accepted by public API", {
-        session_id: selectedSessionId,
-        message_id: message.message_id,
-        created_at: message.created_at,
-      });
-      setMessages((currentMessages) => upsertMessage(currentMessages, message));
+      await sendThreadInput(selectedThreadId, trimmedDraft, createClientId("input_followup"));
       setMessageDraft("");
-      setStatusMessage("Message accepted. Waiting for stream updates.");
-      setSelectedSession((currentSession) =>
-        currentSession
-          ? applySessionStatus(currentSession, "running", message.created_at, {
-              last_message_at: message.created_at,
-            })
-          : currentSession,
-      );
-      setSessions((currentSessions) =>
-        currentSessions.map((session) =>
-          session.session_id === selectedSessionId
-            ? applySessionStatus(session, "running", message.created_at, {
-                last_message_at: message.created_at,
-              })
-            : session,
-        ),
-      );
-      latestSnapshotRef.current = {
-        session: selectedSession
-          ? applySessionStatus(selectedSession, "running", message.created_at, {
-              last_message_at: message.created_at,
-            })
-          : selectedSession,
-        messages: upsertMessage(latestSnapshotRef.current.messages, message),
-        events: latestSnapshotRef.current.events,
-      };
-      missedStreamRecoveryRef.current.start(
-        {
-          getSnapshot: () => latestSnapshotRef.current,
-          refreshSession: async () => {
-            logLiveChatDebug("chat-recovery", "running missed-stream recovery refresh", {
-              session_id: selectedSessionId,
-            });
-            const bundle = await refreshSelectedSession(selectedSessionId);
-            logLiveChatDebug("chat-recovery", "missed-stream recovery refresh completed", {
-              session_id: selectedSessionId,
-              recovered_status: bundle?.session.status ?? null,
-              recovered_message_count: bundle?.messages.length ?? null,
-              recovered_event_count: bundle?.events.length ?? null,
-              recovered_active_approval_id: bundle?.session.active_approval_id ?? null,
-            });
-            return bundle
-              ? {
-                  session: bundle.session,
-                  messages: bundle.messages,
-                  events: bundle.events,
-                }
-              : null;
-          },
-        },
-        recoveryBaseline,
-      );
+      setStatusMessage("Input accepted. Waiting for thread updates.");
+      await refreshThreads(selectedThreadId);
     } catch (error) {
-      missedStreamRecoveryRef.current.cancel();
-      setErrorMessage(error instanceof Error ? error.message : "Failed to send the message.");
+      setErrorMessage(error instanceof Error ? error.message : "Failed to send input.");
     } finally {
       setIsSendingMessage(false);
     }
   }
 
-  async function handleStopSession() {
-    if (!selectedSessionId) {
+  async function handleInterruptThread() {
+    if (!selectedThreadId) {
       return;
     }
 
-    setIsStoppingSession(true);
+    setIsInterruptingThread(true);
     setErrorMessage(null);
     setStatusMessage(null);
 
     try {
-      const result = await stopSessionFromChat(selectedSessionId);
-      setSelectedSession(result.session);
-      setSessions((currentSessions) => upsertSession(currentSessions, result.session));
-      setStatusMessage(
-        result.canceled_approval
-          ? `Session stopped and approval ${result.canceled_approval.approval_id} was canceled.`
-          : "Session stopped.",
-      );
-      await refreshSelectedSession(selectedSessionId);
+      await interruptThreadFromChat(selectedThreadId);
+      setStatusMessage("Interrupt requested.");
+      await refreshSelectedThreadAndList(selectedThreadId);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to stop the session.");
+      setErrorMessage(error instanceof Error ? error.message : "Failed to interrupt the thread.");
     } finally {
-      setIsStoppingSession(false);
+      setIsInterruptingThread(false);
+    }
+  }
+
+  async function handleRequestDecision(decision: "approved" | "denied") {
+    if (!selectedRequestDetail || selectedRequestDetail.status !== "pending") {
+      return;
+    }
+
+    setIsRespondingToRequest(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+
+    try {
+      const result = await respondToPendingRequest(
+        selectedRequestDetail.request_id,
+        decision,
+        createClientId("response"),
+      );
+      setStatusMessage(
+        decision === "approved"
+          ? `Approved ${result.request.request_id}.`
+          : `Denied ${result.request.request_id}.`,
+      );
+      await refreshSelectedThreadAndList(result.thread.thread_id);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to respond to the request.");
+    } finally {
+      setIsRespondingToRequest(false);
     }
   }
 
   return (
     <ChatView
       connectionState={connectionState}
-      createSessionTitle={createSessionTitle}
-      draftAssistantMessages={Object.entries(draftAssistantMessages).map(
-        ([messageId, content]) => ({
-          message_id: messageId,
-          content,
-        }),
-      )}
+      draftAssistantMessages={draftAssistantMessages}
       errorMessage={errorMessage}
-      events={events}
-      isCreatingSession={isCreatingSession}
-      isLoadingSession={isLoadingSession}
-      isLoadingSessions={isLoadingSessions}
+      isCreatingThread={isCreatingThread}
+      isInterruptingThread={isInterruptingThread}
+      isLoadingThread={isLoadingThread}
+      isLoadingThreads={isLoadingThreads}
+      isRespondingToRequest={isRespondingToRequest}
       isSendingMessage={isSendingMessage}
-      isStartingSession={isStartingSession}
-      isStoppingSession={isStoppingSession}
       messageDraft={messageDraft}
-      messages={messages}
-      onCreateSession={handleCreateSession}
-      onCreateSessionTitleChange={setCreateSessionTitle}
+      newThreadInput={newThreadInput}
+      onApproveRequest={() => void handleRequestDecision("approved")}
+      onCreateThread={() => void handleCreateThread()}
       onMessageDraftChange={setMessageDraft}
-      onSelectSession={setSelectedSessionId}
-      onSendMessage={handleSendMessage}
-      onStartSession={handleStartSession}
-      onStopSession={handleStopSession}
-      selectedSession={selectedSession}
-      selectedSessionId={selectedSessionId}
-      sessions={sessions}
+      onNewThreadInputChange={setNewThreadInput}
+      onDenyRequest={() => void handleRequestDecision("denied")}
+      onInterruptThread={() => void handleInterruptThread()}
+      onSelectThread={setSelectedThreadId}
+      onSendMessage={() => void handleSendMessage()}
+      selectedRequestDetail={selectedRequestDetail}
+      selectedThreadId={selectedThreadId}
+      selectedThreadView={selectedThreadView}
       statusMessage={statusMessage}
+      streamEvents={streamEvents}
+      threads={threads}
       workspaceId={workspaceId}
     />
   );
