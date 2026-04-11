@@ -6,19 +6,33 @@ import {
   stubEventSource,
 } from "./helpers/browser-mocks";
 
-test("renders the approval queue and resolves a pending approval on desktop and mobile", async ({
-  page,
-}) => {
+async function runRequestDecisionFlow(
+  page: Parameters<typeof test>[0]["page"],
+  decision: "approved" | "denied",
+) {
   await stubEventSource(page);
   await mockApprovalFlow(page);
 
-  await page.goto("/approvals");
-  await expect(page.getByRole("heading", { name: "Approval", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Run deployment", exact: true })).toBeVisible();
-  await expect(page.getByText("Deploy the latest checked-in build to staging.")).toBeVisible();
+  await page.goto("/chat?workspaceId=ws_alpha&threadId=thread_001");
+  await expect(page.getByRole("heading", { name: "Chat", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "thread_001", exact: true })).toBeVisible();
+  await expect(page.locator(".request-detail-card")).toBeVisible();
+  await expect(page.getByText("Apply the prepared deployment plan.")).toBeVisible();
   await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
 
-  await page.getByRole("button", { name: "Approve request" }).click();
-  await expect(page.getByText("Approved apr_001. Session running.")).toBeVisible();
-  await expect(page.getByText("No pending approvals.")).toBeVisible();
+  const actionLabel = decision === "approved" ? "Approve request" : "Deny request";
+  await page.getByRole("button", { name: actionLabel }).click();
+  await expect(
+    page.getByText(`${decision === "approved" ? "Approved" : "Denied"} req_001.`),
+  ).toBeVisible();
+  await expect(page.getByText(`Latest request: ${decision}`)).toBeVisible();
+  await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
+}
+
+test("resolves a pending approval on desktop and mobile", async ({ page }) => {
+  await runRequestDecisionFlow(page, "approved");
+});
+
+test("denies a pending approval on desktop and mobile", async ({ page }) => {
+  await runRequestDecisionFlow(page, "denied");
 });
