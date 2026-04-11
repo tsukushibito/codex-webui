@@ -13,7 +13,6 @@
       "node",
       "vitest/globals"
     ],
-    "baseUrl": ".",
     "paths": {
       "@/*": [
         "./*"
