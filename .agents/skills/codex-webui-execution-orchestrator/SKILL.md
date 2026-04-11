@@ -9,7 +9,7 @@ description: Coordinate multi-Issue execution in `codex-webui` by running main-o
 
 Use this skill when the main agent needs to coordinate multiple Issues for this repository.
 
-This skill is routing-only. It does not replace the existing single-Issue skills, and it must not directly implement the chosen Issue itself.
+This skill is routing-only in role boundary. It may select and invoke downstream repo skills, and it may keep a cross-skill loop running, but it does not replace the existing single-Issue skills and it must not directly implement the chosen Issue itself.
 
 Responsibilities:
 
@@ -49,6 +49,8 @@ Use this skill when:
 - the next step is unclear because several candidate Issues are available
 - the user wants one current execution target rather than a backlog summary
 
+Interpret execution-oriented requests such as `進めて`, `continue`, `keep going`, `進行して`, or multi-Issue execution asks as continue-until requests by default unless the user explicitly limits the task to routing, recommendation, or planning only.
+
 Do not use this skill when:
 
 - the user already chose a single Issue and wants package or sprint execution
@@ -67,17 +69,35 @@ Follow this order every time.
 6. Check whether the current target must be split into SubIssues before execution.
 7. Select exactly one next handoff skill.
 8. Append a routing event for the selected handoff or any blocking drift before continuing.
-9. If the user asked to proceed with work in the current turn, invoke that selected handoff skill in the same turn instead of stopping after the routing brief.
-10. If the user asked to continue until a concrete end-state, treat steps 3-9 as one iteration, then rerun main intake after the invoked handoff skill returns instead of stopping after the first handoff.
-11. If the requested end-state cannot be reached in the current session and resumable follow-up is the correct outcome, invoke `codex-webui-execution-handoff` once before ending the turn.
-12. Append `run_completed` or `run_blocked` after the final handoff outcome is known.
-13. Stop only when the requested end-state is reached, or execution is hard blocked and the required handoff outcome has been produced or has itself failed.
-14. Park the other Issues explicitly.
+9. If the user explicitly asked only for routing, target selection, or a next-skill recommendation, the workflow may stop after the routing brief. In that routing-only case, do not force a resumable handoff doc unless the user explicitly asked for one.
+10. Otherwise, invoke the selected handoff skill in the same turn instead of stopping after the routing brief.
+11. After every completed non-terminal handoff, rerun main intake before deciding whether to stop or choose the next handoff.
+12. Only the fresh post-handoff intake may transition the run to `run_completed` or `run_blocked`.
+13. If the fresh post-handoff intake verifies a terminal completion condition, append `run_completed` and stop.
+14. If the fresh post-handoff intake verifies a hard blocker, invoke `codex-webui-execution-handoff` once when resumable continuation is required, then append `run_blocked` after any required terminal handoff outcome is known.
+15. If no verified terminal condition or hard blocker exists, select the next handoff and continue the loop.
+16. Park the other Issues explicitly.
 
 Do not skip main intake in this workflow.
 
-If the user explicitly asked only for routing, target selection, or a next-skill recommendation, the workflow may stop after the routing brief.
-In that routing-only case, do not force a resumable handoff doc unless the user explicitly asked for one.
+Use this execution state machine for execution-oriented runs:
+
+1. `intake`
+2. `select_target`
+3. `select_handoff`
+4. `run_handoff`
+5. `post_handoff_intake`
+6. decide one: `continue_loop`, `complete_run`, or `block_and_handoff`
+7. repeat until `complete_run` or `block_and_handoff`
+
+Invalid transitions:
+
+- `run_handoff -> complete_run`
+- `run_handoff -> stop`
+
+Only `post_handoff_intake` may transition to `complete_run` or `block_and_handoff`.
+`codex-webui-execution-handoff` is the only terminal handoff. After that handoff completes, append the final blocked outcome and stop without rerunning intake.
+Routing-only requests may stop after target selection and routing output because no handoff loop was requested.
 
 ## Run Logging
 
@@ -104,6 +124,7 @@ Append an `anomaly` event immediately when any of the following happens:
 - a selected handoff skill fails to complete cleanly
 - the logger script itself fails
 - execution hits a real hard block and the loop must stop
+- the orchestrator is about to terminate after a non-terminal handoff without a fresh post-handoff intake and a verified terminal condition
 
 ## Delegated Failure Fallback Classes
 
@@ -215,6 +236,15 @@ If no drift blocks progress, route to one of these skills:
 
 Do not recommend multiple competing handoffs in the same result.
 
+Treat these handoffs as non-terminal by default:
+
+- `codex-webui-work-packages` when creating, resuming, reconciling, or archiving a package or worktree and final merge, sync, cleanup, Issue close, or Project completion tracking is still pending
+- tracking-only `codex-webui-github-projects` work that only syncs execution state, SubIssues, or completion tracking
+- `codex-webui-sprint-cycle` when a bounded slice remains incomplete after the sprint
+- `codex-webui-pre-push-validation` when publish-oriented, merge-oriented, or archive-oriented follow-through is still pending
+
+After these handoffs, rerun intake and continue unless a fresh post-handoff intake verifies a terminal condition.
+
 Before selecting a normal next-step handoff, ask whether execution can still continue toward the requested end-state in the current session. If the answer is no and resumable follow-up is required, the handoff must become `codex-webui-execution-handoff` for a single terminal handoff pass.
 
 When the user asked to proceed with execution, do not stop after naming the next handoff skill. Invoke exactly one selected handoff skill in the same turn.
@@ -226,6 +256,21 @@ When the user asked to continue until a concrete end-state, rerun main intake af
 - execution is hard blocked and requires user input
 - execution is hard blocked on external state that the repo agent cannot change in the current turn
 - no unambiguous next handoff exists without making a product or implementation decision that should be surfaced to the user
+
+If a fresh post-handoff intake can identify one unambiguous next handoff without requiring a new product decision and no hard blocker exists, the orchestrator must select it and continue the loop.
+
+An orchestration run may end with `run_completed` only when a verified terminal condition allows it. Use `run_completed` only when one of the following is true:
+
+- the user explicitly asked for routing only and the requested routing brief has been produced
+- a fresh post-handoff intake verifies that the requested execution end-state has been reached
+
+An orchestration run may end with `run_blocked` only when a verified terminal blocker allows it. Use `run_blocked` only when one of the following is true:
+
+- a fresh post-handoff intake verifies a hard blocker that requires user input
+- a fresh post-handoff intake verifies a hard external blocker that cannot change in the current turn
+- a fresh post-handoff intake verifies that no unambiguous next handoff exists without a new product or implementation decision
+
+If resumable continuation is required for any blocked stop, invoke `codex-webui-execution-handoff` before appending `run_blocked`.
 
 Treat these cases as requiring a terminal `codex-webui-execution-handoff` before the run stops, unless the user asked only for routing or there is no meaningful local state to preserve:
 
@@ -277,6 +322,19 @@ The result should be short and routing-oriented.
 
 If the user asked to proceed with work in the current turn, present the brief and then continue into the selected handoff skill instead of ending after the brief.
 If the user also asked to continue until a concrete end-state, keep iterating after that handoff returns instead of treating the first completed handoff as the end of the request.
+When the user asked to proceed with execution, add these sections after `Next handoff`:
+
+6. `Loop state`
+7. `Stop reason`
+
+`Loop state` must be exactly one of:
+
+- `continuing`
+- `blocked`
+- `completed`
+
+`Stop reason` must explain why the loop is allowed to stop or continue in the current turn.
+If `Loop state` is `continuing`, do not end the turn after the brief.
 If the run ends by creating a resumable handoff, `Next handoff` should report that `codex-webui-execution-handoff` was used and identify the created `.tmp/` file.
 
 ## Guardrails
@@ -294,6 +352,8 @@ If the run ends by creating a resumable handoff, `Next handoff` should report th
 - Do not bypass the selected handoff skill when the user asked to proceed with execution
 - Do not let the main agent absorb planner, worker, evaluator, or validator duties once a handoff skill has been selected
 - Do not treat one completed handoff or one approved sprint as sufficient to end a continue-until request
+- Do not stop after `codex-webui-work-packages`, including archive work that still leaves merge, sync, cleanup, Issue close, or Project completion tracking pending, tracking-only `codex-webui-github-projects`, `codex-webui-sprint-cycle`, or `codex-webui-pre-push-validation` unless a fresh post-handoff intake proves that a terminal condition has been reached
+- Do not append `run_completed` or `run_blocked` after a handoff unless a fresh post-handoff intake or a routing-only stop explicitly allows that terminal state
 - Do not treat one approved sprint as immediately ready for push-oriented, merge-oriented, or archive-oriented follow-through before the dedicated pre-push validation gate runs
 - Do not end a blocked continue-until run without attempting `codex-webui-execution-handoff` when resumable follow-up context exists
 - Do not create more than one `codex-webui-execution-handoff` document for the same orchestration run unless the user explicitly asks
