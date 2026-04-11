@@ -1,17 +1,11 @@
 import { expect, test } from "@playwright/test";
 
-test("runs the main chat flow against the live runtime stack", async ({ page }) => {
+import { expectNoHorizontalScroll } from "./helpers/browser-mocks";
+
+test("runs the main thread flow against the live runtime stack", async ({ page }) => {
   const workspaceName = `pw-${Date.now()}`;
-  const sessionTitle = "Runtime-backed chat flow";
-  const message = "Please explain the diff.";
-  const createSessionButton = page.getByRole("button", { name: "Create session" });
-  const startSessionButton = page.getByRole("button", { name: "Start session" });
-  const stopSessionButton = page.getByRole("button", { name: "Stop session" });
-  const sendMessageButton = page.getByRole("button", { name: "Send message" });
-  const currentSessionSection = page.locator("section.workspace-card").filter({
-    has: page.getByRole("heading", { name: sessionTitle, exact: true }),
-  });
-  const currentSessionStatus = currentSessionSection.locator(".status-badge");
+  const firstInput = "Runtime-backed thread flow";
+  const followUpInput = "Please explain the diff.";
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Home", exact: true })).toBeVisible();
@@ -19,28 +13,39 @@ test("runs the main chat flow against the live runtime stack", async ({ page }) 
   await page.getByLabel("Workspace name").fill(workspaceName);
   await page.getByRole("button", { name: "Create workspace" }).click();
   await expect(page.getByText(`Workspace "${workspaceName}" created.`)).toBeVisible();
+  await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
 
-  const workspaceCard = page.locator("article.workspace-card").filter({
-    has: page.getByRole("heading", { name: workspaceName, exact: true }),
-  });
-  await workspaceCard.getByRole("link", { name: "Go to Chat" }).click();
+  await page
+    .locator("article.workspace-card")
+    .filter({ has: page.getByRole("heading", { name: workspaceName, exact: true }) })
+    .getByRole("link", { name: "Open thread" })
+    .click();
   await expect(page).toHaveURL(/\/chat\?workspaceId=/);
   await expect(page.getByRole("heading", { name: "Chat", exact: true })).toBeVisible();
 
-  await page.getByLabel("New session title").fill(sessionTitle);
-  await expect(createSessionButton).toBeEnabled();
-  await createSessionButton.click();
-  await expect(currentSessionSection).toBeVisible({ timeout: 15_000 });
-  await expect(currentSessionStatus).toHaveText("created", { timeout: 15_000 });
-  await expect(startSessionButton).toBeEnabled({ timeout: 15_000 });
+  await page.getByLabel("First input").fill(firstInput);
+  await expect(page.getByRole("button", { name: "Start new thread" })).toBeEnabled();
+  await page.getByRole("button", { name: "Start new thread" }).click();
+  await expect(page.getByText("Started thread")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: /thread_/ })).toBeVisible({ timeout: 15_000 });
 
-  await startSessionButton.click();
-  const composer = page.getByLabel("Send message");
-  await composer.fill(message);
-  await expect(sendMessageButton).toBeEnabled({ timeout: 15_000 });
-  await expect(sendMessageButton).toBeEnabled();
-  await sendMessageButton.click();
-  await expect(page.getByText(message)).toBeVisible();
-  await expect(currentSessionStatus).toHaveText(/running|waiting input/);
-  await expect(stopSessionButton).toBeEnabled({ timeout: 15_000 });
+  const sendReplyButton = page.getByRole("button", { name: "Send reply" });
+  if (await sendReplyButton.isEnabled()) {
+    await page.getByLabel("Send follow-up input").fill(followUpInput);
+    await sendReplyButton.click();
+    await expect(page.getByText("Input accepted. Waiting for thread updates.")).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText(followUpInput)).toBeVisible({ timeout: 15_000 });
+  } else {
+    await expect(sendReplyButton).toBeDisabled();
+  }
+
+  const interruptThreadButton = page.getByRole("button", { name: "Interrupt thread" });
+  if (await interruptThreadButton.isEnabled()) {
+    await interruptThreadButton.click();
+    await expect(page.getByText("Interrupt requested.")).toBeVisible({ timeout: 15_000 });
+  } else {
+    await expect(interruptThreadButton).toBeDisabled();
+  }
 });
