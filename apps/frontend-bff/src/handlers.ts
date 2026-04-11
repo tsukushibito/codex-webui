@@ -11,6 +11,7 @@ import {
   mapEventList,
   mapMessage,
   mapMessageList,
+  mapNotificationEvent,
   mapPendingRequestView,
   mapRequestDetail,
   mapRequestResponseResult,
@@ -21,6 +22,7 @@ import {
   mapThreadInputAcceptedResponse,
   mapThreadList,
   mapThreadListItem,
+  mapThreadStreamEvent,
   mapThreadView,
   mapTimeline,
   mapWorkspace,
@@ -34,6 +36,7 @@ import type {
   RuntimeApprovalResolveResult,
   RuntimeApprovalStreamEventProjection,
   RuntimeMessageProjection,
+  RuntimeNotificationEvent,
   RuntimeRequestDetailView,
   RuntimeRequestResponseResult,
   RuntimeSessionEventProjection,
@@ -773,6 +776,28 @@ export async function getApprovalStream(_request: Request) {
       RuntimeApprovalStreamEventProjection,
       ReturnType<typeof mapApprovalStreamEvent>
     >("/api/v1/approvals/stream", mapApprovalStreamEvent);
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function getThreadStream(_request: Request, threadId: string) {
+  try {
+    return await relaySse<RuntimeSessionEventProjection, ReturnType<typeof mapThreadStreamEvent>>(
+      `/api/v1/threads/${threadId}/stream`,
+      mapThreadStreamEvent,
+    );
+  } catch (error) {
+    return toErrorResponse(error);
+  }
+}
+
+export async function getNotificationsStream(_request: Request) {
+  try {
+    return await relaySse<RuntimeNotificationEvent, ReturnType<typeof mapNotificationEvent>>(
+      "/api/v1/notifications/stream",
+      mapNotificationEvent,
+    );
   } catch (error) {
     return toErrorResponse(error);
   }

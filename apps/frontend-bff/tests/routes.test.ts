@@ -6,10 +6,12 @@ import {
   getApproval,
   getApprovalStream,
   getHome,
+  getNotificationsStream,
   getPendingRequest,
   getRequestDetail,
   getSessionStream,
   getThread,
+  getThreadStream,
   getThreadView,
   getTimeline,
   listEvents,
@@ -1479,6 +1481,90 @@ describe("frontend-bff route handlers", () => {
         },
       })}`,
     );
+  });
+
+  it("relays thread stream events on the v0.9 thread stream path", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      sseResponse([
+        ": connected\n\n",
+        `data: ${JSON.stringify({
+          event_id: "evt_thread_001",
+          session_id: "thread_001",
+          event_type: "message.assistant.delta",
+          sequence: 12,
+          occurred_at: "2026-03-27T05:20:10Z",
+          payload: {
+            message_id: "msg_assistant_003",
+            delta: "Updated the config",
+          },
+          native_event_name: "item/delta",
+        })}\n\n`,
+      ]),
+    );
+
+    const response = await getThreadStream(
+      new Request("http://localhost/api/v1/threads/thread_001/stream"),
+      "thread_001",
+    );
+
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    await expect(response.text()).resolves.toContain(
+      `data: ${JSON.stringify({
+        event_id: "evt_thread_001",
+        thread_id: "thread_001",
+        event_type: "message.assistant.delta",
+        sequence: 12,
+        occurred_at: "2026-03-27T05:20:10Z",
+        payload: {
+          message_id: "msg_assistant_003",
+          delta: "Updated the config",
+        },
+      })}`,
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:3001/api/v1/threads/thread_001/stream",
+      {
+        headers: {
+          accept: "text/event-stream",
+        },
+        cache: "no-store",
+      },
+    );
+  });
+
+  it("relays notifications stream events on the v0.9 notifications path", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      sseResponse([
+        `data: ${JSON.stringify({
+          thread_id: "thread_001",
+          event_type: "resume_candidate_changed",
+          occurred_at: "2026-03-27T05:20:10Z",
+          high_priority: true,
+        })}\n\n`,
+      ]),
+    );
+
+    const response = await getNotificationsStream(
+      new Request("http://localhost/api/v1/notifications/stream"),
+    );
+
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    await expect(response.text()).resolves.toContain(
+      `data: ${JSON.stringify({
+        thread_id: "thread_001",
+        event_type: "resume_candidate_changed",
+        occurred_at: "2026-03-27T05:20:10Z",
+        high_priority: true,
+      })}`,
+    );
+    expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:3001/api/v1/notifications/stream", {
+      headers: {
+        accept: "text/event-stream",
+      },
+      cache: "no-store",
+    });
   });
 
   it("returns a public runtime-unavailable error when codex-runtime cannot be reached", async () => {
