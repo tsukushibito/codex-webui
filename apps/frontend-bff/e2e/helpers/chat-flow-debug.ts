@@ -101,7 +101,6 @@ export function installChatFlowDebugCapture(page: Page): ChatFlowDebugCapture {
 
 export function sawThreadStreamRequest(debugCapture: ChatFlowDebugCapture, threadId: string) {
   return debugCapture.networkLines.some(
-    (line) =>
-      line.startsWith("[request]") && line.includes(`/api/v1/threads/${threadId}/stream`),
+    (line) => line.startsWith("[request]") && line.includes(`/api/v1/threads/${threadId}/stream`),
   );
 }

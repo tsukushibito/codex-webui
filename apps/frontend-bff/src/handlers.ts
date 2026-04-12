@@ -174,44 +174,106 @@ function mapSseChunk<TInput, TOutput>(
 function createSseRelayStream<TInput, TOutput>(
   path: string,
   source: ReadableStream<Uint8Array>,
+  signal: AbortSignal,
   mapper: (value: TInput) => TOutput,
 ) {
   const reader = source.getReader();
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   let buffer = "";
+  let closed = false;
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+  function flushBufferedChunk(controller: ReadableStreamDefaultController<Uint8Array>) {
+    if (buffer.length === 0) {
+      return;
+    }
+
+    const mappedChunk = mapSseChunk(path, buffer, mapper);
+    if (mappedChunk.length > 0) {
+      controller.enqueue(encoder.encode(mappedChunk));
+    }
+    buffer = "";
+  }
 
   return new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      const { done, value } = await reader.read();
-      if (done) {
-        if (buffer.length > 0) {
-          const mappedChunk = mapSseChunk(path, buffer, mapper);
-          if (mappedChunk.length > 0) {
-            controller.enqueue(encoder.encode(mappedChunk));
-          }
+    start(controller) {
+      const cleanup = () => {
+        if (closed) {
+          return;
         }
-        logLiveChatDebug("sse-relay", "runtime stream closed", {
+
+        closed = true;
+        if (heartbeatTimer !== null) {
+          clearInterval(heartbeatTimer);
+          heartbeatTimer = null;
+        }
+        signal.removeEventListener("abort", handleAbort);
+      };
+
+      const handleAbort = () => {
+        logLiveChatDebug("sse-relay", "aborting runtime stream from browser signal", {
           path,
         });
+        cleanup();
+        void reader.cancel(signal.reason).catch(() => {});
         controller.close();
-        return;
-      }
+      };
 
-      buffer += decoder.decode(value, { stream: true });
-
-      let boundaryIndex = buffer.indexOf("\n\n");
-      while (boundaryIndex >= 0) {
-        const chunk = buffer.slice(0, boundaryIndex);
-        buffer = buffer.slice(boundaryIndex + 2);
-        const mappedChunk = mapSseChunk(path, chunk, mapper);
-        if (mappedChunk.length > 0) {
-          controller.enqueue(encoder.encode(mappedChunk));
+      signal.addEventListener("abort", handleAbort, { once: true });
+      controller.enqueue(encoder.encode(": stream-open\n\n"));
+      heartbeatTimer = setInterval(() => {
+        if (closed) {
+          return;
         }
-        boundaryIndex = buffer.indexOf("\n\n");
-      }
+
+        controller.enqueue(encoder.encode(": keep-alive\n\n"));
+      }, 5000);
+
+      void (async () => {
+        try {
+          while (!closed) {
+            const { done, value } = await reader.read();
+            if (done) {
+              flushBufferedChunk(controller);
+              logLiveChatDebug("sse-relay", "runtime stream closed", {
+                path,
+              });
+              cleanup();
+              controller.close();
+              return;
+            }
+
+            buffer += decoder.decode(value, { stream: true });
+
+            let boundaryIndex = buffer.indexOf("\n\n");
+            while (boundaryIndex >= 0) {
+              const chunk = buffer.slice(0, boundaryIndex);
+              buffer = buffer.slice(boundaryIndex + 2);
+              const mappedChunk = mapSseChunk(path, chunk, mapper);
+              if (mappedChunk.length > 0) {
+                controller.enqueue(encoder.encode(mappedChunk));
+              }
+              boundaryIndex = buffer.indexOf("\n\n");
+            }
+          }
+        } catch (error) {
+          cleanup();
+          if (signal.aborted) {
+            controller.close();
+            return;
+          }
+
+          controller.error(error);
+        }
+      })();
     },
     async cancel() {
+      closed = true;
+      if (heartbeatTimer !== null) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
       logLiveChatDebug("sse-relay", "browser stream canceled", {
         path,
       });
@@ -220,11 +282,15 @@ function createSseRelayStream<TInput, TOutput>(
   });
 }
 
-async function relaySse<TInput, TOutput>(path: string, mapper: (value: TInput) => TOutput) {
+async function relaySse<TInput, TOutput>(
+  request: Request,
+  path: string,
+  mapper: (value: TInput) => TOutput,
+) {
   logLiveChatDebug("sse-relay", "opening runtime stream", {
     path,
   });
-  const response = await runtimeClient.requestStream(path);
+  const response = await runtimeClient.requestStream(path, request.signal);
   if (!response.ok) {
     logLiveChatDebug("sse-relay", "runtime stream returned non-ok status", {
       path,
@@ -240,7 +306,7 @@ async function relaySse<TInput, TOutput>(path: string, mapper: (value: TInput) =
     return toErrorResponse(new Error("codex-runtime stream response had no body"));
   }
 
-  return new Response(createSseRelayStream(path, response.body, mapper), {
+  return new Response(createSseRelayStream(path, response.body, request.signal, mapper), {
     status: 200,
     headers: {
       "content-type": "text/event-stream; charset=utf-8",
@@ -760,9 +826,10 @@ export async function denyApproval(_request: Request, approvalId: string) {
   }
 }
 
-export async function getSessionStream(_request: Request, sessionId: string) {
+export async function getSessionStream(request: Request, sessionId: string) {
   try {
     return await relaySse<RuntimeSessionEventProjection, ReturnType<typeof mapEvent>>(
+      request,
       `/api/v1/sessions/${sessionId}/stream`,
       mapEvent,
     );
@@ -771,20 +838,21 @@ export async function getSessionStream(_request: Request, sessionId: string) {
   }
 }
 
-export async function getApprovalStream(_request: Request) {
+export async function getApprovalStream(request: Request) {
   try {
     return await relaySse<
       RuntimeApprovalStreamEventProjection,
       ReturnType<typeof mapApprovalStreamEvent>
-    >("/api/v1/approvals/stream", mapApprovalStreamEvent);
+    >(request, "/api/v1/approvals/stream", mapApprovalStreamEvent);
   } catch (error) {
     return toErrorResponse(error);
   }
 }
 
-export async function getThreadStream(_request: Request, threadId: string) {
+export async function getThreadStream(request: Request, threadId: string) {
   try {
     return await relaySse<RuntimeSessionEventProjection, ReturnType<typeof mapThreadStreamEvent>>(
+      request,
       `/api/v1/threads/${threadId}/stream`,
       mapThreadStreamEvent,
     );
@@ -793,9 +861,10 @@ export async function getThreadStream(_request: Request, threadId: string) {
   }
 }
 
-export async function getNotificationsStream(_request: Request) {
+export async function getNotificationsStream(request: Request) {
   try {
     return await relaySse<RuntimeNotificationEvent, ReturnType<typeof mapNotificationEvent>>(
+      request,
       "/api/v1/notifications/stream",
       mapNotificationEvent,
     );

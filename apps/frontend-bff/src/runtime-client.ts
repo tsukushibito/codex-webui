@@ -1,3 +1,5 @@
+import { Agent } from "undici";
+
 import { resolveConfig } from "./config";
 import { BffError, isErrorEnvelope } from "./errors";
 
@@ -6,8 +8,16 @@ interface RuntimeJsonResult<T> {
   body: T;
 }
 
+type UndiciRequestInit = RequestInit & {
+  dispatcher?: Agent;
+};
+
 export class RuntimeClient {
   private readonly runtimeBaseUrl: string;
+  private readonly runtimeStreamDispatcher = new Agent({
+    bodyTimeout: 0,
+    headersTimeout: 0,
+  });
 
   constructor(runtimeBaseUrl = resolveConfig().runtimeBaseUrl) {
     this.runtimeBaseUrl = runtimeBaseUrl.endsWith("/")
@@ -76,7 +86,7 @@ export class RuntimeClient {
     };
   }
 
-  async requestStream(path: string) {
+  async requestStream(path: string, signal?: AbortSignal) {
     let response: Response;
     try {
       response = await fetch(`${this.runtimeBaseUrl}${path}`, {
@@ -84,7 +94,9 @@ export class RuntimeClient {
           accept: "text/event-stream",
         },
         cache: "no-store",
-      });
+        dispatcher: this.runtimeStreamDispatcher,
+        signal,
+      } as UndiciRequestInit);
     } catch (error) {
       throw new BffError(
         503,

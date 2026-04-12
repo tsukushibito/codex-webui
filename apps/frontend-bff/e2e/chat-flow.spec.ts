@@ -1,4 +1,4 @@
-import { expect, type Page, type TestInfo, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoHorizontalScroll, mockChatFlow, stubEventSource } from "./helpers/browser-mocks";
 import {
@@ -104,9 +104,7 @@ test("runs the main thread flow from Home through interrupt on desktop and mobil
       page
         .locator(".thread-summary-card")
         .filter({ hasText: "thread_001" })
-        .getByText("Running", {
-          exact: true,
-        }),
+        .getByText("Running", { exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Interrupt thread" })).toBeEnabled();
     await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);

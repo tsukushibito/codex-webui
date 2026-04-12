@@ -41,6 +41,8 @@ function upsertStreamEvent(
   return events.map((event, index) => (index === existingIndex ? nextEvent : event));
 }
 
+const ACTIVE_THREAD_REFRESH_INTERVAL_MS = 1500;
+
 export function ChatPageClient() {
   const searchParams = useSearchParams();
   const workspaceId = searchParams.get("workspaceId");
@@ -66,6 +68,7 @@ export function ChatPageClient() {
   const [connectionState, setConnectionState] = useState<"idle" | "live" | "reconnecting">("idle");
   const [streamVersion, setStreamVersion] = useState(0);
   const reconnectTimerRef = useRef<number | null>(null);
+  const activeThreadRefreshTimerRef = useRef<number | null>(null);
   const threadListRefreshIdRef = useRef(0);
   const selectedThreadRefreshIdRef = useRef(0);
 
@@ -208,8 +211,40 @@ export function ChatPageClient() {
       if (reconnectTimerRef.current !== null) {
         window.clearTimeout(reconnectTimerRef.current);
       }
+      if (activeThreadRefreshTimerRef.current !== null) {
+        window.clearInterval(activeThreadRefreshTimerRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    if (activeThreadRefreshTimerRef.current !== null) {
+      window.clearInterval(activeThreadRefreshTimerRef.current);
+      activeThreadRefreshTimerRef.current = null;
+    }
+
+    if (!selectedThreadId || selectedThreadView?.current_activity.kind !== "running") {
+      return;
+    }
+
+    logLiveChatDebug("chat-refresh", "starting active thread polling", {
+      thread_id: selectedThreadId,
+      interval_ms: ACTIVE_THREAD_REFRESH_INTERVAL_MS,
+    });
+    activeThreadRefreshTimerRef.current = window.setInterval(() => {
+      logLiveChatDebug("chat-refresh", "polling active thread bundle", {
+        thread_id: selectedThreadId,
+      });
+      void refreshSelectedThreadAndList(selectedThreadId);
+    }, ACTIVE_THREAD_REFRESH_INTERVAL_MS);
+
+    return () => {
+      if (activeThreadRefreshTimerRef.current !== null) {
+        window.clearInterval(activeThreadRefreshTimerRef.current);
+        activeThreadRefreshTimerRef.current = null;
+      }
+    };
+  }, [selectedThreadId, selectedThreadView?.current_activity.kind]);
 
   useEffect(() => {
     logLiveChatDebug("chat-stream", "stream effect fired", {
@@ -225,8 +260,9 @@ export function ChatPageClient() {
       stream_version: streamVersion,
     });
     const stream = new EventSource(`/api/v1/threads/${selectedThreadId}/stream`);
-    setConnectionState("live");
+    setConnectionState("idle");
     stream.onopen = () => {
+      setConnectionState("live");
       logLiveChatDebug("chat-stream", "thread stream opened", {
         thread_id: selectedThreadId,
       });

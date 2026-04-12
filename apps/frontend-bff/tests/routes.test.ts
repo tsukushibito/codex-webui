@@ -1446,10 +1446,8 @@ describe("frontend-bff route handlers", () => {
       ]),
     );
 
-    const response = await getSessionStream(
-      new Request("http://localhost/api/v1/sessions/thread_001/stream"),
-      "thread_001",
-    );
+    const request = new Request("http://localhost/api/v1/sessions/thread_001/stream");
+    const response = await getSessionStream(request, "thread_001");
 
     expect(response.headers.get("content-type")).toContain("text/event-stream");
     await expect(response.text()).resolves.toContain(
@@ -1464,6 +1462,16 @@ describe("frontend-bff route handlers", () => {
           delta: "Updated the config",
         },
       })}`,
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:3001/api/v1/sessions/thread_001/stream",
+      expect.objectContaining({
+        headers: {
+          accept: "text/event-stream",
+        },
+        cache: "no-store",
+        signal: request.signal,
+      }),
     );
   });
 
@@ -1487,9 +1495,8 @@ describe("frontend-bff route handlers", () => {
       ]),
     );
 
-    const response = await getApprovalStream(
-      new Request("http://localhost/api/v1/approvals/stream"),
-    );
+    const request = new Request("http://localhost/api/v1/approvals/stream");
+    const response = await getApprovalStream(request);
 
     expect(response.headers.get("content-type")).toContain("text/event-stream");
     await expect(response.text()).resolves.toContain(
@@ -1505,6 +1512,16 @@ describe("frontend-bff route handlers", () => {
           approval_category: "external_side_effect",
         },
       })}`,
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:3001/api/v1/approvals/stream",
+      expect.objectContaining({
+        headers: {
+          accept: "text/event-stream",
+        },
+        cache: "no-store",
+        signal: request.signal,
+      }),
     );
   });
 
@@ -1540,14 +1557,13 @@ describe("frontend-bff route handlers", () => {
       ]),
     );
 
-    const response = await getThreadStream(
-      new Request("http://localhost/api/v1/threads/thread_001/stream"),
-      "thread_001",
-    );
+    const request = new Request("http://localhost/api/v1/threads/thread_001/stream");
+    const response = await getThreadStream(request, "thread_001");
 
     expect(response.headers.get("content-type")).toContain("text/event-stream");
     expect(response.headers.get("x-accel-buffering")).toBe("no");
     const responseBody = await response.text();
+    expect(responseBody).toContain(": stream-open");
     expect(responseBody).toContain(
       `data: ${JSON.stringify({
         event_id: "evt_thread_001",
@@ -1576,12 +1592,13 @@ describe("frontend-bff route handlers", () => {
     );
     expect(fetchMock).toHaveBeenCalledWith(
       "http://127.0.0.1:3001/api/v1/threads/thread_001/stream",
-      {
+      expect.objectContaining({
         headers: {
           accept: "text/event-stream",
         },
         cache: "no-store",
-      },
+        signal: request.signal,
+      }),
     );
   });
 
@@ -1598,9 +1615,8 @@ describe("frontend-bff route handlers", () => {
       ]),
     );
 
-    const response = await getNotificationsStream(
-      new Request("http://localhost/api/v1/notifications/stream"),
-    );
+    const request = new Request("http://localhost/api/v1/notifications/stream");
+    const response = await getNotificationsStream(request);
 
     expect(response.headers.get("content-type")).toContain("text/event-stream");
     await expect(response.text()).resolves.toContain(
@@ -1611,12 +1627,16 @@ describe("frontend-bff route handlers", () => {
         high_priority: true,
       })}`,
     );
-    expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:3001/api/v1/notifications/stream", {
-      headers: {
-        accept: "text/event-stream",
-      },
-      cache: "no-store",
-    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:3001/api/v1/notifications/stream",
+      expect.objectContaining({
+        headers: {
+          accept: "text/event-stream",
+        },
+        cache: "no-store",
+        signal: request.signal,
+      }),
+    );
   });
 
   it("returns a public runtime-unavailable error when codex-runtime cannot be reached", async () => {

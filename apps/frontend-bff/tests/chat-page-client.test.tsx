@@ -661,6 +661,110 @@ describe("ChatPageClient", () => {
     expect(container.textContent).toContain("The live stream completed normally.");
   });
 
+  it("polls active thread state and converges to waiting input without relying on stream delivery", async () => {
+    const runningThreadListItem = buildThreadListItem({
+      native_status: {
+        thread_status: "running",
+        active_flags: [],
+        latest_turn_status: "running",
+      },
+      current_activity: {
+        kind: "running",
+        label: "Running",
+      },
+    });
+    const waitingThreadListItem = buildThreadListItem({
+      native_status: {
+        thread_status: "waiting_input",
+        active_flags: [],
+        latest_turn_status: null,
+      },
+      current_activity: {
+        kind: "waiting_on_user_input",
+        label: "Waiting for your input",
+      },
+    });
+    const runningThreadView = buildThreadView({
+      thread: {
+        thread_id: "thread_001",
+        workspace_id: "ws_alpha",
+        native_status: {
+          thread_status: "running",
+          active_flags: [],
+          latest_turn_status: "running",
+        },
+        updated_at: "2026-03-27T05:22:00Z",
+      },
+      current_activity: {
+        kind: "running",
+        label: "Running",
+      },
+      composer: {
+        accepting_user_input: false,
+        interrupt_available: true,
+        blocked_by_request: false,
+      },
+    });
+    const waitingThreadView = buildThreadView({
+      thread: {
+        thread_id: "thread_001",
+        workspace_id: "ws_alpha",
+        native_status: {
+          thread_status: "waiting_input",
+          active_flags: [],
+          latest_turn_status: null,
+        },
+        updated_at: "2026-03-27T05:23:00Z",
+      },
+      current_activity: {
+        kind: "waiting_on_user_input",
+        label: "Waiting for your input",
+      },
+      composer: {
+        accepting_user_input: true,
+        interrupt_available: false,
+        blocked_by_request: false,
+      },
+    });
+
+    chatDataMocks.listWorkspaceThreads
+      .mockResolvedValueOnce({
+        items: [runningThreadListItem],
+        next_cursor: null,
+        has_more: false,
+      })
+      .mockResolvedValueOnce({
+        items: [waitingThreadListItem],
+        next_cursor: null,
+        has_more: false,
+      });
+    chatDataMocks.loadChatThreadBundle
+      .mockResolvedValueOnce({
+        view: runningThreadView,
+        pendingRequestDetail: null,
+      })
+      .mockResolvedValueOnce({
+        view: waitingThreadView,
+        pendingRequestDetail: null,
+      });
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    expect(container.textContent).toContain("Running");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+    await flushUi();
+
+    expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
+    expect(chatDataMocks.listWorkspaceThreads).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain("Waiting for your input");
+  });
+
   it("ignores stale refresh responses after send and keeps the latest thread state", async () => {
     const waitingThreadListItem = buildThreadListItem({
       native_status: {
