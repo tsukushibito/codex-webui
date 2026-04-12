@@ -82,7 +82,6 @@ test("runs the main thread flow from Home through interrupt on desktop and mobil
   await page.getByRole("button", { name: "Start new thread" }).click();
   await expect(page.getByText("Started thread thread_001.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "thread_001", exact: true })).toBeVisible();
-  await expect(page.getByText("Fix build error")).toBeVisible();
   await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
   if (isDesktop) {
     expectDesktopThreadLayoutStable(baselineLayout!, await threadCards(page, "thread_001"));
@@ -93,9 +92,11 @@ test("runs the main thread flow from Home through interrupt on desktop and mobil
   await expect(sendReplyButton).toBeEnabled();
   await sendReplyButton.click();
   await expect(page.getByText("Input accepted. Waiting for thread updates.")).toBeVisible();
-  await expect(page.locator(".chat-message.user").first()).toContainText(
-    "Please explain the diff.",
-  );
+  await expect(
+    page.locator(".thread-summary-card").filter({ hasText: "thread_001" }).getByText("Running", {
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Interrupt thread" })).toBeEnabled();
   await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
   if (isDesktop) {

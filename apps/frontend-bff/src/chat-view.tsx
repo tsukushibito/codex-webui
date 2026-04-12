@@ -64,7 +64,7 @@ function threadBadgeClass(thread: PublicThreadListItem) {
     return "status-badge warning";
   }
 
-  if (thread.current_activity.kind === "in_progress") {
+  if (thread.current_activity.kind === "running") {
     return "status-badge success";
   }
 
@@ -378,7 +378,7 @@ export function ChatView({
                       <strong>{item.kind}</strong>
                       <span className="workspace-meta">{formatTimestamp(item.occurred_at)}</span>
                     </div>
-                    <p>{String(item.payload.summary ?? item.kind)}</p>
+                    <p>{String(item.payload.content ?? item.payload.summary ?? item.kind)}</p>
                   </article>
                 ))}
 
@@ -399,7 +399,12 @@ export function ChatView({
                       <span className="workspace-meta">{formatTimestamp(event.occurred_at)}</span>
                     </div>
                     <p>
-                      {String(event.payload.summary ?? event.payload.message ?? event.event_type)}
+                      {String(
+                        event.payload.content ??
+                          event.payload.summary ??
+                          event.payload.message ??
+                          event.event_type,
+                      )}
                     </p>
                   </article>
                 ))}

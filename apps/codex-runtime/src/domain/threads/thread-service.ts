@@ -111,6 +111,7 @@ function summarizeTimelineEvent(event: SessionEventProjection): string {
 function toTimelineItem(event: SessionEventProjection): TimelineItem {
   const payload = event.payload as Record<string, unknown>;
   const requestId = typeof payload.approval_id === "string" ? payload.approval_id : null;
+  const content = typeof payload.content === "string" ? payload.content : null;
 
   return {
     timeline_item_id: event.event_id,
@@ -119,6 +120,7 @@ function toTimelineItem(event: SessionEventProjection): TimelineItem {
     item_kind: event.event_type,
     occurred_at: event.occurred_at,
     summary: summarizeTimelineEvent(event),
+    content,
     request_id: requestId,
   };
 }

@@ -51,8 +51,12 @@ function hasActiveFlag(thread: RuntimeThreadSummary, flag: string) {
   return thread.native_status.active_flags.includes(flag);
 }
 
+function hasApprovalWaitFlag(thread: RuntimeThreadSummary) {
+  return hasActiveFlag(thread, "waiting_on_request");
+}
+
 function deriveThreadCurrentActivity(thread: RuntimeThreadSummary) {
-  if (thread.derived_hints.has_pending_request || hasActiveFlag(thread, "waitingOnApproval")) {
+  if (thread.derived_hints.has_pending_request || hasApprovalWaitFlag(thread)) {
     return {
       kind: "waiting_on_approval",
       label: "Approval required",
@@ -73,7 +77,7 @@ function deriveThreadCurrentActivity(thread: RuntimeThreadSummary) {
     };
   }
 
-  if (thread.native_status.thread_status === "active") {
+  if (thread.native_status.thread_status === "running") {
     return {
       kind: "running",
       label: "Running",
@@ -94,7 +98,7 @@ function deriveThreadCurrentActivity(thread: RuntimeThreadSummary) {
 }
 
 function deriveThreadBadge(thread: RuntimeThreadSummary) {
-  if (thread.derived_hints.has_pending_request || hasActiveFlag(thread, "waitingOnApproval")) {
+  if (thread.derived_hints.has_pending_request || hasApprovalWaitFlag(thread)) {
     return {
       kind: "approval_required",
       label: "Approval required",
@@ -119,7 +123,7 @@ function deriveThreadBadge(thread: RuntimeThreadSummary) {
 }
 
 function deriveThreadBlockedCue(thread: RuntimeThreadSummary) {
-  if (thread.derived_hints.has_pending_request || hasActiveFlag(thread, "waitingOnApproval")) {
+  if (thread.derived_hints.has_pending_request || hasApprovalWaitFlag(thread)) {
     return {
       kind: "approval_required",
       label: "Needs your response",
@@ -144,7 +148,7 @@ function deriveThreadBlockedCue(thread: RuntimeThreadSummary) {
 }
 
 function deriveThreadResumeCue(thread: RuntimeThreadSummary) {
-  if (thread.derived_hints.has_pending_request || hasActiveFlag(thread, "waitingOnApproval")) {
+  if (thread.derived_hints.has_pending_request || hasApprovalWaitFlag(thread)) {
     return {
       reason_kind: "waiting_on_approval",
       priority_band: "highest" as const,
@@ -168,7 +172,7 @@ function deriveThreadResumeCue(thread: RuntimeThreadSummary) {
     };
   }
 
-  if (thread.native_status.thread_status === "active") {
+  if (thread.native_status.thread_status === "running") {
     return {
       reason_kind: "active_thread",
       priority_band: "medium" as const,
@@ -268,6 +272,7 @@ function mapTimelineItem(item: RuntimeTimelineItem) {
     kind: item.item_kind,
     payload: {
       summary: item.summary,
+      content: item.content,
       ...(item.request_id ? { request_id: item.request_id } : {}),
     },
   };
@@ -305,7 +310,7 @@ export function mapThreadView(
       : null,
     composer: {
       accepting_user_input: view.thread.derived_hints.accepting_user_input,
-      interrupt_available: view.thread.native_status.thread_status === "active",
+      interrupt_available: view.thread.native_status.thread_status === "running",
       blocked_by_request: view.thread.derived_hints.has_pending_request,
     },
     timeline: mapTimeline(timeline),

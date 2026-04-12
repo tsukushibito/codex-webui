@@ -1234,6 +1234,76 @@ describe("thread routes", () => {
           thread_id: "thread_001",
           item_kind: "message.user",
           summary: "user input accepted",
+          content: "Continue the runtime cutover",
+        }),
+      ]),
+    );
+
+    await app.close();
+  });
+
+  it("preserves assistant completion content in the thread timeline", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("thread-routes-root");
+    const database = await createTempDatabase("thread-routes-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+    });
+
+    database.db
+      .insert(workspaces)
+      .values({
+        workspaceId: "ws_alpha",
+        workspaceName: "alpha",
+        directoryName: "alpha",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:00:00.000Z",
+      })
+      .run();
+
+    database.db
+      .insert(sessions)
+      .values({
+        sessionId: "thread_001",
+        workspaceId: "ws_alpha",
+        title: "Existing thread",
+        status: "running",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:01:00.000Z",
+        startedAt: "2026-04-09T00:00:00.000Z",
+        lastMessageAt: "2026-04-09T00:00:30.000Z",
+        activeApprovalId: null,
+        currentTurnId: "turn_001",
+        pendingAssistantMessageId: "msg_assistant_pending_001",
+        appSessionOverlayState: "open",
+      })
+      .run();
+
+    await app.runtimeServices.sessionService.applyAssistantMessageCompletion("thread_001", {
+      turn_id: "turn_001",
+      content: "Here is the explanation.",
+    });
+
+    const timelineResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/threads/thread_001/timeline",
+    });
+
+    expect(timelineResponse.statusCode).toBe(200);
+    expect(timelineResponse.json().items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          thread_id: "thread_001",
+          item_kind: "message.assistant.completed",
+          summary: "assistant completed",
+          content: "Here is the explanation.",
         }),
       ]),
     );

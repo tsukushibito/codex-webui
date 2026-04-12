@@ -63,14 +63,14 @@ function buildThreadListItem(overrides: Partial<PublicThreadListItem> = {}): Pub
     thread_id: "thread_001",
     workspace_id: "ws_alpha",
     native_status: {
-      thread_status: "active",
-      active_flags: [],
-      latest_turn_status: "inProgress",
+      thread_status: "running",
+      active_flags: ["waiting_on_request"],
+      latest_turn_status: "running",
     },
     updated_at: "2026-03-27T05:22:00Z",
     current_activity: {
-      kind: "in_progress",
-      label: "In progress",
+      kind: "running",
+      label: "Running",
     },
     badge: null,
     blocked_cue: null,
@@ -85,9 +85,9 @@ function buildThreadView(overrides: Partial<PublicThreadView> = {}): PublicThrea
       thread_id: "thread_001",
       workspace_id: "ws_alpha",
       native_status: {
-        thread_status: "active",
-        active_flags: [],
-        latest_turn_status: "inProgress",
+        thread_status: "running",
+        active_flags: ["waiting_on_request"],
+        latest_turn_status: "running",
       },
       updated_at: "2026-03-27T05:22:00Z",
     },
@@ -104,18 +104,19 @@ function buildThreadView(overrides: Partial<PublicThreadView> = {}): PublicThrea
     },
     timeline: {
       items: [
-        {
-          timeline_item_id: "evt_001",
-          thread_id: "thread_001",
-          turn_id: null,
-          item_id: null,
-          sequence: 1,
-          occurred_at: "2026-03-27T05:22:00Z",
-          kind: "message.user",
-          payload: {
-            summary: "user input accepted",
+          {
+            timeline_item_id: "evt_001",
+            thread_id: "thread_001",
+            turn_id: null,
+            item_id: null,
+            sequence: 1,
+            occurred_at: "2026-03-27T05:22:00Z",
+            kind: "message.user",
+            payload: {
+              summary: "user input accepted",
+              content: "Please explain the changes.",
+            },
           },
-        },
       ],
       next_cursor: null,
       has_more: false,
@@ -163,9 +164,9 @@ function buildAcceptedInputResponse(
       thread_id: "thread_001",
       workspace_id: "ws_alpha",
       native_status: {
-        thread_status: "active",
-        active_flags: [],
-        latest_turn_status: "inProgress",
+        thread_status: "running",
+        active_flags: ["waiting_on_request"],
+        latest_turn_status: "running",
       },
       updated_at: "2026-03-27T05:23:00Z",
     },
@@ -325,9 +326,9 @@ describe("ChatPageClient", () => {
         thread_id: "thread_001",
         workspace_id: "ws_alpha",
         native_status: {
-          thread_status: "active",
-          active_flags: [],
-          latest_turn_status: "inProgress",
+          thread_status: "running",
+          active_flags: ["waiting_on_request"],
+          latest_turn_status: "running",
         },
         updated_at: "2026-03-27T05:21:00Z",
       },
@@ -396,5 +397,102 @@ describe("ChatPageClient", () => {
 
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain("Request pending. Respond from the current thread.");
+  });
+
+  it("keeps the final assistant message visible after completion refresh", async () => {
+    const initialThreadView = buildThreadView({
+      timeline: {
+        items: [],
+        next_cursor: null,
+        has_more: false,
+      },
+    });
+    const finalThreadView = buildThreadView({
+      timeline: {
+        items: [
+          {
+            timeline_item_id: "evt_002",
+            thread_id: "thread_001",
+            turn_id: null,
+            item_id: null,
+            sequence: 2,
+            occurred_at: "2026-03-27T05:22:05Z",
+            kind: "message.assistant.completed",
+            payload: {
+              summary: "assistant completed",
+              content: "Here is the explanation.",
+            },
+          },
+        ],
+        next_cursor: null,
+        has_more: false,
+      },
+    });
+    const deltaEvent: PublicThreadStreamEvent = {
+      event_id: "evt_delta_001",
+      thread_id: "thread_001",
+      event_type: "message.assistant.delta",
+      sequence: 2,
+      occurred_at: "2026-03-27T05:22:03Z",
+      payload: {
+        message_id: "msg_asst_001",
+        delta: "Working on it",
+      },
+    };
+    const completedEvent: PublicThreadStreamEvent = {
+      event_id: "evt_completed_001",
+      thread_id: "thread_001",
+      event_type: "message.assistant.completed",
+      sequence: 3,
+      occurred_at: "2026-03-27T05:22:05Z",
+      payload: {
+        message_id: "msg_asst_001",
+        content: "Here is the explanation.",
+      },
+    };
+
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [buildThreadListItem()],
+      next_cursor: null,
+      has_more: false,
+    });
+    chatDataMocks.loadChatThreadBundle
+      .mockResolvedValueOnce({
+        view: initialThreadView,
+        pendingRequestDetail: null,
+      })
+      .mockResolvedValueOnce({
+        view: finalThreadView,
+        pendingRequestDetail: null,
+      });
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    await act(async () => {
+      MockEventSource.instances[0]?.onmessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify(deltaEvent),
+        }),
+      );
+    });
+    await flushUi();
+
+    expect(container.textContent).toContain("Working on it");
+
+    await act(async () => {
+      MockEventSource.instances[0]?.onmessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify(completedEvent),
+        }),
+      );
+    });
+    await flushUi();
+
+    expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain("Here is the explanation.");
+    expect(container.textContent).not.toContain("Working on it…");
   });
 });

@@ -30,9 +30,9 @@ describe("home data access", () => {
             thread_id: "thread_approval",
             workspace_id: "ws_alpha",
             native_status: {
-              thread_status: "active",
-              active_flags: ["waitingOnApproval"],
-              latest_turn_status: "inProgress",
+              thread_status: "running",
+              active_flags: ["waiting_on_request"],
+              latest_turn_status: "running",
             },
             updated_at: "2026-03-27T05:23:00Z",
             current_activity: {

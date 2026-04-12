@@ -147,9 +147,9 @@ describe("frontend-bff route handlers", () => {
               created_at: "2026-03-27T05:10:00Z",
               updated_at: "2026-03-27T05:24:00Z",
               native_status: {
-                thread_status: "active",
+                thread_status: "running",
                 active_flags: [],
-                latest_turn_status: "inProgress",
+                latest_turn_status: "running",
               },
               derived_hints: {
                 accepting_user_input: false,
@@ -164,9 +164,9 @@ describe("frontend-bff route handlers", () => {
               created_at: "2026-03-27T05:11:00Z",
               updated_at: "2026-03-27T05:23:00Z",
               native_status: {
-                thread_status: "active",
-                active_flags: ["waitingOnApproval"],
-                latest_turn_status: "inProgress",
+                thread_status: "running",
+                active_flags: ["waiting_on_request"],
+                latest_turn_status: "running",
               },
               derived_hints: {
                 accepting_user_input: false,
@@ -251,9 +251,9 @@ describe("frontend-bff route handlers", () => {
           thread_id: "thread_approval",
           workspace_id: "ws_alpha",
           native_status: {
-            thread_status: "active",
-            active_flags: ["waitingOnApproval"],
-            latest_turn_status: "inProgress",
+            thread_status: "running",
+            active_flags: ["waiting_on_request"],
+            latest_turn_status: "running",
           },
           updated_at: "2026-03-27T05:23:00Z",
           current_activity: {
@@ -305,9 +305,9 @@ describe("frontend-bff route handlers", () => {
           thread_id: "thread_active",
           workspace_id: "ws_alpha",
           native_status: {
-            thread_status: "active",
+            thread_status: "running",
             active_flags: [],
-            latest_turn_status: "inProgress",
+            latest_turn_status: "running",
           },
           updated_at: "2026-03-27T05:24:00Z",
           current_activity: {
@@ -383,9 +383,9 @@ describe("frontend-bff route handlers", () => {
             created_at: "2026-03-27T05:12:34Z",
             updated_at: "2026-03-27T05:22:00Z",
             native_status: {
-              thread_status: "active",
-              active_flags: ["waitingOnApproval"],
-              latest_turn_status: "inProgress",
+              thread_status: "running",
+              active_flags: ["waiting_on_request"],
+              latest_turn_status: "running",
             },
             derived_hints: {
               accepting_user_input: false,
@@ -417,9 +417,9 @@ describe("frontend-bff route handlers", () => {
           thread_id: "thread_001",
           workspace_id: "ws_alpha",
           native_status: {
-            thread_status: "active",
-            active_flags: ["waitingOnApproval"],
-            latest_turn_status: "inProgress",
+            thread_status: "running",
+            active_flags: ["waiting_on_request"],
+            latest_turn_status: "running",
           },
           updated_at: "2026-03-27T05:22:00Z",
           current_activity: {
@@ -504,9 +504,9 @@ describe("frontend-bff route handlers", () => {
             created_at: "2026-03-27T05:12:34Z",
             updated_at: "2026-03-27T05:22:00Z",
             native_status: {
-              thread_status: "active",
+              thread_status: "running",
               active_flags: [],
-              latest_turn_status: "inProgress",
+              latest_turn_status: "running",
             },
             derived_hints: {
               accepting_user_input: false,
@@ -551,9 +551,9 @@ describe("frontend-bff route handlers", () => {
         thread_id: "thread_002",
         workspace_id: "ws_alpha",
         native_status: {
-          thread_status: "active",
+          thread_status: "running",
           active_flags: [],
-          latest_turn_status: "inProgress",
+          latest_turn_status: "running",
         },
         updated_at: "2026-03-27T05:22:00Z",
       },
@@ -572,9 +572,9 @@ describe("frontend-bff route handlers", () => {
             created_at: "2026-03-27T05:12:34Z",
             updated_at: "2026-03-27T05:23:00Z",
             native_status: {
-              thread_status: "active",
+              thread_status: "running",
               active_flags: [],
-              latest_turn_status: "inProgress",
+              latest_turn_status: "running",
             },
             derived_hints: {
               accepting_user_input: false,
@@ -627,9 +627,9 @@ describe("frontend-bff route handlers", () => {
         thread_id: "thread_001",
         workspace_id: "ws_alpha",
         native_status: {
-          thread_status: "active",
+          thread_status: "running",
           active_flags: [],
-          latest_turn_status: "inProgress",
+          latest_turn_status: "running",
         },
         updated_at: "2026-03-27T05:23:00Z",
       },
@@ -714,9 +714,9 @@ describe("frontend-bff route handlers", () => {
           created_at: "2026-03-27T05:12:34Z",
           updated_at: "2026-03-27T05:21:00Z",
           native_status: {
-            thread_status: "active",
+            thread_status: "running",
             active_flags: [],
-            latest_turn_status: "inProgress",
+            latest_turn_status: "running",
           },
           derived_hints: {
             accepting_user_input: false,
@@ -760,9 +760,9 @@ describe("frontend-bff route handlers", () => {
         thread_id: "thread_001",
         workspace_id: "ws_alpha",
         native_status: {
-          thread_status: "active",
+          thread_status: "running",
           active_flags: [],
-          latest_turn_status: "inProgress",
+          latest_turn_status: "running",
         },
         updated_at: "2026-03-27T05:21:00Z",
       },
@@ -879,6 +879,17 @@ describe("frontend-bff route handlers", () => {
               item_kind: "message.user",
               occurred_at: "2026-03-27T05:22:10Z",
               summary: "user input accepted",
+              content: "Please explain the diff.",
+              request_id: null,
+            },
+            {
+              timeline_item_id: "evt_002",
+              thread_id: "thread_001",
+              sequence: 43,
+              item_kind: "message.assistant.completed",
+              occurred_at: "2026-03-27T05:22:12Z",
+              summary: "assistant completed",
+              content: "Here is the explanation.",
               request_id: null,
             },
           ],
@@ -941,6 +952,20 @@ describe("frontend-bff route handlers", () => {
             kind: "message.user",
             payload: {
               summary: "user input accepted",
+              content: "Please explain the diff.",
+            },
+          },
+          {
+            timeline_item_id: "evt_002",
+            thread_id: "thread_001",
+            turn_id: null,
+            item_id: null,
+            sequence: 43,
+            occurred_at: "2026-03-27T05:22:12Z",
+            kind: "message.assistant.completed",
+            payload: {
+              summary: "assistant completed",
+              content: "Here is the explanation.",
             },
           },
         ],

@@ -96,6 +96,7 @@ export interface RuntimeTimelineItem {
   item_kind: string;
   occurred_at: string;
   summary: string;
+  content: string | null;
   request_id: string | null;
 }
 

@@ -87,7 +87,7 @@ export async function mockChatFlow(page: Page) {
   let workspaceCreated = false;
   let threadExists = false;
   let threadStatus: "idle" | "running" = "idle";
-  let latestTurnStatus: "completed" | "inProgress" | "interrupted" = "completed";
+  let latestTurnStatus: "completed" | "running" | "interrupted" = "completed";
   const timelineItems: Array<{
     timeline_item_id: string;
     thread_id: string;
@@ -113,7 +113,7 @@ export async function mockChatFlow(page: Page) {
       thread_id: "thread_001",
       workspace_id: "ws_alpha",
       native_status: {
-        thread_status: threadStatus === "running" ? "active" : "idle",
+        thread_status: threadStatus === "running" ? "running" : "idle",
         active_flags: [],
         latest_turn_status: latestTurnStatus,
       },
@@ -227,7 +227,8 @@ export async function mockChatFlow(page: Page) {
         occurred_at: timestamps.firstInput,
         kind: "message.user",
         payload: {
-          summary: body.content,
+          summary: "user input accepted",
+          content: body.content,
         },
       });
 
@@ -268,7 +269,7 @@ export async function mockChatFlow(page: Page) {
 
       threadExists = true;
       threadStatus = "running";
-      latestTurnStatus = "inProgress";
+      latestTurnStatus = "running";
       messageCount += 1;
       timelineItems.push({
         timeline_item_id: `evt_${messageCount}`,
@@ -279,7 +280,8 @@ export async function mockChatFlow(page: Page) {
         occurred_at: timestamps.replied,
         kind: "message.user",
         payload: {
-          summary: body.content,
+          summary: "user input accepted",
+          content: body.content,
         },
       });
 
@@ -290,7 +292,8 @@ export async function mockChatFlow(page: Page) {
         sequence: messageCount,
         occurred_at: timestamps.replied,
         payload: {
-          summary: body.content,
+          summary: "user input accepted",
+          content: body.content,
         },
       });
 
@@ -365,9 +368,9 @@ export async function mockApprovalFlow(page: Page) {
     thread_id: "thread_001",
     workspace_id: "ws_alpha",
     native_status: {
-      thread_status: resolution === "pending" ? "active" : "idle",
-      active_flags: resolution === "pending" ? ["waitingOnApproval"] : [],
-      latest_turn_status: resolution === "pending" ? "inProgress" : "completed",
+      thread_status: resolution === "pending" ? "running" : "idle",
+      active_flags: resolution === "pending" ? ["waiting_on_request"] : [],
+      latest_turn_status: resolution === "pending" ? "running" : "completed",
     },
     updated_at: resolution === "pending" ? requestedAt : resolvedAt,
   });
