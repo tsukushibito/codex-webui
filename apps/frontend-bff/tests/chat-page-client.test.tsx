@@ -187,6 +187,18 @@ class MockEventSource {
   }
 }
 
+function createDeferred<T>() {
+  let resolve: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+
+  return {
+    promise,
+    resolve: resolve!,
+  };
+}
+
 async function flushUi() {
   await act(async () => {
     await Promise.resolve();
@@ -647,5 +659,222 @@ describe("ChatPageClient", () => {
 
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain("The live stream completed normally.");
+  });
+
+  it("ignores stale refresh responses after send and keeps the latest thread state", async () => {
+    const waitingThreadListItem = buildThreadListItem({
+      native_status: {
+        thread_status: "waiting_input",
+        active_flags: [],
+        latest_turn_status: null,
+      },
+      current_activity: {
+        kind: "waiting_on_user_input",
+        label: "Waiting for your input",
+      },
+    });
+    const initialThreadView = buildThreadView({
+      thread: {
+        thread_id: "thread_001",
+        workspace_id: "ws_alpha",
+        native_status: {
+          thread_status: "waiting_input",
+          active_flags: [],
+          latest_turn_status: null,
+        },
+        updated_at: "2026-03-27T05:22:00Z",
+      },
+      current_activity: {
+        kind: "waiting_on_user_input",
+        label: "Waiting for your input",
+      },
+      composer: {
+        accepting_user_input: true,
+        interrupt_available: false,
+        blocked_by_request: false,
+      },
+    });
+    const runningThreadView = buildThreadView({
+      thread: {
+        thread_id: "thread_001",
+        workspace_id: "ws_alpha",
+        native_status: {
+          thread_status: "running",
+          active_flags: [],
+          latest_turn_status: "running",
+        },
+        updated_at: "2026-03-27T05:23:00Z",
+      },
+      current_activity: {
+        kind: "running",
+        label: "Running",
+      },
+      composer: {
+        accepting_user_input: false,
+        interrupt_available: true,
+        blocked_by_request: false,
+      },
+      timeline: {
+        items: [
+          {
+            timeline_item_id: "evt_user_002",
+            thread_id: "thread_001",
+            turn_id: null,
+            item_id: null,
+            sequence: 2,
+            occurred_at: "2026-03-27T05:23:00Z",
+            kind: "message.user",
+            payload: {
+              summary: "user input accepted",
+              content: "Continue with the fix.",
+            },
+          },
+        ],
+        next_cursor: null,
+        has_more: false,
+      },
+    });
+    const completedThreadView = buildThreadView({
+      thread: {
+        thread_id: "thread_001",
+        workspace_id: "ws_alpha",
+        native_status: {
+          thread_status: "waiting_input",
+          active_flags: [],
+          latest_turn_status: null,
+        },
+        updated_at: "2026-03-27T05:24:00Z",
+      },
+      current_activity: {
+        kind: "waiting_on_user_input",
+        label: "Waiting for your input",
+      },
+      composer: {
+        accepting_user_input: true,
+        interrupt_available: false,
+        blocked_by_request: false,
+      },
+      timeline: {
+        items: [
+          {
+            timeline_item_id: "evt_user_002",
+            thread_id: "thread_001",
+            turn_id: null,
+            item_id: null,
+            sequence: 2,
+            occurred_at: "2026-03-27T05:23:00Z",
+            kind: "message.user",
+            payload: {
+              summary: "user input accepted",
+              content: "Continue with the fix.",
+            },
+          },
+          {
+            timeline_item_id: "evt_completed_003",
+            thread_id: "thread_001",
+            turn_id: null,
+            item_id: null,
+            sequence: 3,
+            occurred_at: "2026-03-27T05:24:00Z",
+            kind: "message.assistant.completed",
+            payload: {
+              summary: "assistant completed",
+              content: "Fix applied.",
+            },
+          },
+        ],
+        next_cursor: null,
+        has_more: false,
+      },
+    });
+    const sendRefresh = createDeferred<{
+      view: PublicThreadView;
+      pendingRequestDetail: PublicRequestDetail | null;
+    }>();
+    const completionRefresh = createDeferred<{
+      view: PublicThreadView;
+      pendingRequestDetail: PublicRequestDetail | null;
+    }>();
+    const statusChangedEvent: PublicThreadStreamEvent = {
+      event_id: "evt_status_001",
+      thread_id: "thread_001",
+      event_type: "session.status_changed",
+      sequence: 3,
+      occurred_at: "2026-03-27T05:24:00Z",
+      payload: {
+        status: "waiting_input",
+      },
+    };
+
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [waitingThreadListItem],
+      next_cursor: null,
+      has_more: false,
+    });
+    chatDataMocks.loadChatThreadBundle
+      .mockResolvedValueOnce({
+        view: initialThreadView,
+        pendingRequestDetail: null,
+      })
+      .mockImplementationOnce(() => sendRefresh.promise)
+      .mockImplementationOnce(() => completionRefresh.promise);
+    chatDataMocks.sendThreadInput.mockResolvedValue(buildAcceptedInputResponse());
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    const textarea = container.querySelector("#message-input");
+    expect(textarea).not.toBeNull();
+
+    await act(async () => {
+      const setTextareaValue = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set;
+
+      setTextareaValue?.call(textarea as HTMLTextAreaElement, "Continue with the fix.");
+      textarea!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await flushUi();
+
+    const sendButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Send reply",
+    );
+    expect(sendButton).not.toBeUndefined();
+
+    await act(async () => {
+      sendButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      MockEventSource.instances[0]?.onmessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify(statusChangedEvent),
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    completionRefresh.resolve({
+      view: completedThreadView,
+      pendingRequestDetail: null,
+    });
+    await flushUi();
+
+    expect(container.textContent).toContain("Waiting for your input");
+    expect(container.textContent).toContain("Fix applied.");
+
+    sendRefresh.resolve({
+      view: runningThreadView,
+      pendingRequestDetail: null,
+    });
+    await flushUi();
+
+    expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(3);
+    expect(container.textContent).toContain("Waiting for your input");
+    expect(container.textContent).not.toContain("Current threadRunning");
   });
 });

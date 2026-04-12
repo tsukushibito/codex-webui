@@ -17,17 +17,31 @@ DEVTUNNEL_ID="${CODEX_WEBUI_DEVTUNNEL_ID:-}"
 DEVTUNNEL_HOST_ARGS="${CODEX_WEBUI_DEVTUNNEL_HOST_ARGS:-}"
 STARTUP_TIMEOUT_SECONDS="${CODEX_WEBUI_STARTUP_TIMEOUT_SECONDS:-60}"
 APP_SERVER_BRIDGE_ENABLED="${CODEX_WEBUI_APP_SERVER_BRIDGE_ENABLED:-1}"
+LOG_FILE="${CODEX_WEBUI_LOG_FILE:-}"
 INTERACTIVE_MODE=false
 USE_DEVTUNNEL=false
+DEBUG_LIVE_CHAT=false
+ORIGINAL_STDIN_IS_TTY=0
+ORIGINAL_STDOUT_IS_TTY=0
+
+if [[ -t 0 ]]; then
+  ORIGINAL_STDIN_IS_TTY=1
+fi
+
+if [[ -t 1 ]]; then
+  ORIGINAL_STDOUT_IS_TTY=1
+fi
 
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/start-codex-webui.sh [--interactive] [--help]
+  scripts/start-codex-webui.sh [--interactive] [--debug-live-chat] [--log-file PATH] [--help]
 
 Options:
-  --interactive  Prompt before startup to decide whether to host through Dev Tunnel
-  --help         Show this help text
+  --interactive      Prompt before startup to decide whether to host through Dev Tunnel
+  --debug-live-chat  Enable live-chat debug logs for runtime and frontend
+  --log-file         Append combined launcher, runtime, frontend, and tunnel output to PATH
+  --help             Show this help text
 EOF
 }
 
@@ -36,6 +50,22 @@ parse_args() {
     case "$1" in
       --interactive)
         INTERACTIVE_MODE=true
+        ;;
+      --debug-live-chat)
+        DEBUG_LIVE_CHAT=true
+        ;;
+      --log-file)
+        shift
+        if (($# == 0)); then
+          fail "--log-file requires a path"
+        fi
+        LOG_FILE="$1"
+        ;;
+      --log-file=*)
+        LOG_FILE="${1#*=}"
+        if [[ -z "${LOG_FILE}" ]]; then
+          fail "--log-file requires a path"
+        fi
         ;;
       --help|-h)
         usage
@@ -58,6 +88,10 @@ parse_args() {
   fi
 }
 
+if [[ "${CODEX_WEBUI_DEBUG_LIVE_CHAT:-}" == "1" || "${NEXT_PUBLIC_CODEX_WEBUI_DEBUG_LIVE_CHAT:-}" == "1" ]]; then
+  DEBUG_LIVE_CHAT=true
+fi
+
 PIDS=()
 
 log() {
@@ -67,6 +101,17 @@ log() {
 fail() {
   echo "[codex-webui] error: $*" >&2
   exit 1
+}
+
+setup_logging() {
+  if [[ -z "${LOG_FILE}" ]]; then
+    return 0
+  fi
+
+  mkdir -p "$(dirname "${LOG_FILE}")"
+  touch "${LOG_FILE}"
+  exec > >(tee -a "${LOG_FILE}") 2>&1
+  log "writing combined logs to ${LOG_FILE}"
 }
 
 prompt_yes_no() {
@@ -123,7 +168,7 @@ prompt_choice() {
 }
 
 require_tty() {
-  if [[ ! -t 0 || ! -t 1 ]]; then
+  if (( ORIGINAL_STDIN_IS_TTY == 0 || ORIGINAL_STDOUT_IS_TTY == 0 )); then
     fail "interactive mode requires an attached TTY"
   fi
 }
@@ -333,13 +378,14 @@ start_runtime() {
     exec env \
       HOST="${RUNTIME_HOST}" \
       PORT="${RUNTIME_PORT}" \
+      CODEX_WEBUI_DEBUG_LIVE_CHAT="$([[ "${DEBUG_LIVE_CHAT}" == true ]] && echo 1 || echo 0)" \
       CODEX_WEBUI_WORKSPACE_ROOT="${WORKSPACE_ROOT}" \
       CODEX_WEBUI_DATABASE_PATH="${DATABASE_PATH}" \
       CODEX_WEBUI_APP_SERVER_BRIDGE_ENABLED="${APP_SERVER_BRIDGE_ENABLED}" \
       CODEX_APP_SERVER_COMMAND="${CODEX_APP_SERVER_COMMAND:-codex}" \
       CODEX_APP_SERVER_ARGS="${CODEX_APP_SERVER_ARGS:-app-server}" \
       npm run dev
-  ) > >(sed 's/^/[runtime] /') 2> >(sed 's/^/[runtime] /' >&2) &
+  ) > >(sed -u 's/^/[runtime] /') 2> >(sed -u 's/^/[runtime] /' >&2) &
   PIDS+=("$!")
 }
 
@@ -349,13 +395,15 @@ start_frontend() {
     cd "${FRONTEND_DIR}"
     exec env \
       CODEX_WEBUI_RUNTIME_BASE_URL="${RUNTIME_BASE_URL}" \
+      NEXT_PUBLIC_CODEX_WEBUI_DEBUG_LIVE_CHAT="$([[ "${DEBUG_LIVE_CHAT}" == true ]] && echo 1 || echo 0)" \
       npm run dev -- --hostname "${FRONTEND_HOST}" --port "${FRONTEND_PORT}"
-  ) > >(sed 's/^/[frontend] /') 2> >(sed 's/^/[frontend] /' >&2) &
+  ) > >(sed -u 's/^/[frontend] /') 2> >(sed -u 's/^/[frontend] /' >&2) &
   PIDS+=("$!")
 }
 
 trap cleanup EXIT INT TERM
 parse_args "$@"
+setup_logging
 
 if [[ "${INTERACTIVE_MODE}" == true ]]; then
   require_tty
@@ -411,7 +459,7 @@ if [[ "${USE_DEVTUNNEL}" == true ]]; then
 
   (
     exec devtunnel host "${DEVTUNNEL_ID}" "${tunnel_args[@]}"
-  ) > >(sed 's/^/[devtunnel] /') 2> >(sed 's/^/[devtunnel] /' >&2) &
+  ) > >(sed -u 's/^/[devtunnel] /') 2> >(sed -u 's/^/[devtunnel] /' >&2) &
   PIDS+=("$!")
 
   log "press Ctrl-C to stop runtime, frontend, and tunnel"

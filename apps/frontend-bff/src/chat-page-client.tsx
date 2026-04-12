@@ -66,6 +66,22 @@ export function ChatPageClient() {
   const [connectionState, setConnectionState] = useState<"idle" | "live" | "reconnecting">("idle");
   const [streamVersion, setStreamVersion] = useState(0);
   const reconnectTimerRef = useRef<number | null>(null);
+  const threadListRefreshIdRef = useRef(0);
+  const selectedThreadRefreshIdRef = useRef(0);
+
+  function updateSelectedThreadId(
+    nextThreadId: string | null,
+    reason: string,
+    details?: Record<string, unknown>,
+  ) {
+    logLiveChatDebug("chat-selection", "updating selected thread", {
+      reason,
+      previous_thread_id: selectedThreadId,
+      next_thread_id: nextThreadId,
+      ...details,
+    });
+    setSelectedThreadId(nextThreadId);
+  }
 
   async function refreshThreads(preferredThreadId?: string | null) {
     if (!workspaceId) {
@@ -74,11 +90,17 @@ export function ChatPageClient() {
       return;
     }
 
+    const refreshId = threadListRefreshIdRef.current + 1;
+    threadListRefreshIdRef.current = refreshId;
     setIsLoadingThreads(true);
     setErrorMessage(null);
 
     try {
       const response = await listWorkspaceThreads(workspaceId);
+      if (threadListRefreshIdRef.current !== refreshId) {
+        return;
+      }
+
       setThreads(response.items);
 
       const nextSelectedThreadId =
@@ -92,38 +114,59 @@ export function ChatPageClient() {
               ? initialThreadId
               : (response.items[0]?.thread_id ?? null);
 
-      setSelectedThreadId(nextSelectedThreadId);
+      updateSelectedThreadId(nextSelectedThreadId, "refresh_threads", {
+        refresh_id: refreshId,
+      });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to load threads.");
+      if (threadListRefreshIdRef.current === refreshId) {
+        setErrorMessage(error instanceof Error ? error.message : "Failed to load threads.");
+      }
     } finally {
-      setIsLoadingThreads(false);
+      if (threadListRefreshIdRef.current === refreshId) {
+        setIsLoadingThreads(false);
+      }
     }
   }
 
   async function refreshSelectedThread(threadId: string) {
+    const refreshId = selectedThreadRefreshIdRef.current + 1;
+    selectedThreadRefreshIdRef.current = refreshId;
     setIsLoadingThread(true);
     setErrorMessage(null);
     logLiveChatDebug("chat-refresh", "refreshing selected thread bundle", {
       thread_id: threadId,
+      refresh_id: refreshId,
     });
 
     try {
       const bundle = await loadChatThreadBundle(threadId);
+      if (selectedThreadRefreshIdRef.current !== refreshId) {
+        logLiveChatDebug("chat-refresh", "discarding stale selected thread bundle", {
+          thread_id: threadId,
+          refresh_id: refreshId,
+        });
+        return null;
+      }
+
       setSelectedThreadView(bundle.view);
       setSelectedRequestDetail(bundle.pendingRequestDetail);
-      setDraftAssistantMessages({});
       return bundle;
     } catch (error) {
-      logLiveChatDebug("chat-refresh", "failed to load selected thread bundle", {
-        thread_id: threadId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to load the selected thread.",
-      );
+      if (selectedThreadRefreshIdRef.current === refreshId) {
+        logLiveChatDebug("chat-refresh", "failed to load selected thread bundle", {
+          thread_id: threadId,
+          refresh_id: refreshId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        setErrorMessage(
+          error instanceof Error ? error.message : "Failed to load the selected thread.",
+        );
+      }
       return null;
     } finally {
-      setIsLoadingThread(false);
+      if (selectedThreadRefreshIdRef.current === refreshId) {
+        setIsLoadingThread(false);
+      }
     }
   }
 
@@ -136,7 +179,13 @@ export function ChatPageClient() {
   }, [workspaceId, initialThreadId]);
 
   useEffect(() => {
+    logLiveChatDebug("chat-stream", "selectedThreadId effect fired", {
+      thread_id: selectedThreadId,
+    });
     if (!selectedThreadId) {
+      logLiveChatDebug("chat-stream", "selected thread cleared", {
+        previous_thread_id: selectedThreadView?.thread.thread_id ?? null,
+      });
       setSelectedThreadView(null);
       setSelectedRequestDetail(null);
       setStreamEvents([]);
@@ -145,6 +194,10 @@ export function ChatPageClient() {
       return;
     }
 
+    logLiveChatDebug("chat-stream", "selected thread changed", {
+      thread_id: selectedThreadId,
+      previous_thread_id: selectedThreadView?.thread.thread_id ?? null,
+    });
     setStreamEvents([]);
     setDraftAssistantMessages({});
     void refreshSelectedThread(selectedThreadId);
@@ -159,10 +212,18 @@ export function ChatPageClient() {
   }, []);
 
   useEffect(() => {
+    logLiveChatDebug("chat-stream", "stream effect fired", {
+      thread_id: selectedThreadId,
+      stream_version: streamVersion,
+    });
     if (!selectedThreadId) {
       return;
     }
 
+    logLiveChatDebug("chat-stream", "creating thread event source", {
+      thread_id: selectedThreadId,
+      stream_version: streamVersion,
+    });
     const stream = new EventSource(`/api/v1/threads/${selectedThreadId}/stream`);
     setConnectionState("live");
     stream.onopen = () => {
@@ -234,6 +295,10 @@ export function ChatPageClient() {
     };
 
     return () => {
+      logLiveChatDebug("chat-stream", "cleaning up thread stream", {
+        thread_id: selectedThreadId,
+        stream_version: streamVersion,
+      });
       stream.close();
       if (reconnectTimerRef.current !== null) {
         window.clearTimeout(reconnectTimerRef.current);
@@ -262,10 +327,16 @@ export function ChatPageClient() {
         trimmedInput,
         createClientId("input_start"),
       );
+      logLiveChatDebug("chat-stream", "created thread from chat", {
+        thread_id: result.thread.thread_id,
+      });
       setNewThreadInput("");
       setStatusMessage(`Started thread ${result.thread.thread_id}.`);
       await refreshThreads(result.thread.thread_id);
-      setSelectedThreadId(result.thread.thread_id);
+      logLiveChatDebug("chat-stream", "selecting created thread", {
+        thread_id: result.thread.thread_id,
+      });
+      updateSelectedThreadId(result.thread.thread_id, "create_thread_success");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to start a new thread.");
     } finally {
@@ -366,7 +437,7 @@ export function ChatPageClient() {
       onNewThreadInputChange={setNewThreadInput}
       onDenyRequest={() => void handleRequestDecision("denied")}
       onInterruptThread={() => void handleInterruptThread()}
-      onSelectThread={setSelectedThreadId}
+      onSelectThread={(threadId) => updateSelectedThreadId(threadId, "user_select_thread")}
       onSendMessage={() => void handleSendMessage()}
       selectedRequestDetail={selectedRequestDetail}
       selectedThreadId={selectedThreadId}

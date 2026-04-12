@@ -4,6 +4,7 @@ import { createInterface, type Interface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 
 import { logLiveChatDebug } from "../../debug.js";
+import { RuntimeError } from "../../errors.js";
 import type { ApprovalCategory } from "../approvals/types.js";
 import type {
   CreateNativeSessionInput,
@@ -62,6 +63,8 @@ export interface NativeSessionEventSink {
 }
 
 interface PendingRequest {
+  id: number;
+  method: string;
   resolve: (value: any) => void;
   reject: (reason?: unknown) => void;
 }
@@ -321,19 +324,38 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
       typeof message.id === "number" &&
       (message.result !== undefined || message.error !== undefined)
     ) {
+      const pending = this.pendingRequests.get(message.id);
+
       logLiveChatDebug("app-server", "received rpc response", {
         id: message.id,
+        method: pending?.method ?? null,
         has_error: message.error !== undefined,
       });
-      const pending = this.pendingRequests.get(message.id);
       if (!pending) {
         return;
       }
 
       this.pendingRequests.delete(message.id);
       if (message.error) {
+        logLiveChatDebug("app-server", "received rpc error response", {
+          id: message.id,
+          method: pending.method,
+          code: message.error.code ?? null,
+          message: message.error.message ?? "codex app-server request failed",
+          data: message.error.data ?? null,
+        });
         pending.reject(
-          new Error(String(message.error.message ?? "codex app-server request failed")),
+          new RuntimeError(
+            502,
+            "app_server_request_failed",
+            String(message.error.message ?? "codex app-server request failed"),
+            {
+              rpc_request_id: message.id,
+              rpc_method: pending.method,
+              rpc_error_code: message.error.code ?? null,
+              rpc_error_data: message.error.data ?? null,
+            },
+          ),
         );
       } else {
         pending.resolve(message.result);
@@ -566,6 +588,8 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
     });
     const response = new Promise<any>((resolve, reject) => {
       this.pendingRequests.set(requestId, {
+        id: requestId,
+        method,
         resolve,
         reject,
       });

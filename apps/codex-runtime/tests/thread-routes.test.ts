@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { approvals, sessionEvents, sessions, workspaces } from "../src/db/schema.js";
 import type { NativeSessionGateway } from "../src/domain/sessions/native-session-gateway.js";
+import { RuntimeError } from "../src/errors.js";
 import { createTempDatabase, createTempWorkspaceRoot } from "./helpers.js";
 
 const cleanupPaths: string[] = [];
@@ -53,6 +54,22 @@ class StubNativeSessionGateway implements NativeSessionGateway {
 
   async interruptSessionTurn(input: { sessionId: string; turnId: string }) {
     this.interrupts.push(input);
+  }
+}
+
+class FailingSendNativeSessionGateway extends StubNativeSessionGateway {
+  override async sendUserMessage(
+    _input: { sessionId: string; content: string },
+  ): Promise<{ turnId: string }> {
+    throw new RuntimeError(
+      502,
+      "app_server_request_failed",
+      "turn is already running",
+      {
+        rpc_method: "turn/start",
+        rpc_error_code: "invalid_state",
+      },
+    );
   }
 }
 
@@ -221,6 +238,77 @@ describe("thread routes", () => {
     expect(secondResponse.json()).toMatchObject({
       thread: {
         thread_id: firstJson.thread.thread_id,
+      },
+    });
+
+    await app.close();
+  });
+
+  it("surfaces native turn-start failures instead of returning an unexpected runtime failure", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("thread-routes-root");
+    const database = await createTempDatabase("thread-routes-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway: new FailingSendNativeSessionGateway(["thread_001"]),
+      },
+    });
+
+    database.db
+      .insert(workspaces)
+      .values({
+        workspaceId: "ws_alpha",
+        workspaceName: "alpha",
+        directoryName: "alpha",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:00:00.000Z",
+      })
+      .run();
+
+    database.db
+      .insert(sessions)
+      .values({
+        sessionId: "thread_001",
+        workspaceId: "ws_alpha",
+        title: "Existing thread",
+        status: "waiting_input",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:01:00.000Z",
+        startedAt: "2026-04-09T00:00:00.000Z",
+        lastMessageAt: null,
+        activeApprovalId: null,
+        currentTurnId: null,
+        pendingAssistantMessageId: null,
+        appSessionOverlayState: "open",
+      })
+      .run();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/threads/thread_001/inputs",
+      payload: {
+        client_request_id: "req_001",
+        content: "Plan the runtime cutover",
+      },
+    });
+
+    expect(response.statusCode).toBe(502);
+    expect(response.json()).toEqual({
+      error: {
+        code: "app_server_request_failed",
+        message: "turn is already running",
+        details: {
+          rpc_method: "turn/start",
+          rpc_error_code: "invalid_state",
+        },
       },
     });
 
