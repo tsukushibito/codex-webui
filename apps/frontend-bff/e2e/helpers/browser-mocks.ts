@@ -80,12 +80,16 @@ export async function mockChatFlow(page: Page) {
     updated: "2026-04-05T02:31:00Z",
     firstInput: "2026-04-05T02:32:00Z",
     replied: "2026-04-05T02:33:00Z",
+    assistantDelta: "2026-04-05T02:33:02Z",
+    assistantCompleted: "2026-04-05T02:33:04Z",
     interrupted: "2026-04-05T02:34:00Z",
   };
 
   let messageCount = 0;
+  let sequenceCount = 0;
   let workspaceCreated = false;
   let threadExists = false;
+  let followupCount = 0;
   let threadStatus: "idle" | "running" = "idle";
   let latestTurnStatus: "completed" | "running" | "interrupted" = "completed";
   const timelineItems: Array<{
@@ -107,6 +111,11 @@ export async function mockChatFlow(page: Page) {
     active_session_summary: null,
     pending_approval_count: 0,
   };
+
+  function nextSequence() {
+    sequenceCount += 1;
+    return sequenceCount;
+  }
 
   function currentThreadSummary() {
     return {
@@ -218,12 +227,13 @@ export async function mockChatFlow(page: Page) {
       threadStatus = "idle";
       latestTurnStatus = "completed";
       messageCount += 1;
+      const sequence = nextSequence();
       timelineItems.splice(0, timelineItems.length, {
         timeline_item_id: `evt_${messageCount}`,
         thread_id: "thread_001",
         turn_id: null,
         item_id: null,
-        sequence: 1,
+        sequence,
         occurred_at: timestamps.firstInput,
         kind: "message.user",
         payload: {
@@ -267,16 +277,18 @@ export async function mockChatFlow(page: Page) {
         content: string;
       };
 
+      followupCount += 1;
       threadExists = true;
       threadStatus = "running";
       latestTurnStatus = "running";
       messageCount += 1;
+      const userSequence = nextSequence();
       timelineItems.push({
         timeline_item_id: `evt_${messageCount}`,
         thread_id: "thread_001",
         turn_id: null,
         item_id: null,
-        sequence: messageCount,
+        sequence: userSequence,
         occurred_at: timestamps.replied,
         kind: "message.user",
         payload: {
@@ -289,13 +301,63 @@ export async function mockChatFlow(page: Page) {
         event_id: `evt_stream_${messageCount}`,
         thread_id: "thread_001",
         event_type: "message.user",
-        sequence: messageCount,
+        sequence: userSequence,
         occurred_at: timestamps.replied,
         payload: {
           summary: "user input accepted",
           content: body.content,
         },
       });
+
+      if (followupCount > 1) {
+        const assistantReply = "Here is the explanation.";
+        setTimeout(() => {
+          void (async () => {
+            const deltaSequence = nextSequence();
+            await emitMockEventSourceMessage(page, {
+              event_id: `evt_stream_delta_${deltaSequence}`,
+              thread_id: "thread_001",
+              event_type: "message.assistant.delta",
+              sequence: deltaSequence,
+              occurred_at: timestamps.assistantDelta,
+              payload: {
+                message_id: "msg_assistant_001",
+                delta: "Here is the",
+              },
+            });
+
+            threadStatus = "idle";
+            latestTurnStatus = "completed";
+            const completedSequence = nextSequence();
+            messageCount += 1;
+            timelineItems.push({
+              timeline_item_id: `evt_${messageCount}`,
+              thread_id: "thread_001",
+              turn_id: null,
+              item_id: null,
+              sequence: completedSequence,
+              occurred_at: timestamps.assistantCompleted,
+              kind: "message.assistant.completed",
+              payload: {
+                summary: "assistant completed",
+                content: assistantReply,
+              },
+            });
+
+            await emitMockEventSourceMessage(page, {
+              event_id: `evt_stream_completed_${completedSequence}`,
+              thread_id: "thread_001",
+              event_type: "message.assistant.completed",
+              sequence: completedSequence,
+              occurred_at: timestamps.assistantCompleted,
+              payload: {
+                message_id: "msg_assistant_001",
+                content: assistantReply,
+              },
+            });
+          })();
+        }, 25);
+      }
 
       return json(
         route,
@@ -315,12 +377,13 @@ export async function mockChatFlow(page: Page) {
       threadStatus = "idle";
       latestTurnStatus = "interrupted";
       messageCount += 1;
+      const sequence = nextSequence();
       timelineItems.push({
         timeline_item_id: `evt_${messageCount}`,
         thread_id: "thread_001",
         turn_id: null,
         item_id: null,
-        sequence: messageCount,
+        sequence,
         occurred_at: timestamps.interrupted,
         kind: "thread.interrupted",
         payload: {

@@ -173,6 +173,11 @@ export function ChatPageClient() {
 
     stream.onmessage = (messageEvent) => {
       const event = JSON.parse(messageEvent.data) as PublicThreadStreamEvent;
+      logLiveChatDebug("chat-stream", "thread stream event received", {
+        thread_id: selectedThreadId,
+        event_type: event.event_type,
+        sequence: event.sequence,
+      });
       setStreamEvents((currentEvents) => upsertStreamEvent(currentEvents, event));
 
       if (event.event_type === "message.assistant.delta") {
@@ -212,6 +217,9 @@ export function ChatPageClient() {
     };
 
     stream.onerror = () => {
+      logLiveChatDebug("chat-stream", "thread stream errored", {
+        thread_id: selectedThreadId,
+      });
       stream.close();
       setConnectionState("reconnecting");
       void refreshSelectedThreadAndList(selectedThreadId).finally(() => {
@@ -283,7 +291,7 @@ export function ChatPageClient() {
       await sendThreadInput(selectedThreadId, trimmedDraft, createClientId("input_followup"));
       setMessageDraft("");
       setStatusMessage("Input accepted. Waiting for thread updates.");
-      await refreshThreads(selectedThreadId);
+      await refreshSelectedThreadAndList(selectedThreadId);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to send input.");
     } finally {

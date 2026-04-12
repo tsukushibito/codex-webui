@@ -108,6 +108,11 @@ test("runs the main thread flow from Home through interrupt on desktop and mobil
   await expect(page.getByText("Thread interrupted.")).toBeVisible();
   await page.getByLabel("Send follow-up input").fill("Resume after interrupt.");
   await expect(sendReplyButton).toBeEnabled();
+  await sendReplyButton.click();
+  await expect(page.getByText("Input accepted. Waiting for thread updates.")).toBeVisible();
+  await expect(
+    page.locator(".chat-message-list").getByText("Here is the explanation.").first(),
+  ).toBeVisible();
   await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
   if (isDesktop) {
     expectDesktopThreadLayoutStable(baselineLayout!, await threadCards(page, "thread_001"));

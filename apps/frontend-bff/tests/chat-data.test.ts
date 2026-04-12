@@ -231,11 +231,11 @@ describe("chat data access", () => {
           thread: {
             thread_id: "thread_001",
             workspace_id: "ws_alpha",
-              native_status: {
-                thread_status: "running",
-                active_flags: [],
-                latest_turn_status: "running",
-              },
+            native_status: {
+              thread_status: "running",
+              active_flags: [],
+              latest_turn_status: "running",
+            },
             updated_at: "2026-03-27T05:21:00Z",
           },
         }),

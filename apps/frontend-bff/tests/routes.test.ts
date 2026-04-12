@@ -1525,6 +1525,18 @@ describe("frontend-bff route handlers", () => {
           },
           native_event_name: "item/delta",
         })}\n\n`,
+        `data: ${JSON.stringify({
+          event_id: "evt_thread_002",
+          session_id: "thread_001",
+          event_type: "message.assistant.completed",
+          sequence: 13,
+          occurred_at: "2026-03-27T05:20:12Z",
+          payload: {
+            message_id: "msg_assistant_003",
+            content: "Updated the config and tests.",
+          },
+          native_event_name: "item/completed",
+        })}\n\n`,
       ]),
     );
 
@@ -1534,7 +1546,9 @@ describe("frontend-bff route handlers", () => {
     );
 
     expect(response.headers.get("content-type")).toContain("text/event-stream");
-    await expect(response.text()).resolves.toContain(
+    expect(response.headers.get("x-accel-buffering")).toBe("no");
+    const responseBody = await response.text();
+    expect(responseBody).toContain(
       `data: ${JSON.stringify({
         event_id: "evt_thread_001",
         thread_id: "thread_001",
@@ -1544,6 +1558,19 @@ describe("frontend-bff route handlers", () => {
         payload: {
           message_id: "msg_assistant_003",
           delta: "Updated the config",
+        },
+      })}`,
+    );
+    expect(responseBody).toContain(
+      `data: ${JSON.stringify({
+        event_id: "evt_thread_002",
+        thread_id: "thread_001",
+        event_type: "message.assistant.completed",
+        sequence: 13,
+        occurred_at: "2026-03-27T05:20:12Z",
+        payload: {
+          message_id: "msg_assistant_003",
+          content: "Updated the config and tests.",
         },
       })}`,
     );

@@ -104,19 +104,19 @@ function buildThreadView(overrides: Partial<PublicThreadView> = {}): PublicThrea
     },
     timeline: {
       items: [
-          {
-            timeline_item_id: "evt_001",
-            thread_id: "thread_001",
-            turn_id: null,
-            item_id: null,
-            sequence: 1,
-            occurred_at: "2026-03-27T05:22:00Z",
-            kind: "message.user",
-            payload: {
-              summary: "user input accepted",
-              content: "Please explain the changes.",
-            },
+        {
+          timeline_item_id: "evt_001",
+          thread_id: "thread_001",
+          turn_id: null,
+          item_id: null,
+          sequence: 1,
+          occurred_at: "2026-03-27T05:22:00Z",
+          kind: "message.user",
+          payload: {
+            summary: "user input accepted",
+            content: "Please explain the changes.",
           },
+        },
       ],
       next_cursor: null,
       has_more: false,
@@ -229,15 +229,112 @@ describe("ChatPageClient", () => {
   });
 
   it("loads the selected thread from v0.9 endpoints and sends follow-up input", async () => {
-    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
-      items: [buildThreadListItem()],
-      next_cursor: null,
-      has_more: false,
-    });
-    chatDataMocks.loadChatThreadBundle.mockResolvedValue({
-      view: buildThreadView(),
-      pendingRequestDetail: null,
-    });
+    chatDataMocks.listWorkspaceThreads
+      .mockResolvedValueOnce({
+        items: [
+          buildThreadListItem({
+            native_status: {
+              thread_status: "waiting_input",
+              active_flags: [],
+              latest_turn_status: null,
+            },
+            current_activity: {
+              kind: "waiting_on_user_input",
+              label: "Waiting for your input",
+            },
+          }),
+        ],
+        next_cursor: null,
+        has_more: false,
+      })
+      .mockResolvedValueOnce({
+        items: [
+          buildThreadListItem({
+            current_activity: {
+              kind: "running",
+              label: "Running",
+            },
+          }),
+        ],
+        next_cursor: null,
+        has_more: false,
+      });
+    chatDataMocks.loadChatThreadBundle
+      .mockResolvedValueOnce({
+        view: buildThreadView({
+          thread: {
+            thread_id: "thread_001",
+            workspace_id: "ws_alpha",
+            native_status: {
+              thread_status: "waiting_input",
+              active_flags: [],
+              latest_turn_status: null,
+            },
+            updated_at: "2026-03-27T05:22:00Z",
+          },
+          current_activity: {
+            kind: "waiting_on_user_input",
+            label: "Waiting for your input",
+          },
+          composer: {
+            accepting_user_input: true,
+            interrupt_available: false,
+            blocked_by_request: false,
+          },
+          timeline: {
+            items: [],
+            next_cursor: null,
+            has_more: false,
+          },
+        }),
+        pendingRequestDetail: null,
+      })
+      .mockResolvedValueOnce({
+        view: buildThreadView({
+          current_activity: {
+            kind: "running",
+            label: "Running",
+          },
+          composer: {
+            accepting_user_input: false,
+            interrupt_available: true,
+            blocked_by_request: false,
+          },
+          timeline: {
+            items: [
+              {
+                timeline_item_id: "evt_001",
+                thread_id: "thread_001",
+                turn_id: null,
+                item_id: null,
+                sequence: 1,
+                occurred_at: "2026-03-27T05:22:00Z",
+                kind: "message.assistant.completed",
+                payload: {
+                  summary: "assistant completed",
+                  content: "Please explain the changes.",
+                },
+              },
+              {
+                timeline_item_id: "evt_002",
+                thread_id: "thread_001",
+                turn_id: "turn_001",
+                item_id: "item_001",
+                sequence: 2,
+                occurred_at: "2026-03-27T05:23:00Z",
+                kind: "message.user",
+                payload: {
+                  summary: "user input accepted",
+                  content: "Continue with the fix.",
+                },
+              },
+            ],
+            next_cursor: null,
+            has_more: false,
+          },
+        }),
+        pendingRequestDetail: null,
+      });
     chatDataMocks.sendThreadInput.mockResolvedValue(buildAcceptedInputResponse());
 
     await act(async () => {
@@ -278,6 +375,9 @@ describe("ChatPageClient", () => {
       "Continue with the fix.",
       expect.stringMatching(/^input_followup_/),
     );
+    expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain("Running");
+    expect(container.textContent).toContain("Continue with the fix.");
   });
 
   it("responds to a pending request from thread context instead of the approvals page", async () => {
@@ -494,5 +594,58 @@ describe("ChatPageClient", () => {
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain("Here is the explanation.");
     expect(container.textContent).not.toContain("Working on it…");
+  });
+
+  it("renders the final assistant message from the stream even before thread refresh converges", async () => {
+    const initialThreadView = buildThreadView({
+      timeline: {
+        items: [],
+        next_cursor: null,
+        has_more: false,
+      },
+    });
+    const completedEvent: PublicThreadStreamEvent = {
+      event_id: "evt_completed_002",
+      thread_id: "thread_001",
+      event_type: "message.assistant.completed",
+      sequence: 3,
+      occurred_at: "2026-03-27T05:22:05Z",
+      payload: {
+        message_id: "msg_asst_002",
+        content: "The live stream completed normally.",
+      },
+    };
+
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [buildThreadListItem()],
+      next_cursor: null,
+      has_more: false,
+    });
+    chatDataMocks.loadChatThreadBundle
+      .mockResolvedValueOnce({
+        view: initialThreadView,
+        pendingRequestDetail: null,
+      })
+      .mockResolvedValueOnce({
+        view: initialThreadView,
+        pendingRequestDetail: null,
+      });
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    await act(async () => {
+      MockEventSource.instances[0]?.onmessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify(completedEvent),
+        }),
+      );
+    });
+    await flushUi();
+
+    expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain("The live stream completed normally.");
   });
 });
