@@ -29,6 +29,26 @@ After the heading, keep the body concise:
 
 ## Entries
 
+## [2026-04-13] restructure | Issue #152 ngrok doc sync
+
+Source:
+
+- planner-approved docs-only sprint for Issue #152
+- `docs/requirements/codex_webui_mvp_requirements_v0_9.md`
+- `docs/codex_webui_dev_container_onboarding.md`
+
+Updated:
+
+- `docs/requirements/codex_webui_mvp_requirements_v0_9.md`
+- `docs/codex_webui_dev_container_onboarding.md`
+- `docs/log.md`
+
+Notes:
+
+- synchronized the maintained supported-browser path to ngrok and recorded ngrok Basic Auth as the access-control boundary
+- rewrote the onboarding flow to describe ngrok-based remote browser verification instead of Dev Tunnel
+- deferred code, task-state, and roadmap updates to later implementation work
+
 ## [2026-04-13] query | GitHub intake command pitfalls for Project audits
 
 Source:
