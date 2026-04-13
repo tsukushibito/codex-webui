@@ -13,6 +13,8 @@ DOCTOR_RUN_WINIT_SMOKE="${DOCTOR_RUN_WINIT_SMOKE:-false}"
 DOCTOR_DEBUG="${DOCTOR_DEBUG:-false}"
 DOCTOR_DEBUG_LINES="${DOCTOR_DEBUG_LINES:-120}"
 EXPECTED_CARGO_VERSION_PREFIX="${EXPECTED_CARGO_VERSION_PREFIX:-${EXPECTED_RUST_VERSION%.*}}"
+NGROK_AUTHTOKEN="${NGROK_AUTHTOKEN:-}"
+NGROK_BASIC_AUTH="${NGROK_BASIC_AUTH:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 failures=0
@@ -104,6 +106,18 @@ check_command() {
   fi
 }
 
+check_required_env() {
+  local label="$1"
+  local value="$2"
+
+  if [[ -n "${value}" ]]; then
+    echo "[ok] ${label}: set"
+  else
+    echo "[ng] ${label}: required for the supported ngrok remote-browser path"
+    failures=$((failures + 1))
+  fi
+}
+
 if debug_enabled; then
   echo "== debug context =="
   debug_log "PATH=${PATH}"
@@ -117,7 +131,7 @@ fi
 echo "== command checks =="
 check_command "VS Code CLI" "code"
 check_command "Codex CLI" "codex"
-check_command "Dev Tunnel CLI" "devtunnel"
+check_command "ngrok CLI" "ngrok"
 check_command "Python" "python"
 check_command "uv" "uv"
 check_command "Node.js" "node"
@@ -137,8 +151,18 @@ check_contains "cargo --version" "$(cargo --version || true)" "${EXPECTED_CARGO_
 check_contains "vulkan sdk path" "${VULKAN_SDK:-unset}" "${EXPECTED_VULKAN_SDK_VERSION}"
 check_contains "npm prefix" "$(npm config get prefix || true)" "${EXPECTED_NPM_PREFIX}"
 
+echo
+echo "== ngrok prerequisites =="
+check_required_env "NGROK_AUTHTOKEN" "${NGROK_AUTHTOKEN}"
+check_required_env "NGROK_BASIC_AUTH" "${NGROK_BASIC_AUTH}"
+
+echo
+echo "== legacy launcher note =="
 if command -v devtunnel >/dev/null 2>&1; then
-  echo "[ok] devtunnel --version: $(devtunnel --version || true)"
+  echo "[info] devtunnel is still installed as temporary legacy tooling for scripts/start-codex-webui.sh; cleanup is deferred to #154."
+  echo "[info] devtunnel --version: $(devtunnel --version || true)"
+else
+  echo "[info] devtunnel is not required for the supported ngrok path; launcher migration/removal is deferred to #154."
 fi
 
 echo
