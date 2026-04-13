@@ -1,6 +1,6 @@
 # Codex WebUI dev container onboarding
 
-Last updated: 2026-04-05
+Last updated: 2026-04-13
 
 ## 1. Purpose
 
@@ -11,7 +11,7 @@ It covers:
 - the repo-root `Dockerfile`
 - the repo-root `docker-compose.yml`
 - the `code tunnel` helper for remote development access
-- the `devtunnel` flow for WebUI verification
+- the ngrok flow for WebUI verification
 
 This is an onboarding and operational guide. It does not replace the maintained product requirements or API specifications under `docs/requirements/` and `docs/specs/`.
 
@@ -22,7 +22,6 @@ The repository root includes the following development entrypoints:
 - `Dockerfile`: development image for this repository
 - `docker-compose.yml`: recommended way to run the dev container
 - `scripts/start-tunnel.sh`: starts `code tunnel`
-- `scripts/start-codex-webui.sh`: starts `codex-runtime`, `frontend-bff`, and `devtunnel`
 - `scripts/doctor.sh`: validates the development container toolchain
 
 The container is intended to mount this repository as `/workspace`.
@@ -71,7 +70,7 @@ Inside the container:
 scripts/doctor.sh
 ```
 
-This checks the expected CLI/toolchain installation, including `code`, `codex`, `devtunnel`, Node.js, Python, Rust, and Vulkan tooling.
+This checks the expected CLI/toolchain installation, including `code`, `codex`, `ngrok`, Node.js, Python, Rust, and Vulkan tooling.
 
 When you run a Vulkan workload directly inside the container, prefer the helper wrapper so an NVIDIA ICD manifest can be synthesized when the graphics libraries are mounted but the manifest is missing:
 
@@ -91,73 +90,63 @@ scripts/start-tunnel.sh
 
 This wrapper is intentionally separate from the WebUI launcher. It is for development access, not for exposing the application to a browser.
 
-## 5. WebUI verification with Dev Tunnel
+## 5. WebUI verification with ngrok
 
-Use `devtunnel` when you want to verify the WebUI from a remote browser, including smartphone access.
+Use `ngrok` when you want to verify the WebUI from a remote browser, including smartphone access.
 
 ### 5.1 One-time tunnel setup
 
 Inside the container:
 
 ```bash
-devtunnel user login
-devtunnel create
-devtunnel port create <tunnel-id> -p 3000 --protocol http
+ngrok config add-authtoken <token>
 ```
 
-The current non-interactive launcher expects an existing persistent tunnel ID.
-
-For an interactive launch, run:
+Set Basic Auth credentials for the remote-browser boundary. A simple shell export is usually enough:
 
 ```bash
-scripts/start-codex-webui.sh --interactive
+export NGROK_BASIC_AUTH="<user>:<password>"
 ```
 
-This prompts before startup so you can choose whether to host through Dev Tunnel at all. If you choose to host, the launcher lets you pick an existing tunnel or create a new one before the server processes start. When the selected tunnel does not have port `3000`, the launcher offers to create it.
+The supported workflow does not require a fixed public URL or a reserved hostname. A free-plan ngrok URL is acceptable as long as it is available for the current verification session.
 
-### 5.2 Start the full WebUI stack
+### 5.2 Start the local WebUI stack
+
+Start the local services on `127.0.0.1` using the app-local commands documented in `apps/codex-runtime/README.md` and `apps/frontend-bff/README.md`.
+
+The local browser-facing port remains `3000`, and the runtime stays on `3001`.
+
+### 5.3 Expose the browser entrypoint with ngrok
 
 Inside the container:
 
 ```bash
-CODEX_WEBUI_DEVTUNNEL_ID=<tunnel-id> scripts/start-codex-webui.sh
+ngrok http 3000 --basic-auth="$NGROK_BASIC_AUTH"
 ```
 
-By default the launcher does the following:
+The ngrok URL is the public browser entrypoint for the active session. It fronts only `frontend-bff`; `codex-runtime` and the App Server remain private on the container network.
 
-- starts `codex-runtime` on port `3001`
-- starts `frontend-bff` on port `3000`
-- points the BFF at `http://127.0.0.1:3001`
-- enables the runtime app-server bridge for real thread execution
-- clears test-only `CODEX_APP_SERVER_*` overrides by default and runs `codex app-server`
-- hosts the BFF through `devtunnel`
+### 5.4 Verify access
 
-For a launch that decides about Dev Tunnel usage at runtime, use `scripts/start-codex-webui.sh --interactive` instead.
+Verify both desktop and smartphone access against the ngrok URL:
 
-The launcher also creates the runtime workspace/data directories under `apps/codex-runtime/var/` when needed.
-
-### 5.3 Default URLs
-
-Local URLs:
-
-- WebUI: `http://127.0.0.1:3000/`
-- Runtime API: `http://127.0.0.1:3001/api/v1/`
-
-The public URL comes from the configured Dev Tunnel.
+- open the ngrok URL in a desktop browser
+- confirm the ngrok Basic Auth prompt appears before the UI
+- confirm the WebUI loads successfully after authentication
+- open the same URL from a smartphone browser
+- confirm the local `http://127.0.0.1:3000/` URL still works inside the container for debugging
+- if the ngrok session restarts, use the new public URL; no fixed public URL is required
 
 ## 6. Useful environment variables
 
-The main variables used by `scripts/start-codex-webui.sh` are:
-
-- `CODEX_WEBUI_DEVTUNNEL_ID`: required persistent Dev Tunnel ID
-  - required for the non-interactive tunnel-hosted path
+- `NGROK_AUTHTOKEN`: optional shell-side convenience variable for the ngrok auth token
+- `NGROK_BASIC_AUTH`: optional shell-side convenience variable for the ngrok Basic Auth credential pair
 - `CODEX_WEBUI_RUNTIME_PORT`: defaults to `3001`
 - `CODEX_WEBUI_FRONTEND_PORT`: defaults to `3000`
 - `CODEX_WEBUI_WORKSPACE_ROOT`: optional override for the runtime workspace root
 - `CODEX_WEBUI_DATABASE_PATH`: optional override for the runtime SQLite path
 - `CODEX_WEBUI_RUNTIME_BASE_URL`: optional override for the BFF runtime base URL
 - `CODEX_WEBUI_APP_SERVER_BRIDGE_ENABLED`: optional override for the runtime bridge flag
-- `CODEX_WEBUI_DEVTUNNEL_HOST_ARGS`: optional extra args for `devtunnel host`
 
 ## 7. Direct Docker usage
 
@@ -173,7 +162,7 @@ Use `docker-compose.yml` unless you have a specific reason not to.
 
 ## 8. Troubleshooting
 
-### 8.1 `devtunnel` command not found
+### 8.1 `ngrok` command not found
 
 Rebuild the image:
 
@@ -181,22 +170,23 @@ Rebuild the image:
 docker compose up -d --build dev
 ```
 
-### 8.2 `CODEX_WEBUI_DEVTUNNEL_ID` is missing
+### 8.2 ngrok authentication is missing
 
-Create a persistent tunnel first, then export the tunnel ID before starting `scripts/start-codex-webui.sh`.
-If you want to decide at launch time instead, use `scripts/start-codex-webui.sh --interactive`.
+Export `NGROK_AUTHTOKEN` or run `ngrok config add-authtoken <token>` before starting the tunnel.
 
-### 8.3 The launcher says port `3000` is missing on the tunnel
+### 8.3 ngrok cannot reach port `3000`
 
 Run:
 
 ```bash
-devtunnel port create <tunnel-id> -p 3000 --protocol http
+ngrok http 3000 --basic-auth="$NGROK_BASIC_AUTH"
 ```
+
+If the browser still cannot load the UI, confirm the frontend is listening on `127.0.0.1:3000` inside the container.
 
 ### 8.4 The runtime fails because the workspace root does not exist
 
-The launcher creates the default workspace root for you. If you override `CODEX_WEBUI_WORKSPACE_ROOT`, make sure the target path is valid and writable inside the container.
+The local startup process creates the default workspace root for you. If you override `CODEX_WEBUI_WORKSPACE_ROOT`, make sure the target path is valid and writable inside the container.
 
 ### 8.5 `vulkaninfo` only shows `llvmpipe`
 
