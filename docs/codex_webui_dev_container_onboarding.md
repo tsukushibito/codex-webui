@@ -33,9 +33,12 @@ The container is intended to mount this repository as `/workspace`.
 From the repository root:
 
 ```bash
+cp .env.example .env
 docker compose up -d --build dev
 docker compose exec dev bash
 ```
+
+The `dev` service also declares `env_file: .env`, so the same file is used as the container-side source for values such as `NGROK_AUTHTOKEN` and `NGROK_BASIC_AUTH`.
 
 The recommended path is `docker compose`, not a direct `docker run`, because the compose file already defines:
 

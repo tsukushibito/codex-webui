@@ -2,6 +2,8 @@ name: ${COMPOSE_PROJECT_NAME:-codex-webui-dev}
 
 services:
   dev:
+    env_file:
+      - .env
     build:
       context: .
       dockerfile: Dockerfile
