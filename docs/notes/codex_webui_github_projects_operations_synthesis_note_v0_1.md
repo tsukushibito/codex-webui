@@ -92,6 +92,20 @@ Practical result:
 - do not rely only on `gh project item-list` to verify parent-child linkage
 - verify issue hierarchy directly through Issue APIs when parent-child correctness matters
 
+### 7. Plain `gh issue view` can fail on a classic-Projects compatibility path
+
+In this environment, plain `gh issue view <number>` can fail even when the repository is using ProjectV2 successfully, because the default Issue view path tries to resolve the deprecated GraphQL field `repository.issue.projectCards`.
+
+Observed failure:
+
+- `GraphQL: Projects (classic) is being deprecated in favor of the new Projects experience ... (repository.issue.projectCards)`
+
+Practical result:
+
+- do not treat this error as evidence that the current Project is a classic Project
+- prefer `gh issue view <number> --json ...` when the needed fields are available there
+- fall back to `gh api` REST or GraphQL when the default Issue view hits the deprecated compatibility path
+
 ## Working rules
 
 ### Rule 1. Discover the feature surface before choosing the command
@@ -185,6 +199,31 @@ When the response looks inconsistent:
 - confirm whether the command is returning a truncated list
 - confirm whether the output format omits built-in fields you expected
 
+### Rule 7. Keep Issue inspection separate from classic-Projects compatibility failures
+
+Safe patterns:
+
+```bash
+gh issue view 151 --repo tsukushibito/codex-webui --json number,title,state,body,url
+```
+
+```bash
+gh api graphql -f query='
+query($owner:String!, $repo:String!, $number:Int!) {
+  repository(owner:$owner, name:$repo) {
+    issue(number:$number) {
+      number
+      title
+      state
+      url
+      body
+    }
+  }
+}' -F owner=tsukushibito -F repo=codex-webui -F number=151
+```
+
+Avoid using plain `gh issue view <number>` as the first inspection step when a structured read will do, because the default presentation path may still touch deprecated classic-Projects fields.
+
 ## Recommended workflow for future Issue and Project updates
 
 1. Inspect the available `gh` command surface first.
@@ -207,6 +246,8 @@ When the response looks inconsistent:
   concurrent writes collided; retry serially
 - expected Project item not found:
   rerun `gh project item-list` with `--limit 100`
+- plain `gh issue view` fails with `repository.issue.projectCards`:
+  rerun with `--json` or switch to `gh api`
 
 ## Current baseline for this repository
 
@@ -214,6 +255,6 @@ Observed working baseline on 2026-04-13:
 
 - `gh version 2.45.0`
 - `gh issue` has no dedicated sub-issue command
+- plain `gh issue view` can fail on the deprecated `repository.issue.projectCards` path; `--json` reads work
 - REST sub-issue endpoints work for `tsukushibito/codex-webui`
 - Project `#9` requires explicit `--limit` during audits because the item count exceeds the default page size
-

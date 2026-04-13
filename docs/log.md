@@ -29,6 +29,26 @@ After the heading, keep the body concise:
 
 ## Entries
 
+## [2026-04-13] query | GitHub intake command pitfalls for Project audits
+
+Source:
+
+- repeated `gh` retries while auditing Issue `#151` and Project `#9`
+- `gh issue view 151 --repo tsukushibito/codex-webui`
+- `gh project item-list 9 --owner tsukushibito --format json`
+
+Updated:
+
+- `.agents/skills/codex-webui-work-intake/SKILL.md`
+- `docs/notes/codex_webui_github_projects_operations_synthesis_note_v0_1.md`
+- `docs/log.md`
+
+Notes:
+
+- recorded that plain `gh issue view` can fail through the deprecated `repository.issue.projectCards` path even when ProjectV2 access is healthy
+- tightened the work-intake skill to use `gh project item-list --limit 100` during Project audits so large Projects are not misread as missing items
+- documented `gh issue view --json` and `gh api` as the safer fallback path for structured Issue reads during intake
+
 ## [2026-04-13] lint | explicit escalation rule for recurring operational pitfalls
 
 Source:

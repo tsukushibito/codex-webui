@@ -55,10 +55,16 @@ Prefer `gh` commands first.
 gh project list --owner tsukushibito
 gh project view <number> --owner tsukushibito
 gh project field-list <number> --owner tsukushibito --format json
-gh project item-list <number> --owner tsukushibito --format json
+gh project item-list <number> --owner tsukushibito --limit 100 --format json
 gh issue list --state open --limit 100
 gh pr list --state open --limit 100
 ```
+
+Operational notes for this repository:
+
+- do not trust the default `gh project item-list` page size on Project `#9`; use `--limit 100` during audits so items are not mistaken as missing
+- avoid plain `gh issue view <number>` when you only need fields that are available through JSON output; in this environment the default view can fail with a classic-Projects deprecation error from `repository.issue.projectCards`
+- prefer `gh issue view <number> --json ...` or `gh api` / GraphQL when inspecting Issue details during intake
 
 When reading Project state, prioritize:
 
