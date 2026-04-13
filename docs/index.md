@@ -1,6 +1,6 @@
 # Codex WebUI LLM Wiki Index
 
-Last updated: 2026-04-09
+Last updated: 2026-04-13
 
 ## Purpose
 
@@ -25,8 +25,7 @@ Read this file first when you need to locate maintained knowledge across source-
 ## Maintained note pages
 
 - [docs/notes/README.md](./notes/README.md): note-page placement, naming, and promotion rules
-
-No repo-local note pages are published under `docs/notes/` yet beyond the area README.
+- [docs/notes/codex_webui_github_projects_operations_synthesis_note_v0_1.md](./notes/codex_webui_github_projects_operations_synthesis_note_v0_1.md): reusable GitHub Issue and Project operation guidance, including sub-issue, `gh api`, and Project audit pitfalls seen in this repo
 
 ## Cross-cutting guidance
 

@@ -25,6 +25,7 @@ Directory-specific responsibilities, document policies, and workflow details bel
 ## Cross-cutting Workflow
 
 - Treat `docs/` as the maintained source of truth; keep reusable synthesis there and update `docs/index.md` and `docs/log.md` when maintained wiki content materially changes
+- When unexpected tool behavior, API responses, or workflow failures reveal reusable operational knowledge, promote that knowledge into maintained repo docs or the relevant repo skill instead of leaving the lesson only in chat history
 - Treat `tasks/` as the area for active work packages only; move completed packages to `tasks/archive/`
 - Treat `artifacts/` as the area for execution outputs such as logs, evidence, and judgment notes
 - Default repo-tracked change flow is a short-lived branch and PR; direct commits to `main` are exceptions only, such as urgent fixes or explicit user direction

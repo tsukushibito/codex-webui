@@ -71,6 +71,15 @@ Start from roadmap phases, then split only as needed.
 
 Prefer `gh` first. Use GraphQL only when `gh project` cannot express the needed operation.
 
+Known operational pitfalls in this repository:
+
+- `gh issue` does not expose a dedicated sub-issue command in the current CLI surface; use `gh api` for formal sub-issue operations
+- prefer REST sub-issue endpoints before GraphQL mutations when both are theoretically available; GraphQL and REST may not behave the same way in this environment
+- when an API endpoint expects numbers or booleans, use `-F/--field` or `--input`; do not use `-f/--raw-field` for typed JSON values
+- do not parallelize sub-issue mutations against the same parent issue; GitHub can reject concurrent writes with ordering or priority conflicts
+- always pass `--limit 100` when auditing Project #9 with `gh project item-list`; the default limit is 30 and can hide valid items
+- verify issue hierarchy through the Issue APIs, and verify Project membership and field values separately; do not assume one CLI output shows all three correctly
+
 ### Inspect current state
 
 Use:
@@ -79,7 +88,7 @@ Use:
 gh project list --owner tsukushibito
 gh project view <number> --owner tsukushibito
 gh project field-list <number> --owner tsukushibito --format json
-gh project item-list <number> --owner tsukushibito --format json
+gh project item-list <number> --owner tsukushibito --limit 100 --format json
 gh issue list --state open --limit 100
 gh pr list --state open --limit 100
 git worktree list

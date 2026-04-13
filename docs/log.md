@@ -1,6 +1,6 @@
 # Codex WebUI LLM Wiki Log
 
-Last updated: 2026-04-09
+Last updated: 2026-04-13
 
 ## Purpose
 
@@ -28,6 +28,46 @@ After the heading, keep the body concise:
 - short note on what changed or remains deferred
 
 ## Entries
+
+## [2026-04-13] lint | explicit escalation rule for recurring operational pitfalls
+
+Source:
+
+- user request to make post-failure knowledge capture mandatory instead of implicit
+- `AGENTS.md`
+- `docs/README.md`
+
+Updated:
+
+- `AGENTS.md`
+- `docs/README.md`
+- `docs/log.md`
+
+Notes:
+
+- made recurring tool, API, and workflow pitfalls an explicit promotion trigger instead of relying only on the broader reusable-synthesis wording
+- clarified that repeated GitHub or tooling surprises should be moved into maintained docs or the relevant repo skill so later sessions do not rediscover them
+## [2026-04-13] query | GitHub issue and Project operation pitfalls
+
+Source:
+
+- repeated retries during Issue and Project maintenance for the `ngrok` migration tracking tree
+- `gh --version`
+- `gh help issue`
+- `gh api --help`
+- `gh project item-list --help`
+
+Updated:
+
+- `docs/notes/codex_webui_github_projects_operations_synthesis_note_v0_1.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- promoted recurring GitHub CLI and API failure patterns into a maintained note instead of leaving them in chat history
+- documented the main causes of retries: incomplete high-level `gh` coverage, REST versus GraphQL behavior differences, typed JSON pitfalls, default Project item limits, and unsafe parallel sub-issue writes
+- recorded the recommended verification split between issue hierarchy, Project membership, and Project field values
 
 ## [2026-04-09] query | v0.9 roadmap review follow-up and implementation-line tracking
 

@@ -58,4 +58,6 @@ This directory is the area for source-of-truth documents such as requirements, s
 - `query`: when a cross-source answer is likely to be reused, promote it from chat into a maintained page instead of leaving it only in conversation history
 - `query`: if the promoted result creates a new maintained note or materially changes maintained navigation, discoverability, or content summaries, update `index.md` and append `log.md`
 - `lint`: when inconsistencies, stale summaries, orphan wiki pages, or weak wiki navigation are found, correct the maintained pages, refresh `index.md` when needed, and append a `lint` entry to `log.md`
+- `operational pitfalls`: when repeated tool failures, API quirks, or workflow surprises cause avoidable retries, capture the reusable lesson in `docs/notes/` or the relevant repo skill instead of relying on chat memory
+- `operational pitfalls`: if the new guidance changes maintained navigation or workflow expectations, update `index.md` and append `log.md`
 - keep `tasks/` for active execution instructions and `artifacts/` for evidence or raw logs; do not use the wiki to duplicate those areas
