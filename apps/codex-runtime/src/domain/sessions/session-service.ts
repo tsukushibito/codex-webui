@@ -120,6 +120,10 @@ function firstRequiredRow<T>(rows: T[], notFound: () => never) {
   return row;
 }
 
+type TurnStartConvergenceGateway = NativeSessionGateway & {
+  acknowledgeTurnStartPersisted?: (input: { sessionId: string; turnId: string }) => Promise<void>;
+};
+
 export class SessionService {
   constructor(
     private readonly database: RuntimeDatabase,
@@ -129,6 +133,15 @@ export class SessionService {
     private readonly sessionEventPublisher: SessionEventPublisher,
     private readonly now: () => Date = () => new Date(),
   ) {}
+
+  private async acknowledgeTurnStartPersisted(sessionId: string, turnId: string) {
+    await (
+      this.nativeSessionGateway as TurnStartConvergenceGateway
+    ).acknowledgeTurnStartPersisted?.({
+      sessionId,
+      turnId,
+    });
+  }
 
   subscribeSessionEvents(sessionId: string, listener: (event: SessionEventProjection) => void) {
     return this.sessionEventPublisher.subscribeSessionEvents(sessionId, listener);
@@ -999,6 +1012,7 @@ export class SessionService {
           toStatus: "running",
         });
       })();
+      await this.acknowledgeTurnStartPersisted(sessionId, nativeTurn.turnId);
     } catch (error) {
       try {
         this.markSessionRecoveryPending({
@@ -1370,6 +1384,65 @@ export class SessionService {
         occurredAt: completedAt,
         fromStatus: session.status as SessionStatus,
         toStatus: "waiting_input",
+      });
+    })();
+
+    return this.getSession(sessionId);
+  }
+
+  async convergeSessionWaitingForInput(
+    sessionId: string,
+    input: {
+      native_event_name: string;
+    },
+  ) {
+    const session = firstRequiredRow(
+      this.database.db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.sessionId, sessionId))
+        .limit(1)
+        .all(),
+      () => {
+        throw new RuntimeError(404, "session_not_found", "session was not found", {
+          session_id: sessionId,
+        });
+      },
+    );
+
+    if (session.status !== "running") {
+      return this.getSession(sessionId);
+    }
+
+    const updatedAt = toIsoString(this.now());
+
+    this.database.sqlite.transaction(() => {
+      this.database.db
+        .update(sessions)
+        .set({
+          status: "waiting_input",
+          updatedAt,
+          currentTurnId: null,
+          pendingAssistantMessageId: null,
+          appSessionOverlayState: "open",
+        })
+        .where(eq(sessions.sessionId, sessionId))
+        .run();
+
+      this.database.db
+        .update(workspaces)
+        .set({
+          updatedAt,
+        })
+        .where(eq(workspaces.workspaceId, session.workspaceId))
+        .run();
+
+      this.appendSessionStatusChangedEvent({
+        sessionId,
+        occurredAt: updatedAt,
+        fromStatus: session.status as SessionStatus,
+        toStatus: "waiting_input",
+        nativeEventName: input.native_event_name,
       });
     })();
 

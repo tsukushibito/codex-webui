@@ -61,7 +61,7 @@ export function resolveConfig(overrides: Partial<RuntimeConfig> = {}): RuntimeCo
     appServerCwd: overrides.appServerCwd ?? process.env.CODEX_APP_SERVER_CWD,
     appServerBridgeEnabled:
       overrides.appServerBridgeEnabled ??
-      parseBooleanFlag(process.env.CODEX_WEBUI_APP_SERVER_BRIDGE_ENABLED, false),
+      parseBooleanFlag(process.env.CODEX_WEBUI_APP_SERVER_BRIDGE_ENABLED, true),
     appServerApprovalPolicy:
       overrides.appServerApprovalPolicy ??
       process.env.CODEX_WEBUI_APP_SERVER_APPROVAL_POLICY ??

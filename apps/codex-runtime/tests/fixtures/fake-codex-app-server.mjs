@@ -4,6 +4,8 @@ const protocolVersion = "2025-03-26";
 let threadCounter = 1;
 let turnCounter = 1;
 let itemCounter = 1;
+const turnStartMode =
+  process.argv.find((arg) => arg.startsWith("--turn-start-mode="))?.split("=")[1] ?? "normal";
 
 function send(message) {
   process.stdout.write(`${JSON.stringify(message)}\n`);
@@ -67,17 +69,7 @@ lineReader.on("line", (line) => {
     const prompt = String(message.params?.input?.[0]?.text ?? "");
     const finalText = `Synthetic assistant response for: ${prompt}`;
 
-    send({
-      jsonrpc: "2.0",
-      id: message.id,
-      result: {
-        turn: {
-          id: turnId,
-        },
-      },
-    });
-
-    setTimeout(() => {
+    const emitTurnCompletion = () => {
       send({
         jsonrpc: "2.0",
         method: "turn/started",
@@ -136,7 +128,33 @@ lineReader.on("line", (line) => {
           },
         },
       });
-    }, 10);
+    };
+
+    if (turnStartMode === "pre_ack_completion") {
+      emitTurnCompletion();
+      send({
+        jsonrpc: "2.0",
+        id: message.id,
+        result: {
+          turn: {
+            id: turnId,
+          },
+        },
+      });
+      return;
+    }
+
+    send({
+      jsonrpc: "2.0",
+      id: message.id,
+      result: {
+        turn: {
+          id: turnId,
+        },
+      },
+    });
+
+    setTimeout(emitTurnCompletion, 10);
     return;
   }
 

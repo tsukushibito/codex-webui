@@ -60,6 +60,12 @@ export interface NativeSessionEventSink {
       turn_id: string;
     },
   ): Promise<unknown>;
+  convergeSessionWaitingForInput?(
+    sessionId: string,
+    input: {
+      native_event_name: string;
+    },
+  ): Promise<unknown>;
 }
 
 interface PendingRequest {
@@ -76,6 +82,11 @@ interface PendingApprovalRequest {
 interface TurnState {
   hasFinalAssistantMessage: boolean;
   waitingForApproval: boolean;
+}
+
+interface PendingTurnStartConvergence {
+  turnId: string | null;
+  queuedEvents: any[];
 }
 
 function turnStateKey(sessionId: string, turnId: string) {
@@ -109,6 +120,7 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
   private pendingApprovals = new Map<string, PendingApprovalRequest>();
   private itemPhases = new Map<string, string>();
   private turnStates = new Map<string, TurnState>();
+  private pendingTurnStartConvergence = new Map<string, PendingTurnStartConvergence>();
   private eventSink: NativeSessionEventSink | null = null;
   private startPromise: Promise<AppServerSnapshot> | null = null;
   private eventChain = Promise.resolve();
@@ -187,6 +199,11 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
   }
 
   async sendUserMessage(input: SendNativeSessionMessageInput) {
+    this.pendingTurnStartConvergence.set(input.sessionId, {
+      turnId: null,
+      queuedEvents: [],
+    });
+
     const result = await this.sendRequest("turn/start", {
       threadId: input.sessionId,
       input: [
@@ -197,9 +214,34 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
       ],
     });
 
+    const turnId = String(result.turn.id);
+    const pending = this.pendingTurnStartConvergence.get(input.sessionId);
+    if (pending) {
+      pending.turnId = turnId;
+    }
+
     return {
-      turnId: String(result.turn.id),
+      turnId,
     };
+  }
+
+  async acknowledgeTurnStartPersisted(input: { sessionId: string; turnId: string }) {
+    const pending = this.pendingTurnStartConvergence.get(input.sessionId);
+    if (!pending || pending.turnId !== input.turnId) {
+      return;
+    }
+
+    this.pendingTurnStartConvergence.delete(input.sessionId);
+    const replayEvents = this.sortDeferredTurnEvents(pending.queuedEvents);
+    this.eventChain = this.eventChain
+      .then(async () => {
+        for (const event of replayEvents) {
+          await this.handleEvent(event);
+        }
+      })
+      .catch(() => {
+        // Keep replay failures isolated from the request path.
+      });
   }
 
   async cancelPendingApproval(input: { sessionId: string; approvalId: string }) {
@@ -389,14 +431,29 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
 
     const method = String(message.method);
     const params = message.params ?? {};
+    const sessionId = String(params.threadId ?? "");
+    const turnId = String(params.turnId ?? params.turn?.id ?? "");
+
+    if (this.shouldDeferTurnEvent(method, sessionId, turnId)) {
+      this.pendingTurnStartConvergence.get(sessionId)?.queuedEvents.push(message);
+      return;
+    }
 
     if (method === "turn/started") {
-      const sessionId = String(params.threadId ?? "");
-      const turnId = String(params.turn?.id ?? "");
       if (sessionId && turnId) {
         this.turnStates.set(turnStateKey(sessionId, turnId), {
           hasFinalAssistantMessage: false,
           waitingForApproval: false,
+        });
+      }
+      return;
+    }
+
+    if (method === "thread/status/changed") {
+      const statusType = String(params.status?.type ?? "");
+      if (sessionId && statusType === "idle" && this.eventSink.convergeSessionWaitingForInput) {
+        await this.eventSink.convergeSessionWaitingForInput(sessionId, {
+          native_event_name: "thread/status/changed",
         });
       }
       return;
@@ -412,8 +469,6 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
         return;
       }
 
-      const sessionId = String(params.threadId ?? "");
-      const turnId = String(params.turnId ?? "");
       const delta = String(params.delta ?? "");
       if (!sessionId || !turnId || delta.length === 0) {
         return;
@@ -438,8 +493,6 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
         return;
       }
 
-      const sessionId = String(params.threadId ?? "");
-      const turnId = String(params.turnId ?? "");
       const content = String(params.item.text ?? "");
       if (!sessionId || !turnId || content.length === 0) {
         return;
@@ -459,8 +512,6 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
     }
 
     if (method === "item/commandExecution/requestApproval") {
-      const sessionId = String(params.threadId ?? "");
-      const turnId = String(params.turnId ?? "");
       const command = String(params.command ?? "");
       const requestId = Number(message.id);
       if (!sessionId || !turnId || !Number.isFinite(requestId) || command.length === 0) {
@@ -500,8 +551,6 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
     }
 
     if (method === "turn/completed") {
-      const sessionId = String(params.threadId ?? "");
-      const turnId = String(params.turn?.id ?? "");
       const status = String(params.turn?.status ?? "");
       if (!sessionId || !turnId) {
         return;
@@ -513,9 +562,8 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
 
       if (
         status === "completed" &&
-        state &&
-        !state.hasFinalAssistantMessage &&
-        !state.waitingForApproval &&
+        !state?.hasFinalAssistantMessage &&
+        !state?.waitingForApproval &&
         this.eventSink.completeTurnWithoutAssistantMessage
       ) {
         logLiveChatDebug("app-server", "turn completed without assistant message", {
@@ -527,6 +575,58 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
         });
       }
     }
+  }
+
+  private shouldDeferTurnEvent(method: string, sessionId: string, turnId: string) {
+    if (!sessionId) {
+      return false;
+    }
+
+    const pending = this.pendingTurnStartConvergence.get(sessionId);
+    if (!pending) {
+      return false;
+    }
+
+    switch (method) {
+      case "turn/started":
+      case "thread/status/changed":
+      case "item/started":
+      case "item/agentMessage/delta":
+      case "item/completed":
+      case "item/commandExecution/requestApproval":
+      case "turn/completed":
+        return pending.turnId === null || pending.turnId === turnId;
+      default:
+        return false;
+    }
+  }
+
+  private sortDeferredTurnEvents(events: any[]) {
+    const eventPriority = (message: any) => {
+      const method = String(message.method);
+      if (method === "thread/status/changed") {
+        return String(message.params?.status?.type ?? "") === "idle" ? 5 : 0;
+      }
+
+      switch (method) {
+        case "turn/started":
+          return 1;
+        case "item/started":
+          return 2;
+        case "item/agentMessage/delta":
+          return 3;
+        case "item/completed":
+          return 4;
+        case "item/commandExecution/requestApproval":
+          return 4;
+        case "turn/completed":
+          return 6;
+        default:
+          return 0;
+      }
+    };
+
+    return [...events].sort((left, right) => eventPriority(left) - eventPriority(right));
   }
 
   private ensureTurnState(sessionId: string, turnId: string) {

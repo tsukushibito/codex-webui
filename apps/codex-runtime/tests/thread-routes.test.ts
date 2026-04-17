@@ -1,11 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildApp } from "../src/app.js";
-import { approvals, sessionEvents, sessions, workspaces } from "../src/db/schema.js";
+import { approvals, messages, sessionEvents, sessions, workspaces } from "../src/db/schema.js";
 import type { NativeSessionGateway } from "../src/domain/sessions/native-session-gateway.js";
 import { RuntimeError } from "../src/errors.js";
 import { createTempDatabase, createTempWorkspaceRoot } from "./helpers.js";
@@ -58,18 +59,14 @@ class StubNativeSessionGateway implements NativeSessionGateway {
 }
 
 class FailingSendNativeSessionGateway extends StubNativeSessionGateway {
-  override async sendUserMessage(
-    _input: { sessionId: string; content: string },
-  ): Promise<{ turnId: string }> {
-    throw new RuntimeError(
-      502,
-      "app_server_request_failed",
-      "turn is already running",
-      {
-        rpc_method: "turn/start",
-        rpc_error_code: "invalid_state",
-      },
-    );
+  override async sendUserMessage(_input: {
+    sessionId: string;
+    content: string;
+  }): Promise<{ turnId: string }> {
+    throw new RuntimeError(502, "app_server_request_failed", "turn is already running", {
+      rpc_method: "turn/start",
+      rpc_error_code: "invalid_state",
+    });
   }
 }
 
@@ -119,6 +116,23 @@ function createSseReader(response: Response) {
   };
 }
 
+async function waitForAssertion(assertion: () => Promise<void>, timeoutMs = 1_000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError: unknown;
+
+  while (Date.now() < deadline) {
+    try {
+      await assertion();
+      return;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  }
+
+  throw lastError;
+}
+
 describe("thread routes", () => {
   it("lists threads from the v0.9 workspace thread route", async () => {
     const workspaceRoot = await createTempWorkspaceRoot("thread-routes-root");
@@ -129,6 +143,7 @@ describe("thread routes", () => {
       config: {
         workspaceRoot,
         databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
       },
@@ -197,6 +212,7 @@ describe("thread routes", () => {
       config: {
         workspaceRoot,
         databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
       },
@@ -253,6 +269,7 @@ describe("thread routes", () => {
       config: {
         workspaceRoot,
         databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
       },
@@ -324,6 +341,7 @@ describe("thread routes", () => {
       config: {
         workspaceRoot,
         databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
       },
@@ -389,6 +407,7 @@ describe("thread routes", () => {
       config: {
         workspaceRoot,
         databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
       },
@@ -598,6 +617,7 @@ describe("thread routes", () => {
       config: {
         workspaceRoot,
         databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
       },
@@ -738,6 +758,7 @@ describe("thread routes", () => {
       config: {
         workspaceRoot,
         databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
       },
@@ -772,6 +793,7 @@ describe("thread routes", () => {
       config: {
         workspaceRoot,
         databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
       },
@@ -886,6 +908,7 @@ describe("thread routes", () => {
       config: {
         workspaceRoot,
         databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
       },
@@ -919,6 +942,7 @@ describe("thread routes", () => {
       config: {
         workspaceRoot,
         databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
       },
@@ -982,6 +1006,7 @@ describe("thread routes", () => {
       config: {
         workspaceRoot,
         databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
       },
@@ -1049,6 +1074,7 @@ describe("thread routes", () => {
       config: {
         workspaceRoot,
         databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
       },
@@ -1132,6 +1158,7 @@ describe("thread routes", () => {
       config: {
         workspaceRoot,
         databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
       },
@@ -1232,6 +1259,7 @@ describe("thread routes", () => {
       config: {
         workspaceRoot,
         databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
       },
@@ -1339,6 +1367,7 @@ describe("thread routes", () => {
       config: {
         workspaceRoot,
         databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
       },
@@ -1395,6 +1424,187 @@ describe("thread routes", () => {
         }),
       ]),
     );
+
+    await app.close();
+  });
+
+  it("converges a first-input-started thread after pre-ack assistant completion delivery", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("thread-routes-root");
+    const database = await createTempDatabase("thread-routes-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerBridgeEnabled: true,
+        appServerCommand: process.execPath,
+        appServerArgs: [
+          fileURLToPath(new URL("./fixtures/fake-codex-app-server.mjs", import.meta.url)),
+          "--turn-start-mode=pre_ack_completion",
+        ],
+      },
+      database,
+    });
+
+    const workspaceResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/workspaces",
+      payload: {
+        workspace_name: "alpha",
+      },
+    });
+
+    expect(workspaceResponse.statusCode).toBe(201);
+    const workspaceId = workspaceResponse.json().workspace_id as string;
+
+    const startResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/workspaces/${workspaceId}/inputs`,
+      payload: {
+        client_request_id: "req_pre_ack_001",
+        content: "Plan the runtime cutover",
+      },
+    });
+
+    expect(startResponse.statusCode).toBe(202);
+    const threadId = startResponse.json().thread.thread_id as string;
+
+    await waitForAssertion(async () => {
+      const persistedSession = database.db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.sessionId, threadId))
+        .limit(1)
+        .all()[0];
+
+      expect(persistedSession).toMatchObject({
+        sessionId: threadId,
+        status: "waiting_input",
+        currentTurnId: null,
+        pendingAssistantMessageId: null,
+      });
+
+      const threadResponse = await app.inject({
+        method: "GET",
+        url: `/api/v1/threads/${threadId}`,
+      });
+      expect(threadResponse.statusCode).toBe(200);
+      expect(threadResponse.json()).toMatchObject({
+        thread_id: threadId,
+        native_status: {
+          thread_status: "idle",
+          latest_turn_status: "completed",
+          active_flags: [],
+        },
+        derived_hints: {
+          accepting_user_input: true,
+          has_pending_request: false,
+          blocked_reason: null,
+        },
+      });
+
+      const viewResponse = await app.inject({
+        method: "GET",
+        url: `/api/v1/threads/${threadId}/view`,
+      });
+      expect(viewResponse.statusCode).toBe(200);
+      expect(viewResponse.json()).toMatchObject({
+        thread: {
+          thread_id: threadId,
+          native_status: {
+            thread_status: "idle",
+          },
+          derived_hints: {
+            accepting_user_input: true,
+          },
+        },
+        pending_request: null,
+      });
+
+      const listResponse = await app.inject({
+        method: "GET",
+        url: `/api/v1/workspaces/${workspaceId}/threads`,
+      });
+      expect(listResponse.statusCode).toBe(200);
+      expect(listResponse.json()).toMatchObject({
+        items: [
+          expect.objectContaining({
+            thread_id: threadId,
+            native_status: expect.objectContaining({
+              thread_status: "idle",
+            }),
+            derived_hints: expect.objectContaining({
+              accepting_user_input: true,
+            }),
+          }),
+        ],
+      });
+      expect(listResponse.json().items).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            thread_id: threadId,
+            native_status: expect.objectContaining({
+              thread_status: "running",
+            }),
+          }),
+        ]),
+      );
+
+      const storedMessages = database.db
+        .select()
+        .from(messages)
+        .where(eq(messages.sessionId, threadId))
+        .all();
+      expect(storedMessages).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: "user",
+          }),
+          expect.objectContaining({
+            role: "assistant",
+            content: "Synthetic assistant response for: Plan the runtime cutover",
+          }),
+        ]),
+      );
+    });
+
+    const messageRows = database.db
+      .select()
+      .from(sessionEvents)
+      .where(eq(sessionEvents.sessionId, threadId))
+      .all();
+    expect(messageRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: "message.user",
+        }),
+        expect.objectContaining({
+          eventType: "message.assistant.completed",
+        }),
+      ]),
+    );
+
+    const followUpResponse = await app.inject({
+      method: "POST",
+      url: `/api/v1/threads/${threadId}/inputs`,
+      payload: {
+        client_request_id: "req_pre_ack_followup_001",
+        content: "Continue the runtime cutover",
+      },
+    });
+
+    expect(followUpResponse.statusCode).toBe(202);
+    expect(followUpResponse.json()).toMatchObject({
+      thread: {
+        thread_id: threadId,
+      },
+      accepted_input: {
+        session_id: threadId,
+        role: "user",
+        content: "Continue the runtime cutover",
+      },
+    });
 
     await app.close();
   });

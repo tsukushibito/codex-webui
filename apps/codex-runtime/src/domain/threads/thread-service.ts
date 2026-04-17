@@ -194,6 +194,10 @@ function firstRow<T>(rows: T[]) {
   return rows[0] ?? null;
 }
 
+type TurnStartConvergenceGateway = NativeSessionGateway & {
+  acknowledgeTurnStartPersisted?: (input: { sessionId: string; turnId: string }) => Promise<void>;
+};
+
 function asRuntimeError(error: unknown) {
   return error instanceof RuntimeError ? error : null;
 }
@@ -295,6 +299,15 @@ export class ThreadService {
     private readonly nativeSessionGateway: NativeSessionGateway,
     private readonly now: () => Date = () => new Date(),
   ) {}
+
+  private async acknowledgeTurnStartPersisted(sessionId: string, turnId: string) {
+    await (
+      this.nativeSessionGateway as TurnStartConvergenceGateway
+    ).acknowledgeTurnStartPersisted?.({
+      sessionId,
+      turnId,
+    });
+  }
 
   async listThreads(workspaceId: string) {
     await this.workspaceRegistry.getWorkspace(workspaceId);
@@ -1041,6 +1054,7 @@ export class ThreadService {
           toStatus: "running",
         });
       })();
+      await this.acknowledgeTurnStartPersisted(threadId, nativeTurn.turnId);
     } catch (error) {
       try {
         this.markThreadRecoveryPending(
