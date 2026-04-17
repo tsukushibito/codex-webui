@@ -260,7 +260,6 @@ function createSseRelayStream<TInput, TOutput>(
         } catch (error) {
           cleanup();
           if (signal.aborted) {
-            controller.close();
             return;
           }
 

@@ -392,6 +392,300 @@ describe("ChatPageClient", () => {
     expect(container.textContent).toContain("Continue with the fix.");
   });
 
+  it("converges a newly started thread back to sendable follow-up input without reload", async () => {
+    const originalThreadId = searchParams.get("threadId");
+    searchParams.delete("threadId");
+    let startedThreadViewLoads = 0;
+    let followUpSubmitted = false;
+
+    const startedThreadRunningView = buildThreadView({
+      thread: {
+        thread_id: "thread_new",
+        workspace_id: "ws_alpha",
+        native_status: {
+          thread_status: "running",
+          active_flags: ["turn_active"],
+          latest_turn_status: "running",
+        },
+        updated_at: "2026-03-27T05:23:00Z",
+      },
+      current_activity: {
+        kind: "running",
+        label: "Running",
+      },
+      composer: {
+        accepting_user_input: false,
+        interrupt_available: true,
+        blocked_by_request: false,
+      },
+      timeline: {
+        items: [
+          {
+            timeline_item_id: "evt_new_001",
+            thread_id: "thread_new",
+            turn_id: "turn_new_001",
+            item_id: "item_new_001",
+            sequence: 1,
+            occurred_at: "2026-03-27T05:23:00Z",
+            kind: "message.user",
+            payload: {
+              summary: "user input accepted",
+              content: "Start a new thread.",
+            },
+          },
+        ],
+        next_cursor: null,
+        has_more: false,
+      },
+    });
+    const startedThreadReadyView = buildThreadView({
+      thread: {
+        thread_id: "thread_new",
+        workspace_id: "ws_alpha",
+        native_status: {
+          thread_status: "waiting_input",
+          active_flags: [],
+          latest_turn_status: null,
+        },
+        updated_at: "2026-03-27T05:23:04Z",
+      },
+      current_activity: {
+        kind: "waiting_on_user_input",
+        label: "Waiting for your input",
+      },
+      composer: {
+        accepting_user_input: true,
+        interrupt_available: false,
+        blocked_by_request: false,
+      },
+      timeline: {
+        items: [
+          {
+            timeline_item_id: "evt_new_001",
+            thread_id: "thread_new",
+            turn_id: "turn_new_001",
+            item_id: "item_new_001",
+            sequence: 1,
+            occurred_at: "2026-03-27T05:23:00Z",
+            kind: "message.user",
+            payload: {
+              summary: "user input accepted",
+              content: "Start a new thread.",
+            },
+          },
+        ],
+        next_cursor: null,
+        has_more: false,
+      },
+    });
+    const followUpRunningView = buildThreadView({
+      thread: {
+        thread_id: "thread_new",
+        workspace_id: "ws_alpha",
+        native_status: {
+          thread_status: "running",
+          active_flags: ["turn_active"],
+          latest_turn_status: "running",
+        },
+        updated_at: "2026-03-27T05:23:08Z",
+      },
+      current_activity: {
+        kind: "running",
+        label: "Running",
+      },
+      composer: {
+        accepting_user_input: false,
+        interrupt_available: true,
+        blocked_by_request: false,
+      },
+      timeline: {
+        items: [
+          {
+            timeline_item_id: "evt_new_001",
+            thread_id: "thread_new",
+            turn_id: "turn_new_001",
+            item_id: "item_new_001",
+            sequence: 1,
+            occurred_at: "2026-03-27T05:23:00Z",
+            kind: "message.user",
+            payload: {
+              summary: "user input accepted",
+              content: "Start a new thread.",
+            },
+          },
+          {
+            timeline_item_id: "evt_new_002",
+            thread_id: "thread_new",
+            turn_id: "turn_new_002",
+            item_id: "item_new_002",
+            sequence: 2,
+            occurred_at: "2026-03-27T05:23:08Z",
+            kind: "message.user",
+            payload: {
+              summary: "user input accepted",
+              content: "Please explain the diff.",
+            },
+          },
+        ],
+        next_cursor: null,
+        has_more: false,
+      },
+    });
+
+    chatDataMocks.listWorkspaceThreads
+      .mockResolvedValueOnce({
+        items: [],
+        next_cursor: null,
+        has_more: false,
+      })
+      .mockResolvedValue({
+        items: [
+          buildThreadListItem({
+            thread_id: "thread_new",
+            native_status: {
+              thread_status: "waiting_input",
+              active_flags: [],
+              latest_turn_status: null,
+            },
+            current_activity: {
+              kind: "waiting_on_user_input",
+              label: "Waiting for your input",
+            },
+          }),
+        ],
+        next_cursor: null,
+        has_more: false,
+      });
+    chatDataMocks.startThreadFromChat.mockResolvedValue(
+      buildAcceptedInputResponse({
+        accepted: {
+          thread_id: "thread_new",
+          turn_id: "turn_new_001",
+          input_item_id: "item_new_001",
+        },
+        thread: {
+          thread_id: "thread_new",
+          workspace_id: "ws_alpha",
+          native_status: {
+            thread_status: "running",
+            active_flags: ["turn_active"],
+            latest_turn_status: "running",
+          },
+          updated_at: "2026-03-27T05:23:00Z",
+        },
+      }),
+    );
+    chatDataMocks.loadChatThreadBundle.mockImplementation(async () => ({
+      view: followUpSubmitted
+        ? followUpRunningView
+        : startedThreadViewLoads++ === 0
+          ? startedThreadRunningView
+          : startedThreadReadyView,
+      pendingRequestDetail: null,
+    }));
+    chatDataMocks.sendThreadInput.mockImplementation(async () => {
+      followUpSubmitted = true;
+
+      return buildAcceptedInputResponse({
+        accepted: {
+          thread_id: "thread_new",
+          turn_id: "turn_new_002",
+          input_item_id: "item_new_002",
+        },
+        thread: {
+          thread_id: "thread_new",
+          workspace_id: "ws_alpha",
+          native_status: {
+            thread_status: "running",
+            active_flags: ["turn_active"],
+            latest_turn_status: "running",
+          },
+          updated_at: "2026-03-27T05:23:08Z",
+        },
+      });
+    });
+
+    try {
+      await act(async () => {
+        root.render(<ChatPageClient />);
+      });
+      await flushUi();
+
+      const firstInputTextarea = container.querySelector("#thread-input");
+      expect(firstInputTextarea).not.toBeNull();
+
+      await act(async () => {
+        const setTextareaValue = Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value",
+        )?.set;
+
+        setTextareaValue?.call(firstInputTextarea as HTMLTextAreaElement, "Start a new thread.");
+        firstInputTextarea!.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await flushUi();
+
+      const startThreadButton = Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "Start new thread",
+      );
+      expect(startThreadButton).not.toBeUndefined();
+
+      await act(async () => {
+        startThreadButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      await flushUi();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(400);
+      });
+      await flushUi();
+
+      expect(container.textContent).toContain("Started thread thread_new.");
+      expect(container.textContent).toContain("Waiting for your input");
+
+      const followUpTextarea = container.querySelector("#message-input");
+      expect(followUpTextarea).not.toBeNull();
+
+      const sendButton = Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "Send reply",
+      );
+      expect(sendButton).not.toBeUndefined();
+      expect((sendButton as HTMLButtonElement).disabled).toBe(true);
+
+      await act(async () => {
+        const setTextareaValue = Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value",
+        )?.set;
+
+        setTextareaValue?.call(followUpTextarea as HTMLTextAreaElement, "Please explain the diff.");
+        followUpTextarea!.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await flushUi();
+
+      expect((sendButton as HTMLButtonElement).disabled).toBe(false);
+
+      await act(async () => {
+        sendButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      await flushUi();
+
+      expect(chatDataMocks.sendThreadInput).toHaveBeenCalledWith(
+        "thread_new",
+        "Please explain the diff.",
+        expect.stringMatching(/^input_followup_/),
+      );
+      expect(container.textContent).toContain("Input accepted. Waiting for thread updates.");
+      expect(container.textContent).toContain("Please explain the diff.");
+    } finally {
+      if (originalThreadId) {
+        searchParams.set("threadId", originalThreadId);
+      } else {
+        searchParams.delete("threadId");
+      }
+    }
+  });
+
   it("responds to a pending request from thread context instead of the approvals page", async () => {
     const pendingRequestDetail = buildPendingRequestDetail();
     chatDataMocks.listWorkspaceThreads.mockResolvedValue({

@@ -149,7 +149,7 @@ Verify both desktop and smartphone access against the ngrok URL:
 - `CODEX_WEBUI_WORKSPACE_ROOT`: optional override for the runtime workspace root
 - `CODEX_WEBUI_DATABASE_PATH`: optional override for the runtime SQLite path
 - `CODEX_WEBUI_RUNTIME_BASE_URL`: optional override for the BFF runtime base URL
-- `CODEX_WEBUI_APP_SERVER_BRIDGE_ENABLED`: optional override for the runtime bridge flag
+- `CODEX_WEBUI_APP_SERVER_BRIDGE_ENABLED`: optional override for the runtime bridge flag; defaults to enabled, set it to `false` only when you intentionally want the synthetic gateway path
 
 ## 7. Direct Docker usage
 

@@ -62,28 +62,34 @@ test("runs the main thread flow against the live runtime stack", async ({ page }
     ).toBeVisible({ timeout: 15_000 });
 
     const sendReplyButton = page.getByRole("button", { name: "Send reply" });
-    if (await sendReplyButton.isEnabled()) {
-      await page.getByLabel("Send follow-up input").fill(followUpInput);
-      await sendReplyButton.click();
-      await expect(page.getByText("Input accepted. Waiting for thread updates.")).toBeVisible({
-        timeout: 15_000,
-      });
-      await expect(page.getByText(followUpInput)).toBeVisible({ timeout: 15_000 });
-      await expect(
-        page
-          .locator(".thread-summary-card")
-          .filter({ hasText: threadId })
-          .getByText("Waiting for your input", { exact: true }),
-      ).toBeVisible({ timeout: 15_000 });
-      await expect(
-        page
-          .locator("section.chat-panel.workspace-card")
-          .filter({ has: page.getByText("Current thread", { exact: true }) })
-          .getByText("Waiting for your input", { exact: true }),
-      ).toBeVisible({ timeout: 15_000 });
-    } else {
-      await expect(sendReplyButton).toBeDisabled();
-    }
+    await expect(sendReplyButton).toBeDisabled();
+    await page.getByLabel("Send follow-up input").fill(followUpInput);
+    await expect(sendReplyButton).toBeEnabled({ timeout: 15_000 });
+    await sendReplyButton.click();
+    await expect(page.getByText("Input accepted. Waiting for thread updates.")).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(
+      page
+        .locator("article")
+        .filter({
+          has: page.getByText("message.user", { exact: true }),
+          hasText: followUpInput,
+        })
+        .first(),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page
+        .locator(".thread-summary-card")
+        .filter({ hasText: threadId })
+        .getByText("Waiting for your input", { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page
+        .locator("section.chat-panel.workspace-card")
+        .filter({ has: page.getByText("Current thread", { exact: true }) })
+        .getByText("Waiting for your input", { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
 
     const interruptThreadButton = page.getByRole("button", { name: "Interrupt thread" });
     if (await interruptThreadButton.isEnabled()) {

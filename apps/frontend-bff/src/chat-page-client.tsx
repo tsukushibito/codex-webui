@@ -42,6 +42,8 @@ function upsertStreamEvent(
 }
 
 const ACTIVE_THREAD_REFRESH_INTERVAL_MS = 1500;
+const POST_START_READY_REFRESH_INTERVAL_MS = 400;
+const POST_START_READY_REFRESH_ATTEMPTS = 8;
 
 export function ChatPageClient() {
   const searchParams = useSearchParams();
@@ -71,6 +73,7 @@ export function ChatPageClient() {
   const activeThreadRefreshTimerRef = useRef<number | null>(null);
   const threadListRefreshIdRef = useRef(0);
   const selectedThreadRefreshIdRef = useRef(0);
+  const selectedThreadIdRef = useRef<string | null>(initialThreadId);
 
   function updateSelectedThreadId(
     nextThreadId: string | null,
@@ -83,7 +86,41 @@ export function ChatPageClient() {
       next_thread_id: nextThreadId,
       ...details,
     });
+    selectedThreadIdRef.current = nextThreadId;
     setSelectedThreadId(nextThreadId);
+  }
+
+  async function convergeStartedThreadSendability(threadId: string) {
+    for (let attempt = 0; attempt < POST_START_READY_REFRESH_ATTEMPTS; attempt += 1) {
+      if (selectedThreadIdRef.current !== threadId) {
+        return;
+      }
+
+      const bundle = await refreshSelectedThread(threadId);
+      if (!bundle) {
+        return;
+      }
+
+      if (bundle.view.composer.accepting_user_input) {
+        await refreshThreads(threadId);
+        return;
+      }
+
+      if (
+        bundle.view.current_activity.kind !== "running" ||
+        bundle.view.pending_request !== null ||
+        bundle.view.composer.blocked_by_request
+      ) {
+        await refreshThreads(threadId);
+        return;
+      }
+
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, POST_START_READY_REFRESH_INTERVAL_MS);
+      });
+    }
+
+    await refreshThreads(threadId);
   }
 
   async function refreshThreads(preferredThreadId?: string | null) {
@@ -180,6 +217,10 @@ export function ChatPageClient() {
   useEffect(() => {
     void refreshThreads(initialThreadId);
   }, [workspaceId, initialThreadId]);
+
+  useEffect(() => {
+    selectedThreadIdRef.current = selectedThreadId;
+  }, [selectedThreadId]);
 
   useEffect(() => {
     logLiveChatDebug("chat-stream", "selectedThreadId effect fired", {
@@ -368,11 +409,9 @@ export function ChatPageClient() {
       });
       setNewThreadInput("");
       setStatusMessage(`Started thread ${result.thread.thread_id}.`);
-      await refreshThreads(result.thread.thread_id);
-      logLiveChatDebug("chat-stream", "selecting created thread", {
-        thread_id: result.thread.thread_id,
-      });
       updateSelectedThreadId(result.thread.thread_id, "create_thread_success");
+      await refreshThreads(result.thread.thread_id);
+      void convergeStartedThreadSendability(result.thread.thread_id);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to start a new thread.");
     } finally {
