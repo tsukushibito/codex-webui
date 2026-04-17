@@ -39,6 +39,7 @@
 
 - Planned evidence root: `artifacts/issue-158-post-start-sendability/`
 - Local validation memo: `artifacts/issue-158-post-start-sendability/managed-playwright-validation-2026-04-18.md`
+- Pre-push validation memo: `artifacts/issue-158-post-start-sendability/pre-push-validation-2026-04-18.md`
 - Expected touched areas:
   - `apps/frontend-bff/e2e/`
   - `apps/frontend-bff/src/`
@@ -47,8 +48,18 @@
 
 ## Status / handoff notes
 
-- Status: `in progress`
-- Notes: `Local reproduction showed the managed Playwright stack was starting codex-runtime without CODEX_WEBUI_APP_SERVER_BRIDGE_ENABLED, so the browser path never exercised the app-server convergence flow. The active slice now enables the live bridge for the managed stack, uses the fake app-server fixture for deterministic first-turn completion, and keeps the browser assertion scoped to the exact follow-up user message. Parent validation issue #150 can resume after this slice reaches main.`
+- Status: `completed on main`
+- Notes: `Merged by PR #159 on 2026-04-17. The runtime now defaults to the live app-server bridge, synthetic-only tests opt out explicitly, and the managed Playwright stack clears its fake-app-server state between runs. Parent validation issue #150 can resume from localhost validation without carrying this implementation defect inline.`
+
+## Completion retrospective
+
+- Completion boundary: `Issue close and task-package archive after PR #159 merged to main.`
+- Contract check: `Satisfied. The localhost browser path now becomes sendable before reload on both Playwright projects, and the fix is backed by runtime config tests, thread-route convergence coverage, frontend unit coverage, and managed Playwright evidence.`
+- What worked: `The runtime-only convergence work was already correct; the blocking gap was the managed Playwright harness not enabling the bridge and reusing fake-app-server SQLite state across runs.`
+- Workflow problems: `The runtime default and the launcher default drifted apart, which hid the live bridge behind an environment toggle and made the managed browser path silently exercise the synthetic gateway.`
+- Improvements to adopt: `Keep the live bridge as the default runtime path, make synthetic mode explicit in tests, and reset deterministic fake-app-server state in managed browser harnesses.`
+- Skill candidates or skill updates: `The execution workflow should explicitly check whether Playwright launcher commands exercise the same runtime mode as the documented local launcher path.`
+- Follow-up updates: `None for #158. #150 remains the next validation issue.`
 
 ## Archive conditions
 
