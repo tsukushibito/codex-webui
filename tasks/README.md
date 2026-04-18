@@ -69,7 +69,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Current Active Tasks
 
-- `None`
+- [issue-150-ngrok-sse-validation](./issue-150-ngrok-sse-validation/README.md)
 
 ## Archived Task Packages
 

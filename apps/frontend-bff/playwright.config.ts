@@ -1,7 +1,19 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const externalBaseUrl = process.env.PLAYWRIGHT_BASE_URL;
+const externalHttpUsername = process.env.PLAYWRIGHT_HTTP_USERNAME;
+const externalHttpPassword = process.env.PLAYWRIGHT_HTTP_PASSWORD;
 const reuseExternalStack = typeof externalBaseUrl === "string" && externalBaseUrl.length > 0;
+const externalHttpCredentials =
+  typeof externalHttpUsername === "string" &&
+  externalHttpUsername.length > 0 &&
+  typeof externalHttpPassword === "string" &&
+  externalHttpPassword.length > 0
+    ? {
+        username: externalHttpUsername,
+        password: externalHttpPassword,
+      }
+    : undefined;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -10,6 +22,7 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: externalBaseUrl || "http://127.0.0.1:3000",
+    ...(externalHttpCredentials ? { httpCredentials: externalHttpCredentials } : {}),
     trace: "on-first-retry",
   },
   webServer: reuseExternalStack
