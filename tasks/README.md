@@ -69,10 +69,11 @@ Each active task package `README.md` must include at least the following section
 
 ## Current Active Tasks
 
-- [issue-150-ngrok-sse-validation](./issue-150-ngrok-sse-validation/README.md)
+- `None`
 
 ## Archived Task Packages
 
+- [issue-150-ngrok-sse-validation](./archive/issue-150-ngrok-sse-validation/README.md)
 - [issue-158-post-start-sendability](./archive/issue-158-post-start-sendability/README.md)
 - [issue-154-ngrok-launcher-cutover](./archive/issue-154-ngrok-launcher-cutover/README.md)
 - [issue-153-ngrok-prereqs-doctor](./archive/issue-153-ngrok-prereqs-doctor/README.md)

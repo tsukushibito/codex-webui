@@ -12,6 +12,7 @@ Archive entries preserve the work instructions that were used at the time, while
 
 ## Packages
 
+- [issue-150-ngrok-sse-validation](./issue-150-ngrok-sse-validation/README.md)
 - [issue-158-post-start-sendability](./issue-158-post-start-sendability/README.md)
 - [app_server_behavior_validation](./app_server_behavior_validation/README.md)
 - [issue-117-wiki-agent-guidance](./issue-117-wiki-agent-guidance/README.md)
