@@ -1,6 +1,6 @@
 # Codex WebUI LLM Wiki Log
 
-Last updated: 2026-04-13
+Last updated: 2026-04-19
 
 ## Purpose
 
@@ -28,6 +28,26 @@ After the heading, keep the body concise:
 - short note on what changed or remains deferred
 
 ## Entries
+
+## [2026-04-19] restructure | launcher ngrok interaction flow
+
+Source:
+
+- user request to add an interactive ngrok decision flow to `scripts/start-codex-webui.sh`
+- `scripts/start-codex-webui.sh`
+- `docs/codex_webui_dev_container_onboarding.md`
+
+Updated:
+
+- `scripts/start-codex-webui.sh`
+- `docs/codex_webui_dev_container_onboarding.md`
+- `docs/log.md`
+
+Notes:
+
+- added launcher support for `--interactive` and `--with-ngrok` so one flow can decide whether ngrok should start for the session
+- documented that the launcher can now collect ngrok Basic Auth and extra arguments before startup instead of requiring a separate manual tunnel command every time
+- kept the local-only launcher path available for runs that should not expose a remote browser entrypoint
 
 ## [2026-04-13] restructure | Issue #152 ngrok doc sync
 

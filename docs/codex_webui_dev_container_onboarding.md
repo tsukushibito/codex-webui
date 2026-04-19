@@ -1,6 +1,6 @@
 # Codex WebUI dev container onboarding
 
-Last updated: 2026-04-13
+Last updated: 2026-04-19
 
 ## 1. Purpose
 
@@ -21,6 +21,7 @@ The repository root includes the following development entrypoints:
 
 - `Dockerfile`: development image for this repository
 - `docker-compose.yml`: recommended way to run the dev container
+- `scripts/start-codex-webui.sh`: starts `codex-runtime` and `frontend-bff`, with optional interactive ngrok launch
 - `scripts/start-tunnel.sh`: starts `code tunnel`
 - `scripts/doctor.sh`: validates the development container toolchain
 
@@ -115,11 +116,29 @@ The supported workflow does not require a fixed public URL or a reserved hostnam
 
 ### 5.2 Start the local WebUI stack
 
-Start the local services on `127.0.0.1` using the app-local commands documented in `apps/codex-runtime/README.md` and `apps/frontend-bff/README.md`.
+The recommended launcher is:
+
+```bash
+scripts/start-codex-webui.sh --interactive
+```
+
+In interactive mode, the launcher can ask whether to start ngrok for the current session and lets you decide the Basic Auth and extra ngrok arguments before it launches the local stack.
+
+If you already know the intended ngrok settings and want a non-interactive run, you can start everything in one command:
+
+```bash
+scripts/start-codex-webui.sh --with-ngrok --ngrok-basic-auth="$NGROK_BASIC_AUTH"
+```
+
+The launcher still supports local-only startup when you omit ngrok flags. App-local commands from `apps/codex-runtime/README.md` and `apps/frontend-bff/README.md` remain valid when you want to run the services separately.
 
 The local browser-facing port remains `3000`, and the runtime stays on `3001`.
 
 ### 5.3 Expose the browser entrypoint with ngrok
+
+If you used `scripts/start-codex-webui.sh --interactive` or `--with-ngrok`, the launcher starts ngrok for you and prints the public URL after the local services are ready.
+
+You can still start ngrok manually when you prefer to keep the launcher local-only:
 
 Inside the container:
 
@@ -183,6 +202,12 @@ Run:
 
 ```bash
 ngrok http 3000 --basic-auth="$NGROK_BASIC_AUTH"
+```
+
+Or rerun the launcher in interactive mode:
+
+```bash
+scripts/start-codex-webui.sh --interactive
 ```
 
 If the browser still cannot load the UI, confirm the frontend is listening on `127.0.0.1:3000` inside the container.
