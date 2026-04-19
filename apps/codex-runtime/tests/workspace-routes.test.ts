@@ -27,6 +27,7 @@ describe("workspace routes", () => {
         databasePath: database.sqlite.name,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
+        appServerBridgeEnabled: false,
       },
       database,
     });
@@ -76,6 +77,7 @@ describe("workspace routes", () => {
         databasePath: database.sqlite.name,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
+        appServerBridgeEnabled: false,
       },
       database,
     });
@@ -112,6 +114,7 @@ describe("workspace routes", () => {
         databasePath: database.sqlite.name,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
+        appServerBridgeEnabled: false,
       },
       database,
     });
@@ -149,6 +152,7 @@ describe("workspace routes", () => {
         databasePath: database.sqlite.name,
         appServerCommand: process.execPath,
         appServerArgs: ["-e", "process.exit(0)"],
+        appServerBridgeEnabled: false,
       },
       database,
     });
