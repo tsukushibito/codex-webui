@@ -1,6 +1,6 @@
 # Codex WebUI LLM Wiki Log
 
-Last updated: 2026-04-19
+Last updated: 2026-04-20
 
 ## Purpose
 
@@ -28,6 +28,47 @@ After the heading, keep the body concise:
 - short note on what changed or remains deferred
 
 ## Entries
+
+## [2026-04-20] lint | requirements alignment for v0.9 UI layout spec
+
+Source:
+
+- follow-up review of `docs/requirements/codex_webui_mvp_requirements_v0_9.md` after adding `docs/specs/codex_webui_ui_layout_spec_v0_9.md`
+- `docs/specs/codex_webui_ui_layout_spec_v0_9.md`
+
+Updated:
+
+- `docs/requirements/codex_webui_mvp_requirements_v0_9.md`
+- `docs/log.md`
+
+Notes:
+
+- clarified that `resume cue` and `blocked cue` do not require standalone UI modules and may be expressed through badges, filters, sort priority, workspace summaries, and notifications
+- aligned navigation requirements with the maintained UI layout direction by centering navigation on the current-workspace thread list and on-demand workspace switching rather than a permanently expanded workspace tree
+- kept approval handling thread-scoped and preserved lightweight cross-workspace discovery as the requirement, rather than a dedicated approval inbox or blocked-thread panel
+
+## [2026-04-20] ingest | v0.9 UI layout specification
+
+Source:
+
+- user request to turn `.tmp/CodexWebUI_UIレイアウト案_v0_9_改訂版_レビュー反映.md` into a maintained UI layout document
+- `.tmp/CodexWebUI_UIレイアウト案_v0_9_改訂版_レビュー反映.md`
+- `docs/requirements/codex_webui_mvp_requirements_v0_9.md`
+- `docs/specs/codex_webui_common_spec_v0_9.md`
+- `docs/specs/codex_webui_public_api_v0_9.md`
+- `docs/specs/codex_webui_internal_api_v0_9.md`
+
+Updated:
+
+- `docs/specs/codex_webui_ui_layout_spec_v0_9.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- promoted the reviewed UI layout proposal into a maintained v0.9 specification aligned with the native-first and thin-facade direction
+- fixed the thread-first layout model across desktop and mobile, including workspace switcher behavior, timeline-first thread view, thread-scoped approval handling, and selection-driven detail surfaces
+- left canonical sort semantics and approval recovery-window guarantees explicitly deferred to requirements or API specifications rather than defining them only in the layout document
 
 ## [2026-04-19] restructure | launcher ngrok interaction flow
 

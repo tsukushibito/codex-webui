@@ -1,6 +1,6 @@
 # Codex WebUI LLM Wiki Index
 
-Last updated: 2026-04-13
+Last updated: 2026-04-20
 
 ## Purpose
 
@@ -20,6 +20,7 @@ Read this file first when you need to locate maintained knowledge across source-
 - [docs/specs/codex_webui_common_spec_v0_9.md](./specs/codex_webui_common_spec_v0_9.md): shared API and behavior rules
 - [docs/specs/codex_webui_internal_api_v0_9.md](./specs/codex_webui_internal_api_v0_9.md): maintained internal API contract
 - [docs/specs/codex_webui_public_api_v0_9.md](./specs/codex_webui_public_api_v0_9.md): maintained public API contract
+- [docs/specs/codex_webui_ui_layout_spec_v0_9.md](./specs/codex_webui_ui_layout_spec_v0_9.md): maintained thread-first desktop/mobile UI layout and interaction structure
 - [docs/validation/app_server_behavior_validation_plan_checklist.md](./validation/app_server_behavior_validation_plan_checklist.md): app-server behavior validation plan
 
 ## Maintained note pages

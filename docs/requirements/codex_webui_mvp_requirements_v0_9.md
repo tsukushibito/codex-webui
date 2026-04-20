@@ -305,6 +305,7 @@ However, these availability signals are helper derivations and must not be promo
 ### 9.5 Resume cue
 A UI cue indicating which thread the user should return to on reconnect or revisit.  
 It is not independent domain state and is derived from thread status, active flags, last updated time, and workspace context.
+It does not require a dedicated standalone UI module and may instead be expressed through thread-list ordering, filters, badges, current activity summaries, notifications, workspace summaries, or equivalent lightweight navigation signals.
 
 ### 9.6 Blocked cue
 A display label used to highlight threads that require user intervention.  
@@ -314,6 +315,9 @@ It is not a replacement for an approval resource and is derived from native fact
 - `thread.status = systemError`
 - latest turn is `failed`
 - an item exists that requires review or confirmation
+
+Blocked cue does not require a dedicated standalone UI module.
+It may instead be expressed through badges, filterable list state, sort priority, current activity, workspace summaries, or lightweight notifications.
 
 ### 9.7 Thread badge
 A display used in thread lists to briefly identify waiting approval, errors, recent failures, and similar conditions.  
@@ -535,7 +539,7 @@ The primary path for resolving approval is inside thread view.
 
 ### 15.4 Global path
 A dedicated global approval list screen is not an MVP requirement.  
-Pending approvals across multiple workspaces / threads only need to be distinguishable through **thread-list badges and blocked cues**.
+Pending approvals across multiple workspaces / threads only need to be distinguishable through **lightweight navigation signals** such as thread-list badges, current activity summaries, filters, sort priority, workspace summaries, or notifications.
 
 ### 15.5 Minimum confirmation information
 Before approve / deny, the user must be able to reach at least the following structured information:
@@ -640,16 +644,28 @@ Current activity is not independent state; it is a read-only summary of native f
 
 ---
 
-## 18. Thread List / Resume Requirements
+## 18. Navigation / Thread List / Resume Requirements
 
-### 18.1 What the list must make visible
+### 18.1 Navigation model
+- navigation is centered on the thread list in the current workspace context
+- the current workspace must be visible in navigation
+- workspace switching must be available on demand
+- a permanently expanded workspace tree is not a required MVP navigation model
+- cross-workspace high-priority threads must remain discoverable without requiring a dedicated global approval screen
+
+### 18.2 Workspace switcher expectations
+- workspace selection may be exposed through a compact current-workspace switcher rather than a permanently expanded workspace list
+- when workspace selection is opened, users must be able to identify available workspaces and switch to another workspace
+- workspace selection should be able to surface lightweight high-priority summaries such as waiting approval, system error, or latest-turn failure for that workspace
+
+### 18.3 What the list must make visible
 - the thread touched most recently
 - currently active threads
 - threads waiting for approval
 - threads containing error
 - resume candidates by workspace
 
-### 18.2 List display
+### 18.4 List display
 In thread lists, the following must be distinguishable in a lightweight form at minimum:
 
 - waiting for approval
@@ -658,7 +674,10 @@ In thread lists, the following must be distinguishable in a lightweight form at 
 - recent update
 - current activity summary for active threads that are not currently opened
 
-### 18.3 Resume priority
+Concrete discovery mechanisms may include badges, current activity summaries, filters, sort priority, workspace summaries, or lightweight notifications.
+The requirement is discoverability and return priority, not a dedicated blocked-thread panel.
+
+### 18.5 Resume priority
 On reconnect or revisit, the minimum resume priority must be:
 
 1. thread with `waitingOnApproval`
@@ -668,21 +687,22 @@ On reconnect or revisit, the minimum resume priority must be:
 5. last viewed thread
 6. most recently updated thread
 
-### 18.4 Application of resume priority
+### 18.6 Application of resume priority
 Resume priority is not a rule for always auto-navigating to thread view on revisit.  
-It is used to emphasize return candidates and determine display order or navigation priority in workspace lists, thread lists, and resume cues.
+It is used to emphasize return candidates and determine display order or navigation priority in workspace summaries, thread lists, filters, notifications, and other lightweight resume cues.
 
-### 18.5 Scope of application
+### 18.7 Scope of application
 - default resume priority may be evaluated globally
 - when a screen is explicitly filtered to a workspace, the same priority rule may be applied within that workspace
 - on mobile, it is sufficient to surface one or a few high-priority threads
 
-### 18.6 Background thread promotion notification
+### 18.8 Background thread promotion notification
 If an active thread that is not currently foregrounded changes into a high-priority condition such as `waitingOnApproval`, `systemError`, or latest turn `failed`, the frontend must notify the user through an in-app banner, toast, badge emphasis, or equivalent lightweight signal.  
 Even without a dedicated global approval screen, navigation back to a high-priority thread must remain possible within one or two actions.
 
-### 18.7 Blocked cue
+### 18.9 Blocked cue
 Blocked is a display-oriented resume cue, not an independent state.
+If shown, it is one allowed expression of return priority or intervention-needed state rather than a required standalone navigation module.
 
 ---
 
@@ -799,9 +819,9 @@ v0.9 MVP is considered established when the following are satisfied:
 - streaming response
 - handling approval inside thread
 - displaying minimum approval confirmation information
-- thread-list badges / blocked cues
+- thread-list badges and equivalent lightweight high-priority indicators
 - lightweight notification for high-priority state changes in background active threads
-- resume cues
+- priority-aware navigation and resume signaling
 - a thread list that can summarize multiple active threads
 - mobile support
 - mobile acceptance criteria
@@ -857,9 +877,10 @@ The following are not goals in v0.9:
 - a new thread is created by the first user input
 - WebUI does not independently restrict the number of active threads allowed by App Server
 - multiple active threads are allowed, but MVP does not require simultaneous detailed rendering
-- timeline / current activity / blocked / badge are display concepts
+- timeline / current activity / blocked / resume / badge are display concepts, not independent canonical state
 - the main body of thread view is the timeline
 - a dedicated global approval list is not an MVP requirement
+- navigation is centered on the current-workspace thread list rather than a permanently expanded workspace tree
 - structured minimum confirmation information before approve / deny is mandatory
 - composer-related UI availability may be derived from native facts, but must not be promoted to canonical state
 - WebUI does not create an independent approval resource
