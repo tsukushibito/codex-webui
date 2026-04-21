@@ -14,6 +14,7 @@ import {
 import { ChatView } from "./chat-view";
 import { logLiveChatDebug } from "./debug";
 import type {
+  PublicNotificationEvent,
   PublicRequestDetail,
   PublicThreadListItem,
   PublicThreadStreamEvent,
@@ -45,6 +46,35 @@ const ACTIVE_THREAD_REFRESH_INTERVAL_MS = 1500;
 const POST_START_READY_REFRESH_INTERVAL_MS = 400;
 const POST_START_READY_REFRESH_ATTEMPTS = 8;
 
+function selectRequestDetail(bundle: {
+  latestResolvedRequestDetail?: PublicRequestDetail | null;
+  pendingRequestDetail: PublicRequestDetail | null;
+}) {
+  return bundle.pendingRequestDetail ?? bundle.latestResolvedRequestDetail ?? null;
+}
+
+function hasStreamSequenceInconsistency(
+  events: PublicThreadStreamEvent[],
+  nextEvent: PublicThreadStreamEvent,
+) {
+  const duplicateSequenceEvent = events.find(
+    (event) => event.sequence === nextEvent.sequence && event.event_id !== nextEvent.event_id,
+  );
+
+  if (duplicateSequenceEvent) {
+    return true;
+  }
+
+  const knownSequences = new Set(events.map((event) => event.sequence));
+  if (knownSequences.has(nextEvent.sequence)) {
+    return false;
+  }
+
+  const maxSequence = events.reduce((currentMax, event) => Math.max(currentMax, event.sequence), 0);
+
+  return maxSequence > 0 && nextEvent.sequence > maxSequence + 1;
+}
+
 export function ChatPageClient() {
   const searchParams = useSearchParams();
   const workspaceId = searchParams.get("workspaceId");
@@ -74,6 +104,7 @@ export function ChatPageClient() {
   const threadListRefreshIdRef = useRef(0);
   const selectedThreadRefreshIdRef = useRef(0);
   const selectedThreadIdRef = useRef<string | null>(initialThreadId);
+  const streamEventsRef = useRef<PublicThreadStreamEvent[]>([]);
 
   function updateSelectedThreadId(
     nextThreadId: string | null,
@@ -189,7 +220,7 @@ export function ChatPageClient() {
       }
 
       setSelectedThreadView(bundle.view);
-      setSelectedRequestDetail(bundle.pendingRequestDetail);
+      setSelectedRequestDetail(selectRequestDetail(bundle));
       return bundle;
     } catch (error) {
       if (selectedThreadRefreshIdRef.current === refreshId) {
@@ -233,6 +264,7 @@ export function ChatPageClient() {
       setSelectedThreadView(null);
       setSelectedRequestDetail(null);
       setStreamEvents([]);
+      streamEventsRef.current = [];
       setDraftAssistantMessages({});
       setConnectionState("idle");
       return;
@@ -243,6 +275,7 @@ export function ChatPageClient() {
       previous_thread_id: selectedThreadView?.thread.thread_id ?? null,
     });
     setStreamEvents([]);
+    streamEventsRef.current = [];
     setDraftAssistantMessages({});
     void refreshSelectedThread(selectedThreadId);
   }, [selectedThreadId]);
@@ -307,6 +340,7 @@ export function ChatPageClient() {
       logLiveChatDebug("chat-stream", "thread stream opened", {
         thread_id: selectedThreadId,
       });
+      void refreshSelectedThreadAndList(selectedThreadId);
     };
 
     stream.onmessage = (messageEvent) => {
@@ -316,7 +350,14 @@ export function ChatPageClient() {
         event_type: event.event_type,
         sequence: event.sequence,
       });
-      setStreamEvents((currentEvents) => upsertStreamEvent(currentEvents, event));
+      const sequenceInconsistent = hasStreamSequenceInconsistency(streamEventsRef.current, event);
+      const nextStreamEvents = upsertStreamEvent(streamEventsRef.current, event);
+      streamEventsRef.current = nextStreamEvents;
+      setStreamEvents(nextStreamEvents);
+
+      if (sequenceInconsistent) {
+        setStatusMessage("Thread stream changed unexpectedly. Reacquiring thread state.");
+      }
 
       if (event.event_type === "message.assistant.delta") {
         const messageId = event.payload.message_id;
@@ -343,11 +384,11 @@ export function ChatPageClient() {
         }
       }
 
-      if (event.event_type === "approval.requested") {
+      if (!sequenceInconsistent && event.event_type === "approval.requested") {
         setStatusMessage("Request pending. Respond from the current thread.");
       }
 
-      if (event.event_type === "approval.resolved") {
+      if (!sequenceInconsistent && event.event_type === "approval.resolved") {
         setStatusMessage("Request resolved. Thread state refreshed.");
       }
 
@@ -382,6 +423,43 @@ export function ChatPageClient() {
       }
     };
   }, [selectedThreadId, streamVersion]);
+
+  useEffect(() => {
+    const notifications = new EventSource("/api/v1/notifications/stream");
+
+    notifications.onmessage = (messageEvent) => {
+      const event = JSON.parse(messageEvent.data) as PublicNotificationEvent;
+      logLiveChatDebug("chat-notifications", "notification stream event received", {
+        event_type: event.event_type,
+        high_priority: event.high_priority,
+        selected_thread_id: selectedThreadIdRef.current,
+        thread_id: event.thread_id,
+      });
+
+      if (event.high_priority) {
+        setStatusMessage("High-priority background thread needs attention.");
+      } else {
+        setStatusMessage("Thread notification received. Refreshing current state.");
+      }
+
+      const currentThreadId = selectedThreadIdRef.current;
+      if (currentThreadId && event.thread_id === currentThreadId) {
+        void refreshSelectedThreadAndList(currentThreadId);
+        return;
+      }
+
+      void refreshThreads(currentThreadId);
+    };
+
+    notifications.onerror = () => {
+      logLiveChatDebug("chat-notifications", "notification stream errored");
+      notifications.close();
+    };
+
+    return () => {
+      notifications.close();
+    };
+  }, [workspaceId]);
 
   async function handleCreateThread() {
     if (!workspaceId) {

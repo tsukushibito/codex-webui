@@ -136,12 +136,16 @@ export async function respondToPendingRequest(
 
 export async function loadChatThreadBundle(threadId: string, fetchImpl: FetchLike = fetch) {
   const view = await getThreadView(threadId, fetchImpl);
-  const pendingRequestDetail = view.pending_request
-    ? await getRequestDetail(view.pending_request.request_id, fetchImpl)
-    : null;
+  const [pendingRequestDetail, latestResolvedRequestDetail] = await Promise.all([
+    view.pending_request ? getRequestDetail(view.pending_request.request_id, fetchImpl) : null,
+    view.latest_resolved_request
+      ? getRequestDetail(view.latest_resolved_request.request_id, fetchImpl)
+      : null,
+  ]);
 
   return {
     view,
+    latestResolvedRequestDetail,
     pendingRequestDetail,
   };
 }

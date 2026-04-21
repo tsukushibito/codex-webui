@@ -151,6 +151,17 @@ function buildPendingRequestDetail(
   };
 }
 
+function buildResolvedRequestDetail(
+  overrides: Partial<PublicRequestDetail> = {},
+): PublicRequestDetail {
+  return buildPendingRequestDetail({
+    status: "resolved",
+    decision: "approved",
+    responded_at: "2026-03-27T05:21:00Z",
+    ...overrides,
+  });
+}
+
 function buildAcceptedInputResponse(
   overrides: Partial<PublicThreadInputAcceptedResponse> = {},
 ): PublicThreadInputAcceptedResponse {
@@ -761,9 +772,9 @@ describe("ChatPageClient", () => {
 
     expect(container.textContent).toContain("Operation: git push origin main");
 
-    const approveButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Approve request",
-    );
+    const approveButton = Array.from(container.querySelectorAll("button"))
+      .reverse()
+      .find((button) => button.textContent === "Approve request");
     expect(approveButton).not.toBeUndefined();
 
     await act(async () => {
@@ -776,6 +787,58 @@ describe("ChatPageClient", () => {
       "approved",
       expect.stringMatching(/^response_/),
     );
+  });
+
+  it("reopens latest resolved request detail without response actions", async () => {
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [buildThreadListItem()],
+      next_cursor: null,
+      has_more: false,
+    });
+    chatDataMocks.loadChatThreadBundle.mockResolvedValue({
+      view: buildThreadView({
+        latest_resolved_request: {
+          request_id: "req_001",
+          thread_id: "thread_001",
+          turn_id: "turn_001",
+          item_id: "item_001",
+          request_kind: "approval",
+          status: "resolved",
+          decision: "denied",
+          requested_at: "2026-03-27T05:20:00Z",
+          responded_at: "2026-03-27T05:21:00Z",
+        },
+      }),
+      latestResolvedRequestDetail: buildResolvedRequestDetail({
+        decision: "denied",
+        responded_at: "2026-03-27T05:21:00Z",
+      }),
+      pendingRequestDetail: null,
+    });
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    expect(container.textContent).toContain("Latest resolved request");
+    expect(container.textContent).toContain("Decision: denied");
+
+    const detailButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Reopen request detail",
+    );
+    expect(detailButton).not.toBeUndefined();
+
+    await act(async () => {
+      detailButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushUi();
+
+    expect(container.textContent).toContain("Request detail");
+    expect(container.textContent).toContain("Decision");
+    expect(container.textContent).toContain("Responded");
+    expect(container.textContent).not.toContain("Approve request");
+    expect(container.textContent).not.toContain("Deny request");
   });
 
   it("refreshes thread state after a thread stream event arrives", async () => {
@@ -816,6 +879,118 @@ describe("ChatPageClient", () => {
 
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain("Request pending. Respond from the current thread.");
+  });
+
+  it("marks stream sequence gaps as inconsistent and reacquires selected thread state", async () => {
+    const firstEvent: PublicThreadStreamEvent = {
+      event_id: "evt_002",
+      thread_id: "thread_001",
+      event_type: "session.status_changed",
+      sequence: 2,
+      occurred_at: "2026-03-27T05:20:00Z",
+      payload: {
+        status: "running",
+      },
+    };
+    const gapEvent: PublicThreadStreamEvent = {
+      event_id: "evt_004",
+      thread_id: "thread_001",
+      event_type: "approval.requested",
+      sequence: 4,
+      occurred_at: "2026-03-27T05:21:00Z",
+      payload: {
+        summary: "Run git push",
+      },
+    };
+
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [buildThreadListItem()],
+      next_cursor: null,
+      has_more: false,
+    });
+    chatDataMocks.loadChatThreadBundle.mockResolvedValue({
+      view: buildThreadView(),
+      pendingRequestDetail: null,
+    });
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    await act(async () => {
+      MockEventSource.instances[0]?.onmessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify(firstEvent),
+        }),
+      );
+    });
+    await flushUi();
+
+    await act(async () => {
+      MockEventSource.instances[0]?.onmessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify(gapEvent),
+        }),
+      );
+    });
+    await flushUi();
+
+    expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(3);
+    expect(container.textContent).toContain(
+      "Thread stream changed unexpectedly. Reacquiring thread state.",
+    );
+  });
+
+  it("uses global notification events as refresh triggers and high-priority signals", async () => {
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [
+        buildThreadListItem(),
+        buildThreadListItem({
+          thread_id: "thread_background",
+          resume_cue: {
+            reason_kind: "waiting_on_approval",
+            priority_band: "highest",
+            label: "Resume here first",
+          },
+        }),
+      ],
+      next_cursor: null,
+      has_more: false,
+    });
+    chatDataMocks.loadChatThreadBundle.mockResolvedValue({
+      view: buildThreadView(),
+      pendingRequestDetail: null,
+    });
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    const notifications = MockEventSource.instances.find(
+      (instance) => instance.url === "/api/v1/notifications/stream",
+    );
+    expect(notifications).not.toBeUndefined();
+
+    await act(async () => {
+      notifications?.onmessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify({
+            thread_id: "thread_background",
+            event_type: "approval.requested",
+            occurred_at: "2026-03-27T05:25:00Z",
+            high_priority: true,
+          }),
+        }),
+      );
+    });
+    await flushUi();
+
+    expect(chatDataMocks.listWorkspaceThreads).toHaveBeenCalledTimes(2);
+    expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("High-priority background thread needs attention.");
+    expect(container.textContent).toContain("Resume here first");
   });
 
   it("keeps the final assistant message visible after completion refresh", async () => {
