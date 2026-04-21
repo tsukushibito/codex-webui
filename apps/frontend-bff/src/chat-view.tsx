@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import type {
   PublicRequestDetail,
   PublicThreadListItem,
   PublicThreadStreamEvent,
   PublicThreadView,
+  PublicTimelineItem,
 } from "./thread-types";
 
 export interface ChatViewProps {
@@ -79,6 +81,14 @@ function requestBadgeClass(request: PublicRequestDetail | null) {
   return request.status === "pending" ? "status-badge warning" : "status-badge success";
 }
 
+type ThreadDetailSelection =
+  | { kind: "request_detail" }
+  | { kind: "timeline_item_detail"; timelineItemId: string };
+
+function timelineItemLabel(item: PublicTimelineItem) {
+  return String(item.payload.content ?? item.payload.summary ?? item.kind);
+}
+
 export function ChatView({
   workspaceId,
   threads,
@@ -108,46 +118,46 @@ export function ChatView({
   onDenyRequest,
 }: ChatViewProps) {
   const draftEntries = Object.entries(draftAssistantMessages);
+  const [isNavigationOpen, setIsNavigationOpen] = useState(false);
+  const [detailSelection, setDetailSelection] = useState<ThreadDetailSelection | null>(null);
+  const selectedTimelineItem =
+    detailSelection?.kind === "timeline_item_detail"
+      ? (selectedThreadView?.timeline.items.find(
+          (item) => item.timeline_item_id === detailSelection.timelineItemId,
+        ) ?? null)
+      : null;
+
+  useEffect(() => {
+    setIsNavigationOpen(false);
+    setDetailSelection(null);
+  }, [selectedThreadId]);
+
+  function selectThread(threadId: string) {
+    onSelectThread(threadId);
+    setIsNavigationOpen(false);
+  }
 
   return (
     <main className="chat-shell">
+      <header className="chat-topbar">
+        <div>
+          <p className="eyebrow">thread_view</p>
+          <h1>Chat</h1>
+        </div>
+        <div className="chat-topbar-actions">
+          <button
+            className="secondary-link action-button navigation-toggle"
+            onClick={() => setIsNavigationOpen((currentValue) => !currentValue)}
+            type="button"
+          >
+            {isNavigationOpen ? "Close threads" : "Threads"}
+          </button>
+          <Link className="secondary-link" href="/">
+            Home
+          </Link>
+        </div>
+      </header>
       <div className="chat-layout">
-        <section className="hero-card">
-          <div className="hero-body">
-            <p className="eyebrow">codex-webui</p>
-            <h1>Chat</h1>
-            <p className="hero-copy">
-              Use the v0.9 thread surface directly: start from first input, respond to pending
-              requests in thread context, and recover state from thread helpers.
-            </p>
-            <div className="hero-metrics">
-              <span className="metric-chip">Workspace: {workspaceId ?? "Choose from Home"}</span>
-              <span className="metric-chip">
-                Stream:{" "}
-                {connectionState === "live"
-                  ? "live"
-                  : connectionState === "reconnecting"
-                    ? "reacquiring"
-                    : "idle"}
-              </span>
-              <span className="metric-chip">Threads: {threads.length}</span>
-            </div>
-            <div className="hero-actions">
-              <Link className="secondary-link" href="/">
-                Back to Home
-              </Link>
-              {workspaceId ? (
-                <Link
-                  className="primary-link"
-                  href={threadChatHref(workspaceId, selectedThreadId ?? undefined)}
-                >
-                  Refresh thread shell
-                </Link>
-              ) : null}
-            </div>
-          </div>
-        </section>
-
         {!workspaceId ? (
           <section className="placeholder-card">
             <p className="eyebrow">Missing workspace</p>
@@ -173,7 +183,13 @@ export function ChatView({
 
         {workspaceId ? (
           <>
-            <section className="chat-panel create-card">
+            <section
+              className={
+                isNavigationOpen
+                  ? "chat-panel create-card thread-navigation open"
+                  : "chat-panel create-card thread-navigation"
+              }
+            >
               <header>
                 <p className="eyebrow">Threads</p>
                 <h2>Start or resume a thread</h2>
@@ -223,7 +239,7 @@ export function ChatView({
                         : "thread-summary-card"
                     }
                     key={thread.thread_id}
-                    onClick={() => onSelectThread(thread.thread_id)}
+                    onClick={() => selectThread(thread.thread_id)}
                     type="button"
                   >
                     <div className="workspace-meta-row">
@@ -241,7 +257,7 @@ export function ChatView({
               </div>
             </section>
 
-            <section className="chat-panel workspace-card">
+            <section className="chat-panel workspace-card thread-view-card">
               <header>
                 <div className="workspace-meta-row">
                   <p className="eyebrow">Current thread</p>
@@ -257,10 +273,28 @@ export function ChatView({
                     ? `Updated ${formatTimestamp(selectedThreadView.thread.updated_at)}`
                     : "Pick a thread from the list to load current activity and requests."}
                 </p>
+                <div className="hero-metrics thread-context-metrics">
+                  <span className="metric-chip">Workspace: {workspaceId}</span>
+                  <span className="metric-chip">
+                    Stream:{" "}
+                    {connectionState === "live"
+                      ? "live"
+                      : connectionState === "reconnecting"
+                        ? "reacquiring"
+                        : "idle"}
+                  </span>
+                  <span className="metric-chip">Threads: {threads.length}</span>
+                  <Link
+                    className="secondary-link compact-link"
+                    href={threadChatHref(workspaceId, selectedThreadId ?? undefined)}
+                  >
+                    Refresh
+                  </Link>
+                </div>
               </header>
 
               {selectedThreadView?.pending_request ? (
-                <div className="request-detail-card">
+                <div className="request-detail-card pending-request-card">
                   <div className="workspace-meta-row">
                     <strong>Pending request</strong>
                     <span className={requestBadgeClass(selectedRequestDetail)}>
@@ -269,15 +303,11 @@ export function ChatView({
                   </div>
                   <p>{selectedThreadView.pending_request.summary}</p>
                   {selectedRequestDetail ? (
-                    <>
-                      <p className="workspace-meta">{selectedRequestDetail.reason}</p>
-                      {selectedRequestDetail.operation_summary ? (
-                        <p className="workspace-meta">
-                          Operation: {selectedRequestDetail.operation_summary}
-                        </p>
-                      ) : null}
-                    </>
+                    <p className="workspace-meta">{selectedRequestDetail.reason}</p>
                   ) : null}
+                  <p className="workspace-meta">
+                    Requested {formatTimestamp(selectedThreadView.pending_request.requested_at)}
+                  </p>
                   <div className="workspace-actions">
                     <button
                       className="primary-link action-button"
@@ -299,6 +329,15 @@ export function ChatView({
                     >
                       Deny request
                     </button>
+                    {selectedRequestDetail ? (
+                      <button
+                        className="secondary-link action-button"
+                        onClick={() => setDetailSelection({ kind: "request_detail" })}
+                        type="button"
+                      >
+                        Request detail
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ) : selectedThreadView?.latest_resolved_request ? (
@@ -319,6 +358,77 @@ export function ChatView({
                   {isInterruptingThread ? "Interrupting..." : "Interrupt thread"}
                 </button>
               </div>
+
+              <section className="timeline-section" aria-label="Timeline">
+                <header>
+                  <p className="eyebrow">Timeline</p>
+                  <h2>Thread context</h2>
+                </header>
+
+                {isLoadingThread ? (
+                  <p className="workspace-status">Refreshing thread detail...</p>
+                ) : null}
+
+                <div className="chat-message-list">
+                  {!isLoadingThread &&
+                  selectedThreadView &&
+                  selectedThreadView.timeline.items.length === 0 &&
+                  draftEntries.length === 0 ? (
+                    <p className="empty-state">
+                      No timeline items yet. Start the thread or send follow-up input to continue.
+                    </p>
+                  ) : null}
+
+                  {selectedThreadView?.timeline.items.map((item) => (
+                    <article className="chat-message assistant" key={item.timeline_item_id}>
+                      <div className="workspace-meta-row">
+                        <strong>{item.kind}</strong>
+                        <span className="workspace-meta">{formatTimestamp(item.occurred_at)}</span>
+                      </div>
+                      <p>{timelineItemLabel(item)}</p>
+                      <button
+                        className="secondary-link action-button inline-detail-button"
+                        onClick={() =>
+                          setDetailSelection({
+                            kind: "timeline_item_detail",
+                            timelineItemId: item.timeline_item_id,
+                          })
+                        }
+                        type="button"
+                      >
+                        Timeline item detail
+                      </button>
+                    </article>
+                  ))}
+
+                  {draftEntries.map(([messageId, content]) => (
+                    <article className="chat-message assistant" key={messageId}>
+                      <div className="workspace-meta-row">
+                        <strong>assistant streaming</strong>
+                        <span className="workspace-meta">Live</span>
+                      </div>
+                      <p>{content}…</p>
+                    </article>
+                  ))}
+
+                  {streamEvents.map((event) => (
+                    <article className="chat-message user" key={event.event_id}>
+                      <div className="workspace-meta-row">
+                        <strong>{event.event_type}</strong>
+                        <span className="workspace-meta">{formatTimestamp(event.occurred_at)}</span>
+                      </div>
+                      <p>
+                        {String(
+                          event.payload.content ??
+                            event.payload.summary ??
+                            event.payload.message ??
+                            event.event_type,
+                        )}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              </section>
 
               <div className="chat-composer">
                 <label className="form-label" htmlFor="message-input">
@@ -348,68 +458,55 @@ export function ChatView({
               </div>
             </section>
 
-            <section className="chat-panel workspace-card">
-              <header>
-                <p className="eyebrow">Activity</p>
-                <h2>Timeline</h2>
-                <p className="field-hint">
-                  Browser refresh and reconnect rely on `thread_view`, `timeline`, and the thread
-                  stream rather than legacy message/event endpoints.
-                </p>
-              </header>
+            {detailSelection ? (
+              <aside className="chat-panel workspace-card thread-detail-surface">
+                <header>
+                  <div className="workspace-meta-row">
+                    <p className="eyebrow">Detail</p>
+                    <button
+                      className="secondary-link action-button compact-button"
+                      onClick={() => setDetailSelection(null)}
+                      type="button"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <h2>
+                    {detailSelection.kind === "request_detail"
+                      ? "Request detail"
+                      : "Timeline item detail"}
+                  </h2>
+                </header>
 
-              {isLoadingThread ? (
-                <p className="workspace-status">Refreshing thread detail...</p>
-              ) : null}
-
-              <div className="chat-message-list">
-                {!isLoadingThread &&
-                selectedThreadView &&
-                selectedThreadView.timeline.items.length === 0 &&
-                draftEntries.length === 0 ? (
-                  <p className="empty-state">
-                    No timeline items yet. Start the thread or send follow-up input to continue.
-                  </p>
+                {detailSelection.kind === "request_detail" && selectedRequestDetail ? (
+                  <div className="detail-stack">
+                    <p>{selectedRequestDetail.summary}</p>
+                    <p className="workspace-meta">{selectedRequestDetail.reason}</p>
+                    {selectedRequestDetail.operation_summary ? (
+                      <p className="workspace-meta">
+                        Operation: {selectedRequestDetail.operation_summary}
+                      </p>
+                    ) : null}
+                    <span className={requestBadgeClass(selectedRequestDetail)}>
+                      {selectedRequestDetail.status}
+                    </span>
+                  </div>
                 ) : null}
 
-                {selectedThreadView?.timeline.items.map((item) => (
-                  <article className="chat-message assistant" key={item.timeline_item_id}>
-                    <div className="workspace-meta-row">
-                      <strong>{item.kind}</strong>
-                      <span className="workspace-meta">{formatTimestamp(item.occurred_at)}</span>
-                    </div>
-                    <p>{String(item.payload.content ?? item.payload.summary ?? item.kind)}</p>
-                  </article>
-                ))}
-
-                {draftEntries.map(([messageId, content]) => (
-                  <article className="chat-message assistant" key={messageId}>
-                    <div className="workspace-meta-row">
-                      <strong>assistant streaming</strong>
-                      <span className="workspace-meta">Live</span>
-                    </div>
-                    <p>{content}…</p>
-                  </article>
-                ))}
-
-                {streamEvents.map((event) => (
-                  <article className="chat-message user" key={event.event_id}>
-                    <div className="workspace-meta-row">
-                      <strong>{event.event_type}</strong>
-                      <span className="workspace-meta">{formatTimestamp(event.occurred_at)}</span>
-                    </div>
-                    <p>
-                      {String(
-                        event.payload.content ??
-                          event.payload.summary ??
-                          event.payload.message ??
-                          event.event_type,
-                      )}
+                {detailSelection.kind === "timeline_item_detail" && selectedTimelineItem ? (
+                  <div className="detail-stack">
+                    <p className="workspace-meta">
+                      {selectedTimelineItem.kind} at{" "}
+                      {formatTimestamp(selectedTimelineItem.occurred_at)}
                     </p>
-                  </article>
-                ))}
-              </div>
-            </section>
+                    <p>{timelineItemLabel(selectedTimelineItem)}</p>
+                    <pre className="detail-json">
+                      {JSON.stringify(selectedTimelineItem.payload, null, 2)}
+                    </pre>
+                  </div>
+                ) : null}
+              </aside>
+            ) : null}
           </>
         ) : null}
       </div>
