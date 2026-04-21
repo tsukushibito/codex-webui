@@ -162,3 +162,10 @@ export interface PublicThreadStreamEvent {
   occurred_at: string;
   payload: Record<string, unknown>;
 }
+
+export interface PublicNotificationEvent {
+  thread_id: string;
+  event_type: string;
+  occurred_at: string;
+  high_priority: boolean;
+}

@@ -19,6 +19,7 @@ import type {
   RuntimeTimelineItem,
   RuntimeWorkspaceSummary,
 } from "./runtime-types";
+import type { PublicNotificationEvent } from "./thread-types";
 
 function deriveCanStart(session: RuntimeSessionSummary, activeSessionId: string | null) {
   if (session.status !== "created") {
@@ -471,7 +472,7 @@ export function mapApprovalStreamEvent(event: RuntimeApprovalStreamEventProjecti
   };
 }
 
-export function mapNotificationEvent(event: RuntimeNotificationEvent) {
+export function mapNotificationEvent(event: RuntimeNotificationEvent): PublicNotificationEvent {
   return {
     thread_id: event.thread_id,
     event_type: event.event_type,
