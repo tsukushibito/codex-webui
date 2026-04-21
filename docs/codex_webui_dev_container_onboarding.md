@@ -1,6 +1,6 @@
 # Codex WebUI dev container onboarding
 
-Last updated: 2026-04-19
+Last updated: 2026-04-21
 
 ## 1. Purpose
 
@@ -223,3 +223,11 @@ If `nvidia-smi` works but `vulkaninfo --summary` still falls back to `llvmpipe`,
 This repository now ships `scripts/with-vulkan-driver.sh`, which can repair the manifest side when the NVIDIA graphics libraries are already mounted into the container.
 
 If the helper still cannot surface an NVIDIA Vulkan device, the host runtime is not providing the required graphics libraries. Native Linux Docker Engine with NVIDIA Container Toolkit is the recommended path for containerized Vulkan validation. Docker Desktop on Windows with the WSL2 backend is reliable for GPU compute, but may not expose the full graphics/Vulkan stack needed for Vulkan app development inside containers.
+
+### 8.6 Vulkan SDK download 404s during image build
+
+The Dockerfile uses LunarG's automated download API with the generic Linux file name, `vulkan_sdk.tar.xz`, instead of constructing the embedded-version tarball name directly.
+
+Keep the post-extraction Dockerfile check in place. `VULKAN_SDK_VERSION` is used both to choose the download path and to define the installed SDK path under `/opt/vulkansdk/<version>/x86_64`. If LunarG metadata or redirects return a different SDK archive than requested, the build must fail immediately instead of leaving a broken `vulkaninfo` symlink or a runtime path that does not match the compose-provided expected version.
+
+When changing the default Vulkan SDK version, update the Dockerfile, `docker-compose.yml`, and `scripts/doctor.sh` together. The compose file passes the version into the image build and also passes the matching expected version into the runtime doctor check.

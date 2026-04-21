@@ -1,6 +1,6 @@
 # Codex WebUI LLM Wiki Log
 
-Last updated: 2026-04-20
+Last updated: 2026-04-21
 
 ## Purpose
 
@@ -28,6 +28,28 @@ After the heading, keep the body concise:
 - short note on what changed or remains deferred
 
 ## Entries
+
+## [2026-04-21] operational pitfall | Vulkan SDK generic download and extraction validation
+
+Source:
+
+- `docker compose build` failure against LunarG's version-embedded Linux Vulkan SDK tarball URL
+- LunarG Vulkan SDK Version Query and Download API
+- `Dockerfile`
+- `docker-compose.yml`
+
+Updated:
+
+- `Dockerfile`
+- `docker-compose.yml`
+- `docs/codex_webui_dev_container_onboarding.md`
+- `docs/log.md`
+
+Notes:
+
+- switched the Vulkan SDK download path to LunarG's generic `vulkan_sdk.tar.xz` API file name
+- kept `VULKAN_SDK_VERSION` as the requested version and as the expected extracted directory version, with compose and doctor defaults aligned
+- documented why the Dockerfile must fail if the extracted SDK directory does not match the compose-provided expected version
 
 ## [2026-04-20] lint | requirements alignment for v0.9 UI layout spec
 

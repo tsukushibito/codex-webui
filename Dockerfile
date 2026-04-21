@@ -11,7 +11,7 @@ ARG NODE_VERSION=25.6.0
 ARG NPM_VERSION=11.8.0
 ARG CODEX_NPM_VERSION=latest
 ARG RUST_VERSION=1.93.1
-ARG VULKAN_SDK_VERSION=1.4.341.1
+ARG VULKAN_SDK_VERSION=1.4.341.0
 ARG USERNAME=dev
 ARG USER_UID=1000
 ARG USER_GID=1000
@@ -175,8 +175,17 @@ RUN curl -fsSL "${DEVTUNNEL_DOWNLOAD_URL}" -o /usr/local/bin/devtunnel \
     && chmod +x /usr/local/bin/devtunnel
 
 RUN mkdir -p /opt/vulkansdk \
-    && curl -fsSL "https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION}/linux/vulkansdk-linux-x86_64-${VULKAN_SDK_VERSION}.tar.xz?Human=true" -o /tmp/vulkansdk.tar.xz \
+    && curl -fsSL "https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION}/linux/vulkan_sdk.tar.xz?Human=true" -o /tmp/vulkansdk.tar.xz \
     && tar -xJf /tmp/vulkansdk.tar.xz -C /opt/vulkansdk \
+    && if [[ ! -x "/opt/vulkansdk/${VULKAN_SDK_VERSION}/x86_64/bin/vulkaninfo" ]]; then \
+    echo "Expected Vulkan SDK ${VULKAN_SDK_VERSION} was not extracted under /opt/vulkansdk/${VULKAN_SDK_VERSION}" >&2; \
+    find /opt/vulkansdk -maxdepth 2 -type d >&2; \
+    exit 1; \
+    fi \
+    && if [[ ! -d "/opt/vulkansdk/${VULKAN_SDK_VERSION}/x86_64/share/vulkan/explicit_layer.d" ]]; then \
+    echo "Expected Vulkan validation layer manifests were not found for SDK ${VULKAN_SDK_VERSION}" >&2; \
+    exit 1; \
+    fi \
     && ln -sf "/opt/vulkansdk/${VULKAN_SDK_VERSION}/x86_64/bin/vulkaninfo" /usr/local/bin/vulkaninfo \
     && rm -f /tmp/vulkansdk.tar.xz
 
