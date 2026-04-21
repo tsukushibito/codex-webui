@@ -73,6 +73,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Archived Task Packages
 
+- [issue-165-thread-first-shell](./archive/issue-165-thread-first-shell/README.md)
 - [issue-164-ui-state-matrix](./archive/issue-164-ui-state-matrix/README.md)
 - [issue-150-ngrok-sse-validation](./archive/issue-150-ngrok-sse-validation/README.md)
 - [issue-158-post-start-sendability](./archive/issue-158-post-start-sendability/README.md)

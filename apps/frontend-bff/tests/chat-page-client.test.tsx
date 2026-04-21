@@ -747,6 +747,19 @@ describe("ChatPageClient", () => {
 
     expect(container.textContent).toContain("Run git push");
     expect(container.textContent).toContain("Codex requests permission to push changes to remote.");
+    expect(container.textContent).not.toContain("Operation: git push origin main");
+
+    const requestDetailButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Request detail",
+    );
+    expect(requestDetailButton).not.toBeUndefined();
+
+    await act(async () => {
+      requestDetailButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushUi();
+
+    expect(container.textContent).toContain("Operation: git push origin main");
 
     const approveButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Approve request",
