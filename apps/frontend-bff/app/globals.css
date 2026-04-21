@@ -37,7 +37,8 @@ a {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -76,6 +77,88 @@ input {
   display: grid;
   gap: 18px;
   padding: 20px;
+}
+
+.home-app-shell {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+}
+
+.home-topbar,
+.workspace-context,
+.home-primary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.home-topbar {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.workspace-context {
+  align-items: end;
+  justify-content: space-between;
+  border: 1px solid rgba(35, 24, 15, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.58);
+  padding: 14px;
+}
+
+.workspace-context-main {
+  display: grid;
+  gap: 6px;
+  min-width: min(100%, 18rem);
+}
+
+.workspace-context-main h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.workspace-switcher {
+  display: grid;
+  gap: 8px;
+  min-width: min(100%, 15rem);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.workspace-switcher summary {
+  cursor: pointer;
+  border-radius: 14px;
+  background: rgba(35, 24, 15, 0.06);
+  color: var(--text-main);
+  padding: 10px 12px;
+}
+
+.workspace-switcher-control {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.workspace-switcher select {
+  width: 100%;
+  border: 1px solid rgba(35, 24, 15, 0.14);
+  border-radius: 14px;
+  background: #fffdf8;
+  color: var(--text-main);
+  padding: 10px 12px;
+}
+
+.workspace-switcher select:focus {
+  outline: 2px solid rgba(184, 77, 36, 0.22);
+  outline-offset: 1px;
+}
+
+.home-primary-actions {
+  align-items: center;
 }
 
 .eyebrow {
@@ -153,7 +236,11 @@ input {
 
 .primary-link,
 .secondary-link,
-.submit-button {
+.submit-button,
+.disabled-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 16px;
   padding: 12px 16px;
   font-weight: 700;
@@ -169,9 +256,16 @@ input {
   color: #fffaf6;
 }
 
-.secondary-link {
+.secondary-link,
+.disabled-link {
   background: rgba(35, 24, 15, 0.06);
   color: var(--text-main);
+}
+
+.disabled-link {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.68;
 }
 
 .primary-link:hover,

@@ -73,6 +73,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Archived Task Packages
 
+- [issue-167-home-shell-resume](./archive/issue-167-home-shell-resume/README.md)
 - [issue-166-request-detail-recovery](./archive/issue-166-request-detail-recovery/README.md)
 - [issue-165-thread-first-shell](./archive/issue-165-thread-first-shell/README.md)
 - [issue-164-ui-state-matrix](./archive/issue-164-ui-state-matrix/README.md)
