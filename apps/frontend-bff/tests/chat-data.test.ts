@@ -123,7 +123,7 @@ describe("chat data access", () => {
     expect(reply.accepted.input_item_id).toBe("item_002");
   });
 
-  it("loads thread view and pending request detail for chat refresh", async () => {
+  it("loads thread view plus pending and latest resolved request detail for chat refresh", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
@@ -153,7 +153,17 @@ describe("chat data access", () => {
             summary: "Run git push",
             requested_at: "2026-03-27T05:20:00Z",
           },
-          latest_resolved_request: null,
+          latest_resolved_request: {
+            request_id: "req_resolved_001",
+            thread_id: "thread_001",
+            turn_id: "turn_000",
+            item_id: "item_000",
+            request_kind: "approval",
+            status: "resolved",
+            decision: "approved",
+            requested_at: "2026-03-27T05:10:00Z",
+            responded_at: "2026-03-27T05:11:00Z",
+          },
           composer: {
             accepting_user_input: false,
             interrupt_available: true,
@@ -187,12 +197,37 @@ describe("chat data access", () => {
           },
           context: null,
         }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          request_id: "req_resolved_001",
+          thread_id: "thread_001",
+          turn_id: "turn_000",
+          item_id: "item_000",
+          request_kind: "approval",
+          status: "resolved",
+          risk_category: "external_side_effect",
+          summary: "Run git fetch",
+          reason: "Codex requested permission to fetch remote refs.",
+          operation_summary: "git fetch origin",
+          requested_at: "2026-03-27T05:10:00Z",
+          responded_at: "2026-03-27T05:11:00Z",
+          decision: "approved",
+          decision_options: {
+            policy_scope_supported: false,
+            default_policy_scope: "once",
+          },
+          context: null,
+        }),
       );
 
     const bundle = await loadChatThreadBundle("thread_001", fetchMock);
 
     expect(bundle.view.thread.thread_id).toBe("thread_001");
     expect(bundle.pendingRequestDetail?.request_id).toBe("req_001");
+    expect(bundle.latestResolvedRequestDetail?.request_id).toBe("req_resolved_001");
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/requests/req_001", expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/requests/req_resolved_001", expect.any(Object));
   });
 
   it("loads request detail, submits a request response, and interrupts a thread", async () => {

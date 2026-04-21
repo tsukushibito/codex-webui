@@ -81,6 +81,10 @@ function requestBadgeClass(request: PublicRequestDetail | null) {
   return request.status === "pending" ? "status-badge warning" : "status-badge success";
 }
 
+function formatMachineLabel(value: string | null | undefined) {
+  return value ? value.replaceAll("_", " ") : "Not available";
+}
+
 type ThreadDetailSelection =
   | { kind: "request_detail" }
   | { kind: "timeline_item_detail"; timelineItemId: string };
@@ -252,6 +256,11 @@ export function ChatView({
                     <span className="workspace-meta">
                       Updated {formatTimestamp(thread.updated_at)}
                     </span>
+                    {thread.resume_cue ? (
+                      <span className="workspace-meta">
+                        {formatMachineLabel(thread.resume_cue.label)}
+                      </span>
+                    ) : null}
                   </button>
                 ))}
               </div>
@@ -298,7 +307,7 @@ export function ChatView({
                   <div className="workspace-meta-row">
                     <strong>Pending request</strong>
                     <span className={requestBadgeClass(selectedRequestDetail)}>
-                      {selectedThreadView.pending_request.risk_category.replaceAll("_", " ")}
+                      {formatMachineLabel(selectedThreadView.pending_request.risk_category)}
                     </span>
                   </div>
                   <p>{selectedThreadView.pending_request.summary}</p>
@@ -341,9 +350,28 @@ export function ChatView({
                   </div>
                 </div>
               ) : selectedThreadView?.latest_resolved_request ? (
-                <p className="request-signal">
-                  Latest request: {selectedThreadView.latest_resolved_request.decision}
-                </p>
+                <div className="request-detail-card resolved-request-card">
+                  <div className="workspace-meta-row">
+                    <strong>Latest resolved request</strong>
+                    <span className={requestBadgeClass(selectedRequestDetail)}>
+                      {selectedThreadView.latest_resolved_request.decision}
+                    </span>
+                  </div>
+                  <p>Decision: {selectedThreadView.latest_resolved_request.decision}</p>
+                  <p className="workspace-meta">
+                    Responded{" "}
+                    {formatTimestamp(selectedThreadView.latest_resolved_request.responded_at)}
+                  </p>
+                  {selectedRequestDetail ? (
+                    <button
+                      className="secondary-link action-button inline-detail-button"
+                      onClick={() => setDetailSelection({ kind: "request_detail" })}
+                      type="button"
+                    >
+                      Reopen request detail
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
 
               <div className="workspace-actions">
@@ -480,16 +508,80 @@ export function ChatView({
 
                 {detailSelection.kind === "request_detail" && selectedRequestDetail ? (
                   <div className="detail-stack">
+                    <div className="workspace-meta-row">
+                      <span className={requestBadgeClass(selectedRequestDetail)}>
+                        {selectedRequestDetail.status}
+                      </span>
+                      <span className="status-badge">
+                        {formatMachineLabel(selectedRequestDetail.risk_category)}
+                      </span>
+                    </div>
                     <p>{selectedRequestDetail.summary}</p>
-                    <p className="workspace-meta">{selectedRequestDetail.reason}</p>
+                    <dl className="request-detail-list">
+                      <div>
+                        <dt>Reason</dt>
+                        <dd>{selectedRequestDetail.reason}</dd>
+                      </div>
+                      {selectedRequestDetail.operation_summary ? (
+                        <div>
+                          <dt>Operation</dt>
+                          <dd>{selectedRequestDetail.operation_summary}</dd>
+                        </div>
+                      ) : null}
+                      <div>
+                        <dt>Requested</dt>
+                        <dd>{formatTimestamp(selectedRequestDetail.requested_at)}</dd>
+                      </div>
+                      <div>
+                        <dt>Thread</dt>
+                        <dd>{selectedRequestDetail.thread_id}</dd>
+                      </div>
+                      <div>
+                        <dt>Turn</dt>
+                        <dd>{selectedRequestDetail.turn_id ?? "Not available"}</dd>
+                      </div>
+                      <div>
+                        <dt>Item</dt>
+                        <dd>{selectedRequestDetail.item_id}</dd>
+                      </div>
+                      {selectedRequestDetail.decision ? (
+                        <div>
+                          <dt>Decision</dt>
+                          <dd>{selectedRequestDetail.decision}</dd>
+                        </div>
+                      ) : null}
+                      {selectedRequestDetail.responded_at ? (
+                        <div>
+                          <dt>Responded</dt>
+                          <dd>{formatTimestamp(selectedRequestDetail.responded_at)}</dd>
+                        </div>
+                      ) : null}
+                    </dl>
                     {selectedRequestDetail.operation_summary ? (
-                      <p className="workspace-meta">
+                      <p className="request-operation-summary">
                         Operation: {selectedRequestDetail.operation_summary}
                       </p>
                     ) : null}
-                    <span className={requestBadgeClass(selectedRequestDetail)}>
-                      {selectedRequestDetail.status}
-                    </span>
+                    {selectedRequestDetail.status === "pending" ? (
+                      <div className="workspace-actions request-detail-actions">
+                        <button
+                          className="primary-link action-button"
+                          disabled={isRespondingToRequest}
+                          onClick={onApproveRequest}
+                          type="button"
+                        >
+                          {isRespondingToRequest ? "Submitting..." : "Approve request"}
+                        </button>
+                        <button
+                          className="secondary-link action-button"
+                          disabled={isRespondingToRequest}
+                          onClick={onDenyRequest}
+                          type="button"
+                        >
+                          Deny request
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
 

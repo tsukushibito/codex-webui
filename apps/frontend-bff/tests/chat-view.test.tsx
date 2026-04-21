@@ -209,4 +209,99 @@ describe("ChatView", () => {
       markup.indexOf("chat-panel create-card"),
     );
   });
+
+  it("renders latest resolved request recovery affordance without response controls", () => {
+    const markup = renderToStaticMarkup(
+      <ChatView
+        connectionState="idle"
+        draftAssistantMessages={{}}
+        errorMessage={null}
+        isCreatingThread={false}
+        isInterruptingThread={false}
+        isLoadingThread={false}
+        isLoadingThreads={false}
+        isRespondingToRequest={false}
+        isSendingMessage={false}
+        messageDraft=""
+        newThreadInput=""
+        onApproveRequest={() => {}}
+        onCreateThread={() => {}}
+        onDenyRequest={() => {}}
+        onInterruptThread={() => {}}
+        onMessageDraftChange={() => {}}
+        onNewThreadInputChange={() => {}}
+        onSelectThread={() => {}}
+        onSendMessage={() => {}}
+        selectedRequestDetail={{
+          request_id: "req_001",
+          thread_id: "thread_001",
+          turn_id: "turn_001",
+          item_id: "item_001",
+          request_kind: "approval",
+          status: "resolved",
+          risk_category: "external_side_effect",
+          summary: "Run git push",
+          reason: "Codex requested permission to push changes.",
+          operation_summary: "git push origin main",
+          requested_at: "2026-03-27T05:20:00Z",
+          responded_at: "2026-03-27T05:21:00Z",
+          decision: "approved",
+          decision_options: {
+            policy_scope_supported: false,
+            default_policy_scope: "once",
+          },
+          context: null,
+        }}
+        selectedThreadId="thread_001"
+        selectedThreadView={{
+          thread: {
+            thread_id: "thread_001",
+            workspace_id: "ws_alpha",
+            native_status: {
+              thread_status: "waiting_input",
+              active_flags: [],
+              latest_turn_status: null,
+            },
+            updated_at: "2026-03-27T05:22:00Z",
+          },
+          current_activity: {
+            kind: "waiting_on_user_input",
+            label: "Waiting for your input",
+          },
+          pending_request: null,
+          latest_resolved_request: {
+            request_id: "req_001",
+            thread_id: "thread_001",
+            turn_id: "turn_001",
+            item_id: "item_001",
+            request_kind: "approval",
+            status: "resolved",
+            decision: "approved",
+            requested_at: "2026-03-27T05:20:00Z",
+            responded_at: "2026-03-27T05:21:00Z",
+          },
+          composer: {
+            accepting_user_input: true,
+            interrupt_available: false,
+            blocked_by_request: false,
+          },
+          timeline: {
+            items: [],
+            next_cursor: null,
+            has_more: false,
+          },
+        }}
+        statusMessage={null}
+        streamEvents={[]}
+        threads={[]}
+        workspaceId="ws_alpha"
+      />,
+    );
+
+    expect(markup).toContain("Latest resolved request");
+    expect(markup).toContain("Decision: approved");
+    expect(markup).toContain("Reopen request detail");
+    expect(markup).not.toContain("Approve request");
+    expect(markup).not.toContain("Deny request");
+  });
 });

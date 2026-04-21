@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { createWorkspaceFromHome, fetchHomeData } from "./home-data";
 import { HomeView } from "./home-view";
 import type { HomeResponse } from "./runtime-types";
+import type { PublicNotificationEvent } from "./thread-types";
 
 export function HomePageClient() {
   const [home, setHome] = useState<HomeResponse | null>(null);
@@ -29,6 +30,28 @@ export function HomePageClient() {
 
   useEffect(() => {
     void loadHome();
+  }, []);
+
+  useEffect(() => {
+    const notifications = new EventSource("/api/v1/notifications/stream");
+
+    notifications.onmessage = (messageEvent) => {
+      const event = JSON.parse(messageEvent.data) as PublicNotificationEvent;
+      setStatusMessage(
+        event.high_priority
+          ? "High-priority background thread needs attention."
+          : "Thread notification received. Refreshing Home.",
+      );
+      void loadHome();
+    };
+
+    notifications.onerror = () => {
+      notifications.close();
+    };
+
+    return () => {
+      notifications.close();
+    };
   }, []);
 
   async function handleCreateWorkspace() {

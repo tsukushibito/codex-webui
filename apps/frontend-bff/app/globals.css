@@ -369,7 +369,8 @@ input {
   padding: 14px;
 }
 
-.pending-request-card {
+.pending-request-card,
+.resolved-request-card {
   overflow-wrap: anywhere;
 }
 
@@ -459,6 +460,41 @@ input {
   line-height: 1.5;
 }
 
+.request-detail-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.request-detail-list div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.request-detail-list dt {
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.request-detail-list dd {
+  margin: 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.request-operation-summary {
+  border-radius: 14px;
+  background: rgba(35, 24, 15, 0.06);
+  padding: 10px 12px;
+}
+
+.request-detail-actions {
+  margin-top: 2px;
+}
+
 .detail-json {
   max-width: 100%;
   overflow: auto;
@@ -529,6 +565,7 @@ input {
     inset: 68px 12px 12px;
     z-index: 20;
     overflow: auto;
+    max-width: calc(100vw - 24px);
   }
 
   .thread-view-card {
