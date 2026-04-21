@@ -79,6 +79,7 @@ Known operational pitfalls in this repository:
 - do not parallelize sub-issue mutations against the same parent issue; GitHub can reject concurrent writes with ordering or priority conflicts
 - always pass `--limit 100` when auditing Project #9 with `gh project item-list`; the default limit is 30 and can hide valid items
 - verify issue hierarchy through the Issue APIs, and verify Project membership and field values separately; do not assume one CLI output shows all three correctly
+- the Project `Parent issue` field is a built-in `PARENT_ISSUE` field and is not currently editable through `gh project item-edit` / `updateProjectV2ItemFieldValue`; after adding a sub-issue, verify the formal parent relation through the REST Issue API `parent_issue_url` and the parent issue's `sub_issues` list, and use issue body links/comments when Project UI visibility needs an explicit fallback
 
 ### Inspect current state
 
@@ -116,6 +117,30 @@ gh project item-add <project-number> --owner tsukushibito --url <issue-url>
 ```
 
 Do not rely on `gh issue create --project` for Projects v2 workflow. Prefer explicit `gh project item-add`.
+
+When the new issue must appear as a child of an existing parent issue:
+
+1. Create the child issue.
+2. Create the formal GitHub issue hierarchy before or immediately after adding the item to the Project.
+3. Add the child issue to Project #9.
+4. Set only editable Project fields such as `Status`, `Phase`, `Area`, `Priority`, and `Implementation Line`.
+5. Verify the Issue hierarchy through the REST Issue API.
+6. Verify Project membership and editable field values through `gh project item-list`.
+7. If the Project built-in `Parent issue` field is empty in `gh project item-list` or GraphQL field values, do not try to edit it directly; it is a derived `PARENT_ISSUE` field and may not be API-editable. Use the Issue hierarchy API result as the authoritative parent-child check, and add explicit parent/child links in issue bodies or comments when Project UI visibility needs a fallback.
+
+Example:
+
+```bash
+child_url="$(gh issue create --repo tsukushibito/codex-webui --title "..." --body-file <file>)"
+child_number="${child_url##*/}"
+child_rest_id="$(gh api "repos/tsukushibito/codex-webui/issues/${child_number}" --jq .id)"
+gh api -X POST "repos/tsukushibito/codex-webui/issues/<parent-number>/sub_issues" -F "sub_issue_id=${child_rest_id}"
+gh project item-add 9 --owner tsukushibito --url "${child_url}"
+
+gh api "repos/tsukushibito/codex-webui/issues/${child_number}" --jq '{number,title,parent_issue_url}'
+gh api "repos/tsukushibito/codex-webui/issues/<parent-number>/sub_issues" --jq ".[] | select(.number == ${child_number}) | {number,title,state,html_url}"
+gh project item-list 9 --owner tsukushibito --limit 100 --format json
+```
 
 ### Update field values
 
