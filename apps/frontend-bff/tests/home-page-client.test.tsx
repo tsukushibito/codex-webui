@@ -160,4 +160,132 @@ describe("HomePageClient", () => {
     expect(container.textContent).toContain("Resume here first");
     expect(container.textContent).toContain("Needs your response");
   });
+
+  it("switches compact workspace context locally and scopes Ask Codex to the selected workspace", async () => {
+    homeDataMocks.fetchHomeData.mockResolvedValueOnce(
+      buildHome({
+        workspaces: [
+          {
+            workspace_id: "ws_alpha",
+            workspace_name: "alpha",
+            created_at: "2026-03-27T05:12:34Z",
+            updated_at: "2026-03-27T05:22:00Z",
+            active_session_summary: null,
+            pending_approval_count: 1,
+          },
+          {
+            workspace_id: "ws_beta",
+            workspace_name: "beta",
+            created_at: "2026-03-27T05:12:34Z",
+            updated_at: "2026-03-27T05:24:00Z",
+            active_session_summary: null,
+            pending_approval_count: 0,
+          },
+        ],
+        resume_candidates: [
+          {
+            thread_id: "thread_beta",
+            workspace_id: "ws_beta",
+            native_status: {
+              thread_status: "idle",
+              active_flags: [],
+              latest_turn_status: "failed",
+            },
+            updated_at: "2026-03-27T05:24:00Z",
+            current_activity: {
+              kind: "latest_turn_failed",
+              label: "Latest turn failed",
+            },
+            badge: {
+              kind: "latest_turn_failed",
+              label: "Failed",
+            },
+            blocked_cue: {
+              kind: "latest_turn_failed",
+              label: "Needs attention",
+            },
+            resume_cue: {
+              reason_kind: "latest_turn_failed",
+              priority_band: "high",
+              label: "Resume soon",
+            },
+          },
+        ],
+      }),
+    );
+
+    await act(async () => {
+      root.render(<HomePageClient />);
+    });
+    await flushUi();
+
+    const switcher = container.querySelector<HTMLSelectElement>("#workspace-switcher");
+    expect(switcher).not.toBeNull();
+    expect(switcher?.value).toBe("ws_beta");
+    expect(container.textContent).toContain("beta");
+    expect(
+      container.querySelector<HTMLAnchorElement>(".home-primary-actions .primary-link")?.href,
+    ).toContain("/chat?workspaceId=ws_beta");
+    expect(
+      container.querySelector<HTMLAnchorElement>(".home-primary-actions .primary-link")?.href,
+    ).not.toContain("threadId");
+
+    await act(async () => {
+      switcher!.value = "ws_alpha";
+      switcher!.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain("alpha");
+    expect(
+      container.querySelector<HTMLAnchorElement>(".home-primary-actions .primary-link")?.href,
+    ).toContain("/chat?workspaceId=ws_alpha");
+    expect(homeDataMocks.fetchHomeData).toHaveBeenCalledTimes(1);
+  });
+
+  it("selects the newest workspace when there is no resume candidate", async () => {
+    homeDataMocks.fetchHomeData.mockResolvedValueOnce(
+      buildHome({
+        workspaces: [
+          {
+            workspace_id: "ws_older",
+            workspace_name: "older",
+            created_at: "2026-03-27T05:12:34Z",
+            updated_at: "2026-03-27T05:22:00Z",
+            active_session_summary: null,
+            pending_approval_count: 0,
+          },
+          {
+            workspace_id: "ws_newest",
+            workspace_name: "newest",
+            created_at: "2026-03-27T05:12:34Z",
+            updated_at: "2026-03-27T05:26:00Z",
+            active_session_summary: null,
+            pending_approval_count: 0,
+          },
+          {
+            workspace_id: "ws_middle",
+            workspace_name: "middle",
+            created_at: "2026-03-27T05:12:34Z",
+            updated_at: "2026-03-27T05:24:00Z",
+            active_session_summary: null,
+            pending_approval_count: 0,
+          },
+        ],
+        resume_candidates: [],
+      }),
+    );
+
+    await act(async () => {
+      root.render(<HomePageClient />);
+    });
+    await flushUi();
+
+    expect(container.querySelector<HTMLSelectElement>("#workspace-switcher")?.value).toBe(
+      "ws_newest",
+    );
+    expect(
+      container.querySelector<HTMLAnchorElement>(".home-primary-actions .primary-link")?.href,
+    ).toContain("/chat?workspaceId=ws_newest");
+    expect(container.textContent).toContain("newest");
+  });
 });

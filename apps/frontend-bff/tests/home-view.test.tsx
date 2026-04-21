@@ -21,7 +21,7 @@ vi.mock("next/link", () => ({
 }));
 
 describe("HomeView", () => {
-  it("renders workspace summaries and navigation entry points", () => {
+  it("renders compact workspace context, switcher cues, and scoped navigation entry points", () => {
     const markup = renderToStaticMarkup(
       <HomeView
         errorMessage={null}
@@ -38,6 +38,14 @@ describe("HomeView", () => {
                 last_message_at: "2026-03-27T05:21:40Z",
               },
               pending_approval_count: 2,
+            },
+            {
+              workspace_id: "ws_beta",
+              workspace_name: "beta",
+              created_at: "2026-03-27T05:12:34Z",
+              updated_at: "2026-03-27T05:24:00Z",
+              active_session_summary: null,
+              pending_approval_count: 0,
             },
           ],
           resume_candidates: [
@@ -68,25 +76,89 @@ describe("HomeView", () => {
                 label: "Resume here first",
               },
             },
+            {
+              thread_id: "thread_failed",
+              workspace_id: "ws_beta",
+              native_status: {
+                thread_status: "idle",
+                active_flags: [],
+                latest_turn_status: "failed",
+              },
+              updated_at: "2026-03-27T05:24:00Z",
+              current_activity: {
+                kind: "latest_turn_failed",
+                label: "Latest turn failed",
+              },
+              badge: {
+                kind: "latest_turn_failed",
+                label: "Failed",
+              },
+              blocked_cue: {
+                kind: "latest_turn_failed",
+                label: "Needs attention",
+              },
+              resume_cue: {
+                reason_kind: "latest_turn_failed",
+                priority_band: "high",
+                label: "Resume soon",
+              },
+            },
           ],
           updated_at: "2026-03-27T05:22:00Z",
         }}
         isLoading={false}
         isSubmitting={false}
         onCreateWorkspace={() => {}}
+        onSelectedWorkspaceIdChange={() => {}}
         onWorkspaceNameChange={() => {}}
+        selectedWorkspaceId="ws_alpha"
         statusMessage={null}
         workspaceName=""
       />,
     );
 
-    expect(markup).toContain("Resume candidates: 1");
+    expect(markup).toContain("Current workspace");
+    expect(markup).toContain("Switch workspace");
+    expect(markup).toContain('<details class="workspace-switcher">');
+    expect(markup).toContain("<summary>Switch workspace</summary>");
+    expect(markup).not.toContain('<details class="workspace-switcher" open="">');
+    expect(markup).toContain('<select id="workspace-switcher"');
+    expect(markup).toContain("alpha - 2 approvals");
+    expect(markup).toContain("beta - Resume soon");
+    expect(markup).toContain("Resume candidates: 2");
     expect(markup).toContain("Resume thread");
+    expect(markup).toContain("/chat?workspaceId=ws_alpha&amp;threadId=thread_approval");
+    expect(markup).toContain("/chat?workspaceId=ws_alpha");
     expect(markup).toContain("Needs your response");
     expect(markup).toContain("alpha");
-    expect(markup).toContain("Open thread");
-    expect(markup).toContain("Open thread shell");
+    expect(markup).toContain("Ask Codex");
     expect(markup).toContain("Request queue: 2");
     expect(markup).toContain("Create workspace");
+  });
+
+  it("does not expose workspace-scoped chat links when no workspace exists", () => {
+    const markup = renderToStaticMarkup(
+      <HomeView
+        errorMessage={null}
+        home={{
+          workspaces: [],
+          resume_candidates: [],
+          updated_at: "2026-03-27T05:22:00Z",
+        }}
+        isLoading={false}
+        isSubmitting={false}
+        onCreateWorkspace={() => {}}
+        onSelectedWorkspaceIdChange={() => {}}
+        onWorkspaceNameChange={() => {}}
+        selectedWorkspaceId=""
+        statusMessage={null}
+        workspaceName=""
+      />,
+    );
+
+    expect(markup).toContain("No workspace selected");
+    expect(markup).toContain("Create a workspace to start a chat from Home.");
+    expect(markup).toContain("No workspaces yet");
+    expect(markup).not.toContain('href="/chat?workspaceId=');
   });
 });

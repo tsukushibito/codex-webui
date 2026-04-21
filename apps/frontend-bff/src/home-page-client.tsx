@@ -7,11 +7,20 @@ import { HomeView } from "./home-view";
 import type { HomeResponse } from "./runtime-types";
 import type { PublicNotificationEvent } from "./thread-types";
 
+function chooseDefaultWorkspaceId(home: HomeResponse | null) {
+  const newestWorkspace = home?.workspaces.toSorted(
+    (left, right) => Date.parse(right.updated_at) - Date.parse(left.updated_at),
+  )[0];
+
+  return home?.resume_candidates[0]?.workspace_id ?? newestWorkspace?.workspace_id ?? "";
+}
+
 export function HomePageClient() {
   const [home, setHome] = useState<HomeResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [workspaceName, setWorkspaceName] = useState("");
 
@@ -20,7 +29,17 @@ export function HomePageClient() {
     setErrorMessage(null);
 
     try {
-      setHome(await fetchHomeData());
+      const nextHome = await fetchHomeData();
+      setHome(nextHome);
+      setSelectedWorkspaceId((currentWorkspaceId) => {
+        if (
+          nextHome.workspaces.some((workspace) => workspace.workspace_id === currentWorkspaceId)
+        ) {
+          return currentWorkspaceId;
+        }
+
+        return chooseDefaultWorkspaceId(nextHome);
+      });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load Home data.");
     } finally {
@@ -68,7 +87,12 @@ export function HomePageClient() {
       await createWorkspaceFromHome(trimmedName);
       setWorkspaceName("");
       setStatusMessage(`Workspace "${trimmedName}" created.`);
-      await loadHome();
+      const nextHome = await fetchHomeData();
+      setHome(nextHome);
+      setSelectedWorkspaceId(
+        nextHome.workspaces.find((workspace) => workspace.workspace_name === trimmedName)
+          ?.workspace_id ?? chooseDefaultWorkspaceId(nextHome),
+      );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to create workspace.");
     } finally {
@@ -83,7 +107,9 @@ export function HomePageClient() {
       isLoading={isLoading}
       isSubmitting={isSubmitting}
       onCreateWorkspace={handleCreateWorkspace}
+      onSelectedWorkspaceIdChange={setSelectedWorkspaceId}
       onWorkspaceNameChange={setWorkspaceName}
+      selectedWorkspaceId={selectedWorkspaceId}
       statusMessage={statusMessage}
       workspaceName={workspaceName}
     />
