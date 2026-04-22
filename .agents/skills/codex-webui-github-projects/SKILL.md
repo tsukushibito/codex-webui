@@ -80,6 +80,7 @@ Known operational pitfalls in this repository:
 - always pass `--limit 100` when auditing Project #9 with `gh project item-list`; the default limit is 30 and can hide valid items
 - verify issue hierarchy through the Issue APIs, and verify Project membership and field values separately; do not assume one CLI output shows all three correctly
 - the Project `Parent issue` field is a built-in `PARENT_ISSUE` field and is not currently editable through `gh project item-edit` / `updateProjectV2ItemFieldValue`; after adding a sub-issue, verify the formal parent relation through the REST Issue API `parent_issue_url` and the parent issue's `sub_issues` list, and use issue body links/comments when Project UI visibility needs an explicit fallback
+- `gh pr checks` can exit 1 with `no checks reported on the '<branch>' branch` when no remote checks are configured; if `gh pr view --json mergeable,statusCheckRollup` shows the PR is mergeable and the rollup is empty, treat local validation evidence as the gate and do not turn the missing remote checks into an automatic blocker
 
 ### Inspect current state
 
