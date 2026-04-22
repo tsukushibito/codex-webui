@@ -61,6 +61,8 @@ The primary conversation unit is `thread`.
 
 UI layout must treat `thread_view` as the main user-facing screen for observing, intervening in, and continuing a single thread.
 
+The dedicated Home screen is not part of the primary v0.9 UI model. The maintained direction is thread-first: `thread_view` is primary, while navigation, workspace switching, thread lists, resume cues, empty states, notifications, and detail surfaces are supporting surfaces.
+
 ### 3.2 Main body of the primary screen
 
 The main body of `thread_view` must be the `timeline`.
