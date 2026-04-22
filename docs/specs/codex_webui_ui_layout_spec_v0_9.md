@@ -103,6 +103,20 @@ Workspace is operationally important, but the navigation primary surface is the 
 
 ## 4. Information architecture
 
+### 4.0 App shell without Home as a primary screen
+
+The v0.9 app shell must not depend on Home as a primary screen.
+
+Former Home-style responsibilities are assigned as follows:
+
+- workspace identity and workspace selection belong to Navigation and the workspace switcher
+- current-workspace thread discovery belongs to the Navigation thread list
+- high-priority return discovery belongs to resume cues, blocked cues, badges, filters, priority-aware sort, workspace summaries, and lightweight notifications
+- no-content guidance belongs to contextual empty states
+- first-use or new-work guidance belongs to the first-input composer state in workspace context
+
+Home may exist later as an optional overview or aggregate, but v0.9 implementation and QA must be able to explain and validate the primary browser UX without it.
+
 ### 4.1 Primary surface
 
 The primary surface is `thread_view`.
@@ -146,6 +160,33 @@ Those cues may be expressed through:
 Workspace must be visible as the current operating context, but it must not dominate the main navigation layout.
 
 The normal navigation state should show the current workspace and its thread list. Full workspace choice should appear only when the user opens the workspace switcher.
+
+### 4.5 Empty and no-selection states
+
+Empty states are contextual app-shell states, not a Home substitute.
+
+The UI must define at least:
+
+- no workspace selected: Navigation shows the workspace switcher or workspace-selection prompt, and `thread_view` shows a workspace-selection-oriented start state rather than an empty thread
+- selected workspace with no threads: Navigation shows an empty current-workspace thread list and an `Ask Codex` / new-input path
+- no thread selected while a workspace is selected: `thread_view` shows the workspace-scoped first-input state or a prompt to choose a thread from Navigation
+- first-input / new-input state: the composer is available in workspace context, and a thread begins only after the first input is accepted
+- `notLoaded` thread selected: `thread_view` may show a loading, resume, or opening state while the backend establishes App Server thread view
+- open-required internal state: backend or facade recovery required to open or resume a thread is absorbed behind the public `thread_view` opening flow and is not exposed as a separate primary screen
+
+These states must preserve the same app-shell responsibilities: Navigation owns discovery and switching, `thread_view` owns conversation start and continuation, and the detail surface remains secondary.
+
+### 4.6 Desktop-first composition and mobile degradation
+
+The normative composition is desktop-first:
+
+- desktop primary state: `[ Navigation ] [ Thread View ]`
+- desktop secondary-detail state: `[ Navigation ] [ Thread View ] [ Detail Surface ]`
+- mobile primary state: single-column `thread_view` with Navigation and Detail Surface reachable through drawers, sheets, overlays, or full-screen detail
+
+Mobile is a reachability degradation of the same information architecture, not a different screen model.
+
+At mobile width, the UI may hide persistent Navigation and right-side Detail Surface columns, but it must keep workspace selection, thread selection, pending request response, interrupt, composer, and return-to-thread paths reachable within the mobile constraints in the v0.9 requirements.
 
 ---
 
@@ -222,7 +263,8 @@ Its main responsibilities are:
 - provide the `Ask Codex` entrypoint
 - list threads
 - support filter and sort controls
-- surface lightweight badge-based or summary-based priority signals
+- surface resume cues and blocked cues as lightweight badge-based or summary-based priority signals
+- expose cross-workspace high-priority discovery without becoming a global inbox
 
 ### 7.2 Required navigation elements
 
@@ -233,6 +275,8 @@ Navigation must include:
 - thread-list controls for filtering and sorting
 - thread list
 - lightweight state badges for at least approval, error, failed, and active situations when those states are available
+- resume cue expression for the thread or threads the user should return to
+- blocked cue expression when a thread needs intervention or cannot continue normally
 
 ### 7.3 Workspace switcher
 
@@ -280,6 +324,17 @@ Navigation should provide a default priority-aware sort such as `Recommended`, p
 
 The UI may treat `Recommended` as the default return-priority ordering, but the canonical ranking semantics, tie-break rules, and scope boundaries must be fixed in requirements or API specifications rather than invented only in layout implementation.
 
+On reconnect or revisit, desktop Navigation should make the top resume-priority candidates visible or directly reachable according to the requirements-level priority order:
+
+1. thread with `waitingOnApproval`
+2. thread with `systemError`
+3. thread whose latest turn is `failed`
+4. currently active thread
+5. last viewed thread
+6. most recently updated thread
+
+This is a return path and emphasis rule, not a requirement to automatically navigate away from the last viewed thread.
+
 ### 7.7 Thread-list row summary
 
 Each thread row should show at least:
@@ -300,6 +355,20 @@ However, the UI must still provide a path to discover high-priority threads in o
 - workspace-switcher priority summaries
 - banner or toast navigation
 - other non-canonical notification surfaces
+
+Navigation must not require a dedicated global approval inbox, dedicated global blocked-thread panel, or Home screen to satisfy cross-workspace high-priority discovery.
+
+### 7.9 Navigation empty states
+
+Navigation must define empty states for:
+
+- no workspace selected
+- workspace list empty or unavailable
+- selected workspace with no threads
+- filter returns no matching threads
+- all high-priority badges clear
+
+These empty states should guide the next reachable action, such as selecting a workspace, creating a workspace, clearing filters, or using the first-input composer. They must not create empty thread records as a way to fill the list.
 
 ---
 
@@ -331,9 +400,10 @@ The main UX must not create empty threads in the list before the first accepted 
 
 - thread header
 - current activity
+- pending request summary when a request is pending
 - timeline
 - pending request affordance when a request is pending
-- composer or equivalent next-input affordance
+- single composer or equivalent next-input affordance
 - interrupt affordance when interruption is available
 
 ### 9.2 Timeline as the main body
@@ -370,7 +440,40 @@ Current activity should appear as a pinned summary near the top of the thread vi
 
 It is derived from native facts and recent thread evidence. It is not independent canonical state.
 
-### 9.6 Approval resolution visibility
+### 9.6 Header and pending request summary
+
+The thread header must identify the selected thread and enough workspace context for the user to understand where actions will apply.
+
+When a request is pending, `thread_view` must present a concise pending request summary inside thread context. The summary must expose the response affordance or a path to the response affordance, and it must provide a path to detail when the minimum confirmation information does not fit inline.
+
+The pending request summary may be pinned or otherwise emphasized while pending, but it must not move approval handling into a separate global approval screen.
+
+### 9.7 Single composer and first-input start
+
+`thread_view` owns one composer path for user input in a workspace or selected thread context.
+
+The UI must not expose multiple competing composers for the same thread. Request-response controls and interrupt controls may appear near the composer or current activity, but they are distinct affordances from the normal next-input composer.
+
+For a new thread, the first-input state is shown before a thread exists. The accepted first input starts the thread, and the resulting thread becomes the selected `thread_view`. Empty thread creation before accepted input is not the primary UX.
+
+### 9.8 No-thread-selected and `notLoaded` opening
+
+When no thread is selected and a workspace is selected, `thread_view` must show either:
+
+- a first-input composer state for starting work in that workspace
+- a no-thread-selected state that directs the user to select an existing thread or use `Ask Codex`
+
+When a `notLoaded` thread is selected from Navigation, `thread_view` is still the target surface. The UI may show an opening or resume-in-progress state while the backend performs App Server load / resume work.
+
+Backend states that require opening, loading, or resuming a thread must be absorbed by the facade and presented as part of this `thread_view` opening flow. The UI must not expose an internal open-required state as a standalone primary screen or require the user to visit Home to recover it.
+
+### 9.9 Interrupt affordance
+
+When interruption is available, `thread_view` must show an interrupt affordance in the active thread context.
+
+On mobile, interrupt should be easier to reach than normal composing while a turn is executing. On desktop, it should remain visible in the thread context without forcing the detail surface to open.
+
+### 9.10 Approval resolution visibility
 
 After approval is resolved, the UI should preserve a visible timeline representation of that resolution rather than removing the event entirely from thread context.
 
@@ -436,6 +539,22 @@ The detail surface is a secondary view for selected content.
 
 It is not a replacement primary screen, and it is not a permanently open inspector by requirement.
 
+The detail surface may be empty or closed when nothing is selected. It opens to inspect a selected thing, not to announce that something happened.
+
+### 11.1.1 Detail content responsibilities
+
+When corresponding source facts are available, the Detail Surface owns expanded inspection for:
+
+- approval or request detail, including minimum confirmation information before approve / deny
+- file summaries or changed-file summaries
+- diff summaries or deeper diff inspection when supported
+- errors, failures, and recovery guidance
+- selected timeline item detail
+- selected current-activity or context detail
+- long command output, tool detail, operation detail, or supporting references that would overload the timeline
+
+The timeline or pending request summary should keep enough context visible that the user understands why the detail exists before opening it.
+
 ### 11.2 Open triggers
 
 The detail surface should open from user-driven selection such as:
@@ -463,6 +582,8 @@ The governing interaction rule is:
 
 - detail opens selection-driven
 - detail does not open event-driven
+
+If a notification or badge leads to detail, the user action on that notification or badge is the selection. The event itself must not automatically open Detail Surface.
 
 ---
 
@@ -498,7 +619,25 @@ The UI must not require a dedicated global inbox or dedicated canonical blocked-
 
 ---
 
-## 13. Rejected layout patterns
+## 13. UX acceptance gates
+
+Implementation and QA must validate the v0.9 UI against these gates:
+
+1. No primary Home dependency: a reviewer can explain workspace selection, thread discovery, return priority, approval attention, and no-content states through Navigation, `thread_view`, Detail Surface, notifications, and empty states without referencing Home as a primary screen.
+2. Navigation ownership: current workspace, workspace switching, current-workspace thread discovery, filters, sort, badges, resume cues, blocked cues, cross-workspace high-priority summaries, and Navigation empty states are visible or reachable from Navigation.
+3. Thread View ownership: `thread_view` contains the thread header, current activity, pending request summary or affordance, timeline as the main body, single composer, interrupt affordance, no-thread-selected handling, `notLoaded` opening state, and first-input thread start.
+4. Single composer / first-input start: one normal composer path exists for a workspace or selected thread context, and a new thread starts only when the first input is accepted.
+5. Approval in thread context: pending approval can be noticed, inspected to the minimum confirmation information, and approved or denied without navigating to a dedicated global approval inbox.
+6. Detail Surface ownership: approval or request detail, file or diff summaries, errors, and selected timeline or context detail open in a secondary surface by user selection.
+7. Selection-driven detail: approval, error, reconnect, and background-priority events may update notifications or badges, but they must not automatically open Detail Surface.
+8. Empty-state coverage: no workspace selected, workspace with no threads, no thread selected, first-input / new-input, `notLoaded` opening, and internal open-required recovery are all covered without relying on Home.
+9. Desktop-first reconnect return priority: desktop Navigation or equivalent app-shell return cues expose resume candidates according to the requirements-level priority order, while preserving a clear path back to the selected or last viewed thread.
+10. Mobile reachability: at mobile width, workspace selection, thread selection, first-input start, pending approval response, interrupt, detail return, and reconnect return remain reachable within the v0.9 mobile requirements.
+11. No global approval inbox requirement: the UI may use lightweight cross-workspace discovery, but it must not introduce a dedicated global approval inbox, independent approval resource, or Home dependency as a required intervention path.
+
+---
+
+## 14. Rejected layout patterns
 
 The following patterns are not the intended v0.9 layout direction:
 
@@ -511,10 +650,11 @@ The following patterns are not the intended v0.9 layout direction:
 - treating `Ask Codex` primarily as empty-thread creation
 - automatic opening of the detail surface on approval or error events
 - requiring standalone dedicated UI modules for `resume_cue` or `blocked_cue`
+- exposing internal open-required recovery as a user-facing primary screen
 
 ---
 
-## 14. Normative dependencies outside this document
+## 15. Normative dependencies outside this document
 
 This specification intentionally depends on other maintained documents for the following guarantees:
 
