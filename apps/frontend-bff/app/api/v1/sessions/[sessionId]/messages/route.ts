@@ -1,11 +1,9 @@
-import { listMessages, postMessage } from "../../../../../../src/handlers";
+import { retiredLegacyRouteResponse } from "../../../../../../src/retired-routes";
 
-export async function GET(request: Request, context: { params: Promise<{ sessionId: string }> }) {
-  const { sessionId } = await context.params;
-  return listMessages(request, sessionId);
+export function GET() {
+  return retiredLegacyRouteResponse("sessions");
 }
 
-export async function POST(request: Request, context: { params: Promise<{ sessionId: string }> }) {
-  const { sessionId } = await context.params;
-  return postMessage(request, sessionId);
+export function POST() {
+  return retiredLegacyRouteResponse("sessions");
 }

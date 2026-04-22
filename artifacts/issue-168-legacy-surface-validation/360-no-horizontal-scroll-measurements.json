@@ -1,0 +1,32 @@
+{
+  "measuredAt": "2026-04-22T05:44:25.950Z",
+  "baseURL": "http://127.0.0.1:3000",
+  "cssViewportWidth": 360,
+  "measurements": [
+    {
+      "name": "Home",
+      "path": "/",
+      "viewportWidth": 360,
+      "documentElementClientWidth": 360,
+      "documentElementScrollWidth": 360,
+      "passed": true
+    },
+    {
+      "name": "Chat thread",
+      "path": "/chat?workspaceId=ws_alpha&threadId=thread_001",
+      "viewportWidth": 360,
+      "documentElementClientWidth": 360,
+      "documentElementScrollWidth": 360,
+      "passed": true
+    },
+    {
+      "name": "Chat request detail",
+      "path": "/chat?workspaceId=ws_alpha&threadId=thread_request",
+      "viewportWidth": 360,
+      "documentElementClientWidth": 360,
+      "documentElementScrollWidth": 360,
+      "passed": true
+    }
+  ],
+  "passed": true
+}

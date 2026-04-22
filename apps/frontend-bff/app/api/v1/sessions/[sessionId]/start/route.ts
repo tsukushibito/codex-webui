@@ -1,6 +1,5 @@
-import { startSession } from "../../../../../../src/handlers";
+import { retiredLegacyRouteResponse } from "../../../../../../src/retired-routes";
 
-export async function POST(request: Request, context: { params: Promise<{ sessionId: string }> }) {
-  const { sessionId } = await context.params;
-  return startSession(request, sessionId);
+export function POST() {
+  return retiredLegacyRouteResponse("sessions");
 }

@@ -1,27 +1,32 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import * as approvalActionApproveRoute from "../app/api/v1/approvals/[approvalId]/approve/route";
+import * as approvalActionDenyRoute from "../app/api/v1/approvals/[approvalId]/deny/route";
+import * as approvalDetailRoute from "../app/api/v1/approvals/[approvalId]/route";
+import * as approvalListRoute from "../app/api/v1/approvals/route";
+import * as approvalStreamRoute from "../app/api/v1/approvals/stream/route";
+import * as sessionEventsRoute from "../app/api/v1/sessions/[sessionId]/events/route";
+import * as sessionMessagesRoute from "../app/api/v1/sessions/[sessionId]/messages/route";
+import * as sessionDetailRoute from "../app/api/v1/sessions/[sessionId]/route";
+import * as sessionStartRoute from "../app/api/v1/sessions/[sessionId]/start/route";
+import * as sessionStopRoute from "../app/api/v1/sessions/[sessionId]/stop/route";
+import * as sessionStreamRoute from "../app/api/v1/sessions/[sessionId]/stream/route";
+import * as workspaceSessionsRoute from "../app/api/v1/workspaces/[workspaceId]/sessions/route";
 import {
-  approveApproval,
-  createSession,
-  getApproval,
-  getApprovalStream,
   getHome,
   getNotificationsStream,
   getPendingRequest,
   getRequestDetail,
-  getSessionStream,
   getThread,
   getThreadStream,
   getThreadView,
   getTimeline,
-  listEvents,
   listThreads,
   listWorkspaces,
   postRequestResponse,
   postThreadInput,
   postThreadInterrupt,
   postWorkspaceInput,
-  stopSession,
 } from "../src/handlers";
 
 function jsonResponse(body: unknown, status = 200) {
@@ -1087,442 +1092,78 @@ describe("frontend-bff route handlers", () => {
     });
   });
 
-  it("derives can_start from the workspace active session after session creation", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock
-      .mockResolvedValueOnce(
-        jsonResponse(
-          {
-            session_id: "thread_002",
-            workspace_id: "ws_alpha",
-            title: "Fix build error",
-            status: "created",
-            created_at: "2026-03-27T05:12:34Z",
-            updated_at: "2026-03-27T05:12:34Z",
-            started_at: null,
-            last_message_at: null,
-            active_approval_id: null,
-            current_turn_id: null,
-            app_session_overlay_state: "open",
-          },
-          201,
-        ),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          workspace_id: "ws_alpha",
-          workspace_name: "alpha",
-          directory_name: "alpha",
-          created_at: "2026-03-27T05:12:34Z",
-          updated_at: "2026-03-27T05:22:00Z",
-          active_session_id: "thread_001",
-          active_session_summary: {
-            session_id: "thread_001",
-            status: "running",
-            last_message_at: "2026-03-27T05:21:40Z",
-          },
-          pending_approval_count: 0,
-        }),
-      );
+  it("returns retired quarantine envelopes for legacy session route modules", async () => {
+    const routes = [
+      workspaceSessionsRoute.GET,
+      workspaceSessionsRoute.POST,
+      sessionDetailRoute.GET,
+      sessionStartRoute.POST,
+      sessionStopRoute.POST,
+      sessionEventsRoute.GET,
+      sessionMessagesRoute.GET,
+      sessionMessagesRoute.POST,
+      sessionStreamRoute.GET,
+    ];
 
-    const response = await createSession(
-      new Request("http://localhost/api/v1/workspaces/ws_alpha/sessions", {
-        method: "POST",
-        body: JSON.stringify({
-          title: "Fix build error",
-        }),
-      }),
-      "ws_alpha",
-    );
+    for (const route of routes) {
+      const response = route();
 
-    expect(response.status).toBe(201);
-    expect(await response.json()).toMatchObject({
-      session_id: "thread_002",
-      status: "created",
-      can_send_message: false,
-      can_start: false,
-      can_stop: false,
-    });
+      expect(response.status).toBe(410);
+      expect(await response.json()).toEqual({
+        error: {
+          code: "legacy_route_retired",
+          message:
+            "Legacy sessions routes are retired; use v0.9 thread and request endpoints instead.",
+          details: {
+            route_family: "sessions",
+            replacement_endpoints: [
+              "/api/v1/workspaces/{workspace_id}/threads",
+              "/api/v1/threads/{thread_id}",
+              "/api/v1/threads/{thread_id}/view",
+              "/api/v1/threads/{thread_id}/pending_request",
+              "/api/v1/requests/{request_id}",
+              "/api/v1/requests/{request_id}/response",
+            ],
+          },
+        },
+      });
+    }
+    expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("maps stop results and canceled approvals to the public shape", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock
-      .mockResolvedValueOnce(
-        jsonResponse({
-          session: {
-            session_id: "thread_001",
-            workspace_id: "ws_alpha",
-            title: "Fix build error",
-            status: "stopped",
-            created_at: "2026-03-27T05:12:34Z",
-            updated_at: "2026-03-27T05:24:00Z",
-            started_at: "2026-03-27T05:13:00Z",
-            last_message_at: "2026-03-27T05:23:00Z",
-            active_approval_id: null,
-            current_turn_id: "turn_009",
-            app_session_overlay_state: "closed",
-          },
-          canceled_approval: {
-            approval_id: "apr_001",
-            session_id: "thread_001",
-            workspace_id: "ws_alpha",
-            status: "canceled",
-            resolution: "canceled",
-            approval_category: "external_side_effect",
-            summary: "Run git push",
-            reason: "Codex requests permission to push changes to remote.",
-            operation_summary: "git push origin main",
-            context: null,
-            created_at: "2026-03-27T05:18:00Z",
-            resolved_at: "2026-03-27T05:24:00Z",
-            native_request_kind: "approval_request",
-          },
-        }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          workspace_id: "ws_alpha",
-          workspace_name: "alpha",
-          directory_name: "alpha",
-          created_at: "2026-03-27T05:12:34Z",
-          updated_at: "2026-03-27T05:24:00Z",
-          active_session_id: null,
-          active_session_summary: null,
-          pending_approval_count: 0,
-        }),
-      );
+  it("returns retired quarantine envelopes for standalone approval route modules", async () => {
+    const routes = [
+      approvalListRoute.GET,
+      approvalDetailRoute.GET,
+      approvalActionApproveRoute.POST,
+      approvalActionDenyRoute.POST,
+      approvalStreamRoute.GET,
+    ];
 
-    const response = await stopSession(
-      new Request("http://localhost/api/v1/sessions/thread_001/stop", {
-        method: "POST",
-      }),
-      "thread_001",
-    );
+    for (const route of routes) {
+      const response = route();
 
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      session: {
-        session_id: "thread_001",
-        workspace_id: "ws_alpha",
-        title: "Fix build error",
-        status: "stopped",
-        created_at: "2026-03-27T05:12:34Z",
-        updated_at: "2026-03-27T05:24:00Z",
-        started_at: "2026-03-27T05:13:00Z",
-        last_message_at: "2026-03-27T05:23:00Z",
-        active_approval_id: null,
-        can_send_message: false,
-        can_start: false,
-        can_stop: false,
-      },
-      canceled_approval: {
-        approval_id: "apr_001",
-        session_id: "thread_001",
-        workspace_id: "ws_alpha",
-        status: "canceled",
-        resolution: "canceled",
-        approval_category: "external_side_effect",
-        title: "Run git push",
-        description: "Codex requests permission to push changes to remote.",
-        requested_at: "2026-03-27T05:18:00Z",
-        resolved_at: "2026-03-27T05:24:00Z",
-      },
-    });
-  });
-
-  it("maps approval detail and approval action responses to public fields", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({
-        approval_id: "apr_001",
-        session_id: "thread_001",
-        workspace_id: "ws_alpha",
-        status: "pending",
-        resolution: null,
-        approval_category: "external_side_effect",
-        summary: "Run git push",
-        reason: "Codex requests permission to push changes to remote.",
-        operation_summary: "git push origin main",
-        context: {
-          command: "git push origin main",
-        },
-        created_at: "2026-03-27T05:18:00Z",
-        resolved_at: null,
-        native_request_kind: "approval_request",
-      }),
-    );
-
-    const detailResponse = await getApproval(
-      new Request("http://localhost/api/v1/approvals/apr_001"),
-      "apr_001",
-    );
-
-    expect(detailResponse.status).toBe(200);
-    expect(await detailResponse.json()).toEqual({
-      approval_id: "apr_001",
-      session_id: "thread_001",
-      workspace_id: "ws_alpha",
-      status: "pending",
-      resolution: null,
-      approval_category: "external_side_effect",
-      title: "Run git push",
-      description: "Codex requests permission to push changes to remote.",
-      operation_summary: "git push origin main",
-      requested_at: "2026-03-27T05:18:00Z",
-      resolved_at: null,
-      context: {
-        command: "git push origin main",
-      },
-    });
-
-    fetchMock.mockReset();
-    fetchMock
-      .mockResolvedValueOnce(
-        jsonResponse({
-          approval: {
-            approval_id: "apr_001",
-            session_id: "thread_001",
-            workspace_id: "ws_alpha",
-            status: "approved",
-            resolution: "approved",
-            approval_category: "external_side_effect",
-            summary: "Run git push",
-            reason: "Codex requests permission to push changes to remote.",
-            operation_summary: "git push origin main",
-            context: {
-              command: "git push origin main",
-            },
-            created_at: "2026-03-27T05:18:00Z",
-            resolved_at: "2026-03-27T05:19:00Z",
-            native_request_kind: "approval_request",
-          },
-          session: {
-            session_id: "thread_001",
-            workspace_id: "ws_alpha",
-            title: "Fix build error",
-            status: "running",
-            created_at: "2026-03-27T05:12:34Z",
-            updated_at: "2026-03-27T05:19:00Z",
-            started_at: "2026-03-27T05:13:00Z",
-            last_message_at: "2026-03-27T05:18:00Z",
-            active_approval_id: null,
-            current_turn_id: "turn_009",
-            app_session_overlay_state: "open",
-          },
-        }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          workspace_id: "ws_alpha",
-          workspace_name: "alpha",
-          directory_name: "alpha",
-          created_at: "2026-03-27T05:12:34Z",
-          updated_at: "2026-03-27T05:19:00Z",
-          active_session_id: "thread_001",
-          active_session_summary: {
-            session_id: "thread_001",
-            status: "running",
-            last_message_at: "2026-03-27T05:18:00Z",
-          },
-          pending_approval_count: 0,
-        }),
-      );
-
-    const actionResponse = await approveApproval(
-      new Request("http://localhost/api/v1/approvals/apr_001/approve", {
-        method: "POST",
-      }),
-      "apr_001",
-    );
-
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
-      "http://127.0.0.1:3001/api/v1/approvals/apr_001/resolve",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({
-          resolution: "approved",
-        }),
-      }),
-    );
-
-    expect(actionResponse.status).toBe(200);
-    expect(await actionResponse.json()).toEqual({
-      approval: {
-        approval_id: "apr_001",
-        session_id: "thread_001",
-        workspace_id: "ws_alpha",
-        status: "approved",
-        resolution: "approved",
-        approval_category: "external_side_effect",
-        title: "Run git push",
-        description: "Codex requests permission to push changes to remote.",
-        requested_at: "2026-03-27T05:18:00Z",
-        resolved_at: "2026-03-27T05:19:00Z",
-      },
-      session: {
-        session_id: "thread_001",
-        workspace_id: "ws_alpha",
-        title: "Fix build error",
-        status: "running",
-        created_at: "2026-03-27T05:12:34Z",
-        updated_at: "2026-03-27T05:19:00Z",
-        started_at: "2026-03-27T05:13:00Z",
-        last_message_at: "2026-03-27T05:18:00Z",
-        active_approval_id: null,
-        can_send_message: false,
-        can_start: false,
-        can_stop: true,
-      },
-    });
-  });
-
-  it("removes native_event_name from public event responses", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({
-        items: [
-          {
-            event_id: "evt_001",
-            session_id: "thread_001",
-            event_type: "approval.requested",
-            sequence: 8,
-            occurred_at: "2026-03-27T05:18:00Z",
-            payload: {
-              approval_id: "apr_001",
-              summary: "Run git push",
-            },
-            native_event_name: "request/started",
-          },
-        ],
-        next_cursor: null,
-        has_more: false,
-      }),
-    );
-
-    const response = await listEvents(
-      new Request("http://localhost/api/v1/sessions/thread_001/events"),
-      "thread_001",
-    );
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      items: [
-        {
-          event_id: "evt_001",
-          session_id: "thread_001",
-          event_type: "approval.requested",
-          sequence: 8,
-          occurred_at: "2026-03-27T05:18:00Z",
-          payload: {
-            approval_id: "apr_001",
-            summary: "Run git push",
+      expect(response.status).toBe(410);
+      expect(await response.json()).toEqual({
+        error: {
+          code: "legacy_route_retired",
+          message:
+            "Legacy approvals routes are retired; use v0.9 thread and request endpoints instead.",
+          details: {
+            route_family: "approvals",
+            replacement_endpoints: [
+              "/api/v1/workspaces/{workspace_id}/threads",
+              "/api/v1/threads/{thread_id}",
+              "/api/v1/threads/{thread_id}/view",
+              "/api/v1/threads/{thread_id}/pending_request",
+              "/api/v1/requests/{request_id}",
+              "/api/v1/requests/{request_id}/response",
+            ],
           },
         },
-      ],
-      next_cursor: null,
-      has_more: false,
-    });
-  });
-
-  it("relays session stream events using the public envelope", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock.mockResolvedValueOnce(
-      sseResponse([
-        ": connected\n\n",
-        `data: ${JSON.stringify({
-          event_id: "evt_001",
-          session_id: "thread_001",
-          event_type: "message.assistant.delta",
-          sequence: 12,
-          occurred_at: "2026-03-27T05:20:10Z",
-          payload: {
-            message_id: "msg_assistant_003",
-            delta: "Updated the config",
-          },
-          native_event_name: "item/delta",
-        })}\n\n`,
-      ]),
-    );
-
-    const request = new Request("http://localhost/api/v1/sessions/thread_001/stream");
-    const response = await getSessionStream(request, "thread_001");
-
-    expect(response.headers.get("content-type")).toContain("text/event-stream");
-    await expect(response.text()).resolves.toContain(
-      `data: ${JSON.stringify({
-        event_id: "evt_001",
-        session_id: "thread_001",
-        event_type: "message.assistant.delta",
-        sequence: 12,
-        occurred_at: "2026-03-27T05:20:10Z",
-        payload: {
-          message_id: "msg_assistant_003",
-          delta: "Updated the config",
-        },
-      })}`,
-    );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:3001/api/v1/sessions/thread_001/stream",
-      expect.objectContaining({
-        headers: {
-          accept: "text/event-stream",
-        },
-        cache: "no-store",
-        signal: request.signal,
-      }),
-    );
-  });
-
-  it("maps approval stream payloads from summary to title", async () => {
-    const fetchMock = vi.mocked(fetch);
-    fetchMock.mockResolvedValueOnce(
-      sseResponse([
-        `data: ${JSON.stringify({
-          event_id: "evt_apr_001",
-          session_id: "thread_001",
-          event_type: "approval.requested",
-          occurred_at: "2026-03-27T05:18:00Z",
-          payload: {
-            approval_id: "apr_001",
-            workspace_id: "ws_alpha",
-            summary: "Run git push",
-            approval_category: "external_side_effect",
-          },
-          native_event_name: "request/started",
-        })}\n\n`,
-      ]),
-    );
-
-    const request = new Request("http://localhost/api/v1/approvals/stream");
-    const response = await getApprovalStream(request);
-
-    expect(response.headers.get("content-type")).toContain("text/event-stream");
-    await expect(response.text()).resolves.toContain(
-      `data: ${JSON.stringify({
-        event_id: "evt_apr_001",
-        session_id: "thread_001",
-        event_type: "approval.requested",
-        occurred_at: "2026-03-27T05:18:00Z",
-        payload: {
-          approval_id: "apr_001",
-          workspace_id: "ws_alpha",
-          title: "Run git push",
-          approval_category: "external_side_effect",
-        },
-      })}`,
-    );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "http://127.0.0.1:3001/api/v1/approvals/stream",
-      expect.objectContaining({
-        headers: {
-          accept: "text/event-stream",
-        },
-        cache: "no-store",
-        signal: request.signal,
-      }),
-    );
+      });
+    }
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("relays thread stream events on the v0.9 thread stream path", async () => {

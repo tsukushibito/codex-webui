@@ -1,6 +1,5 @@
-import { approveApproval } from "../../../../../../src/handlers";
+import { retiredLegacyRouteResponse } from "../../../../../../src/retired-routes";
 
-export async function POST(request: Request, context: { params: Promise<{ approvalId: string }> }) {
-  const { approvalId } = await context.params;
-  return approveApproval(request, approvalId);
+export function POST() {
+  return retiredLegacyRouteResponse("approvals");
 }

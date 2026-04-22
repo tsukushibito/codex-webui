@@ -483,7 +483,7 @@ export async function mockApprovalFlow(page: Page) {
                 occurred_at: resolvedAt,
                 kind: "approval.resolved",
                 payload: {
-                  summary: `Approval ${resolution}.`,
+                  summary: `Latest request: ${resolution}`,
                 },
               },
             ]),
@@ -604,84 +604,6 @@ export async function mockApprovalFlow(page: Page) {
           change_ticket: "CHG-93",
         },
       });
-    }
-
-    if (pathname === "/api/v1/approvals" && request.method() === "GET") {
-      return json(route, {
-        items:
-          resolution === "pending"
-            ? [
-                {
-                  approval_id: "apr_001",
-                  session_id: "thread_001",
-                  workspace_id: "ws_alpha",
-                  status: "pending",
-                  resolution: null,
-                  approval_category: "external_side_effect",
-                  title: "Run deployment",
-                  description: "Apply the prepared deployment plan.",
-                  requested_at: requestedAt,
-                  resolved_at: null,
-                },
-              ]
-            : [],
-        next_cursor: null,
-        has_more: false,
-      });
-    }
-
-    if (pathname === "/api/v1/approvals/apr_001" && request.method() === "GET") {
-      return json(route, {
-        approval_id: "apr_001",
-        session_id: "thread_001",
-        workspace_id: "ws_alpha",
-        status: resolution === "pending" ? "pending" : resolution,
-        resolution: resolution === "pending" ? null : resolution,
-        approval_category: "external_side_effect",
-        title: "Run deployment",
-        description: "Apply the prepared deployment plan.",
-        requested_at: requestedAt,
-        resolved_at: resolution === "pending" ? null : resolvedAt,
-        operation_summary: "Deploy the latest checked-in build to staging.",
-        context: {
-          environment: "staging",
-          change_ticket: "CHG-93",
-        },
-      });
-    }
-
-    if (pathname === "/api/v1/approvals/apr_001/approve" && request.method() === "POST") {
-      resolution = "approved";
-      return json(
-        route,
-        {
-          request: {
-            request_id: "req_001",
-            status: "resolved",
-            decision: "approved",
-            responded_at: resolvedAt,
-          },
-          thread: currentThread(),
-        },
-        200,
-      );
-    }
-
-    if (pathname === "/api/v1/approvals/apr_001/deny" && request.method() === "POST") {
-      resolution = "denied";
-      return json(
-        route,
-        {
-          request: {
-            request_id: "req_001",
-            status: "resolved",
-            decision: "denied",
-            responded_at: resolvedAt,
-          },
-          thread: currentThread(),
-        },
-        200,
-      );
     }
 
     if (pathname === "/api/v1/requests/req_001/response" && request.method() === "POST") {

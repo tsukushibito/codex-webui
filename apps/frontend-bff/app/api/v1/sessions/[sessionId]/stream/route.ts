@@ -1,9 +1,8 @@
-import { getSessionStream } from "../../../../../../src/handlers";
+import { retiredLegacyRouteResponse } from "../../../../../../src/retired-routes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request, context: { params: Promise<{ sessionId: string }> }) {
-  const { sessionId } = await context.params;
-  return getSessionStream(request, sessionId);
+export function GET() {
+  return retiredLegacyRouteResponse("sessions");
 }

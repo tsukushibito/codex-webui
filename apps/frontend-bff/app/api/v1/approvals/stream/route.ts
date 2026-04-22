@@ -1,8 +1,8 @@
-import { getApprovalStream } from "../../../../../src/handlers";
+import { retiredLegacyRouteResponse } from "../../../../../src/retired-routes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
-  return getApprovalStream(request);
+export function GET() {
+  return retiredLegacyRouteResponse("approvals");
 }
