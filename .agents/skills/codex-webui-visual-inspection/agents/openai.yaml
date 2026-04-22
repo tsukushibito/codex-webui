@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex WebUI Visual Inspection"
+  short_description: "Capture and review UI screenshots."
+  default_prompt: "Use $codex-webui-visual-inspection to capture desktop and mobile screenshots, inspect the UI, and guide frontend polish."
