@@ -158,11 +158,13 @@ describe("browser-critical state matrix", () => {
     expect(matrixEntry("request_response").request_kind_values).toContain("approval");
   });
 
-  it("marks legacy route families as compatibility behavior for follow-up 168", () => {
+  it("marks legacy route families as retired quarantined compatibility behavior for follow-up 168", () => {
     expect(
       browserAdjacentCompatibilityBehaviors.every(
         (behavior) =>
-          behavior.classification === "non_browser_critical_compatibility" &&
+          behavior.classification === "retired_non_browser_critical_compatibility" &&
+          behavior.reason.includes("retired") &&
+          behavior.reason.includes("quarantined") &&
           behavior.follow_up_issue === 168,
       ),
     ).toBe(true);

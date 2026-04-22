@@ -34,7 +34,7 @@ export interface BrowserCriticalStateMatrixEntry {
 
 export interface BrowserAdjacentCompatibilityBehavior {
   route_family: string;
-  classification: "non_browser_critical_compatibility";
+  classification: "retired_non_browser_critical_compatibility";
   follow_up_issue: 168;
   reason: string;
 }
@@ -166,16 +166,16 @@ export const browserCriticalStateMatrix = [
 export const browserAdjacentCompatibilityBehaviors = [
   {
     route_family: "/api/v1/workspaces/{workspace_id}/sessions and /api/v1/sessions/{session_id}/*",
-    classification: "non_browser_critical_compatibility",
+    classification: "retired_non_browser_critical_compatibility",
     follow_up_issue: 168,
     reason:
-      "Legacy session route behavior remains available but is outside the browser-critical v0.9 matrix.",
+      "Legacy session route behavior is retired and quarantined outside the browser-critical v0.9 matrix.",
   },
   {
     route_family: "/api/v1/approvals*",
-    classification: "non_browser_critical_compatibility",
+    classification: "retired_non_browser_critical_compatibility",
     follow_up_issue: 168,
     reason:
-      "Standalone approval route behavior remains available but request helpers are the browser-critical v0.9 surface.",
+      "Standalone approval route behavior is retired and quarantined; request helpers are the browser-critical v0.9 surface.",
   },
 ] as const satisfies readonly BrowserAdjacentCompatibilityBehavior[];

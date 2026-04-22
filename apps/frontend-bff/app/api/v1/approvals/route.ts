@@ -1,5 +1,5 @@
-import { listApprovals } from "../../../../src/handlers";
+import { retiredLegacyRouteResponse } from "../../../../src/retired-routes";
 
-export async function GET(request: Request) {
-  return listApprovals(request);
+export function GET() {
+  return retiredLegacyRouteResponse("approvals");
 }
