@@ -161,7 +161,7 @@ The public API must not silently assume native enum values, native request capab
 | `blocked_cue` | display model | no | indicates user intervention is likely needed |
 | `resume_cue` | display model | no | indicates return priority and reason |
 | `composer` | display model | no | input availability hints |
-| `home_overview` | helper aggregate | no | app-shell and home initialization aggregate |
+| `home_overview` | helper aggregate | no | app-shell initialization aggregate |
 | `thread_stream_event` | transport projection | no | thread-scoped SSE delta event |
 | `notification_event` | transport projection | no | non-authoritative refresh trigger for the global notifications stream |
 
@@ -504,8 +504,9 @@ Rules:
 
 Rules:
 
-- `home_overview` is an app-shell helper aggregate
+- `home_overview` is an app-shell initialization helper aggregate
 - it is not a canonical domain resource
+- it does not imply a canonical or primary Home screen contract
 - `resume_candidates` is a resume-oriented helper path, not a replacement for thread lists
 - `resume_candidates` must reflect the minimum resume priority defined in section 6.8
 
@@ -517,11 +518,12 @@ Rules:
 
 #### `GET /api/v1/home`
 
-Returns the app-shell and home initialization aggregate.
+Returns the app-shell initialization aggregate.
 
 Rules:
 
 - this endpoint is a helper aggregate, not a canonical domain resource
+- this endpoint name does not define a canonical or primary Home screen contract
 - it may return `workspaces` and `resume_candidates` together
 - the shape may be extended compatibly over time
 

@@ -16,10 +16,13 @@ This roadmap depends on the following maintained documents:
 - `docs/specs/codex_webui_common_spec_v0_9.md`
 - `docs/specs/codex_webui_internal_api_v0_9.md`
 - `docs/specs/codex_webui_public_api_v0_9.md`
+- `docs/specs/codex_webui_ui_layout_spec_v0_9.md`
 - `docs/specs/codex_webui_app_server_contract_matrix_v0_9.md`
 - `docs/validation/app_server_behavior_validation_plan_checklist.md`
 
 GitHub Issues and Projects track execution state. This roadmap remains the maintained source of truth for sequencing, scope boundaries, and completion conditions.
+
+Where this roadmap touches UX, interpret it as sequencing guidance only. The maintained current UX model is governed by `docs/specs/codex_webui_ui_layout_spec_v0_9.md` together with the v0.9 requirements and API specifications.
 
 ## 3. Current State
 
@@ -164,7 +167,7 @@ Replace the current session-first Chat and standalone Approval UI with a v0.9 th
 
 #### Main workstreams
 
-1. Rework Home to emphasize workspace selection, resume candidates, and thread list cues.
+1. Absorb the former Home responsibilities into navigation, workspace switching, thread list presentation, resume cues, and empty states instead of preserving Home as a primary screen.
 2. Rework the main interaction surface around `thread_view`, `timeline`, `current_activity`, `composer`, and thread-context request helpers.
 3. Make first user input the canonical new-thread start path from the browser.
 4. Present pending and just-resolved request information from thread context instead of a standalone approval domain flow.

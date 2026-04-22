@@ -1,6 +1,6 @@
 # Codex WebUI LLM Wiki Log
 
-Last updated: 2026-04-21
+Last updated: 2026-04-23
 
 ## Purpose
 
@@ -28,6 +28,28 @@ After the heading, keep the body concise:
 - short note on what changed or remains deferred
 
 ## Entries
+
+## [2026-04-23] lint | UX renewal source-of-truth alignment
+
+Source:
+
+- planner-approved docs-only sprint for Issue #176
+- `.tmp/CodexWebUI_UX重視_作業計画書_v0_1.md` as a working input only, not a normative source
+- review of remaining Home / Chat / Approval roadmap ambiguity against the maintained v0.9 UI layout direction
+
+Updated:
+
+- `docs/codex_webui_mvp_roadmap_v0_1.md`
+- `docs/specs/codex_webui_ui_layout_spec_v0_9.md`
+- `docs/specs/codex_webui_public_api_v0_9.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- clarified that roadmap UX wording is sequencing guidance and that the v0.9 UI layout spec plus v0.9 requirements/specs govern the current thread-first UX model
+- retired Home as an active primary Phase 4B UI target by moving former Home responsibilities into navigation, workspace switching, thread lists, resume cues, and empty states
+- clarified that `home_overview` and `GET /api/v1/home` are helper aggregates for app-shell initialization, not canonical UI screen contracts
 
 ## [2026-04-21] operational pitfall | Vulkan SDK generic download and extraction validation
 
