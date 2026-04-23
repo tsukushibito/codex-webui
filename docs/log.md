@@ -29,6 +29,29 @@ After the heading, keep the body concise:
 
 ## Entries
 
+## [2026-04-23] ingest | Agent UI benchmark note
+
+Source:
+
+- planner-approved docs-only sprint for Issue #178
+- `tasks/issue-178-benchmark-agent-uis/README.md`
+- `docs/requirements/codex_webui_mvp_requirements_v0_9.md`
+- `docs/specs/codex_webui_ui_layout_spec_v0_9.md`
+- `docs/codex_webui_mvp_roadmap_v0_1.md`
+- primary public product documentation for reference UI families, used only for structural orientation
+
+Updated:
+
+- `docs/notes/codex_webui_agent_ui_benchmark_note_v0_1.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- added a maintained benchmark note comparing CLI/TUI, assistant, IDE assistant, and autonomous agent/task-runner UI families across main pane, navigation, status, approval/risk, detail, composer, and background-task cues
+- mapped adopt and do-not-adopt patterns back to CodexWebUI v0.9 `thread_view`, `timeline`, request flow, Navigation, Detail Surface, resume/blocked cues, current activity, single composer, and mobile reachability
+- explicitly constrained the benchmark to structural and interaction lessons, rejecting visual copying, visual mimicry, standalone approval inbox dependency, Home as primary UX dependency, independent WebUI-owned conversation/approval state, and automatic detail opening on events
+
 ## [2026-04-23] lint | UX renewal source-of-truth alignment
 
 Source:

@@ -26,6 +26,7 @@ Read this file first when you need to locate maintained knowledge across source-
 ## Maintained note pages
 
 - [docs/notes/README.md](./notes/README.md): note-page placement, naming, and promotion rules
+- [docs/notes/codex_webui_agent_ui_benchmark_note_v0_1.md](./notes/codex_webui_agent_ui_benchmark_note_v0_1.md): structural benchmark note for agent and assistant UI families, mapping reusable interaction lessons to CodexWebUI v0.9 `thread_view`, timeline, Navigation, Detail Surface, request-flow, resume, and mobile responsibilities
 - [docs/notes/codex_webui_github_projects_operations_synthesis_note_v0_1.md](./notes/codex_webui_github_projects_operations_synthesis_note_v0_1.md): reusable GitHub Issue and Project operation guidance, including sub-issue, `gh api`, and Project audit pitfalls seen in this repo
 
 ## Cross-cutting guidance

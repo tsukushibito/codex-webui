@@ -12,6 +12,7 @@ Archive entries preserve the work instructions that were used at the time, while
 
 ## Packages
 
+- [issue-178-benchmark-agent-uis](./issue-178-benchmark-agent-uis/README.md)
 - [issue-167-home-shell-resume](./issue-167-home-shell-resume/README.md)
 - [issue-150-ngrok-sse-validation](./issue-150-ngrok-sse-validation/README.md)
 - [issue-158-post-start-sendability](./issue-158-post-start-sendability/README.md)
