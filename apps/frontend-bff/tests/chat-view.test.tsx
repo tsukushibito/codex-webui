@@ -21,6 +21,145 @@ vi.mock("next/link", () => ({
 }));
 
 describe("ChatView", () => {
+  it("renders Navigation workspace switching, creation, and grouped thread cues", () => {
+    const markup = renderToStaticMarkup(
+      <ChatView
+        connectionState="idle"
+        draftAssistantMessages={{}}
+        errorMessage={null}
+        isCreatingThread={false}
+        isCreatingWorkspace={false}
+        isInterruptingThread={false}
+        isLoadingThread={false}
+        isLoadingThreads={false}
+        isLoadingWorkspaces={false}
+        isRespondingToRequest={false}
+        isSendingMessage={false}
+        messageDraft=""
+        newThreadInput=""
+        onApproveRequest={() => {}}
+        onCreateThread={() => {}}
+        onCreateWorkspace={() => {}}
+        onDenyRequest={() => {}}
+        onInterruptThread={() => {}}
+        onMessageDraftChange={() => {}}
+        onNewThreadInputChange={() => {}}
+        onSelectThread={() => {}}
+        onSelectWorkspace={() => {}}
+        onSendMessage={() => {}}
+        onWorkspaceNameChange={() => {}}
+        selectedRequestDetail={null}
+        selectedThreadId="thread_active"
+        selectedThreadView={null}
+        statusMessage={null}
+        streamEvents={[]}
+        threads={[
+          {
+            thread_id: "thread_approval",
+            workspace_id: "ws_alpha",
+            native_status: {
+              thread_status: "running",
+              active_flags: ["waiting_on_request"],
+              latest_turn_status: "running",
+            },
+            updated_at: "2026-03-27T05:22:00Z",
+            current_activity: {
+              kind: "waiting_on_approval",
+              label: "Approval required",
+            },
+            badge: {
+              kind: "approval",
+              label: "Waiting approval",
+            },
+            blocked_cue: {
+              kind: "approval_required",
+              label: "Needs response",
+            },
+            resume_cue: {
+              reason_kind: "waiting_on_approval",
+              priority_band: "highest",
+              label: "Resume here first",
+            },
+          },
+          {
+            thread_id: "thread_active",
+            workspace_id: "ws_alpha",
+            native_status: {
+              thread_status: "running",
+              active_flags: [],
+              latest_turn_status: "running",
+            },
+            updated_at: "2026-03-27T05:20:00Z",
+            current_activity: {
+              kind: "running",
+              label: "Running",
+            },
+            badge: null,
+            blocked_cue: null,
+            resume_cue: null,
+          },
+          {
+            thread_id: "thread_recent",
+            workspace_id: "ws_alpha",
+            native_status: {
+              thread_status: "waiting_input",
+              active_flags: [],
+              latest_turn_status: null,
+            },
+            updated_at: "2026-03-27T05:18:00Z",
+            current_activity: {
+              kind: "waiting_on_user_input",
+              label: "Waiting for your input",
+            },
+            badge: null,
+            blocked_cue: null,
+            resume_cue: {
+              reason_kind: "recent",
+              priority_band: "medium",
+              label: "Recently updated",
+            },
+          },
+        ]}
+        workspaceId="ws_alpha"
+        workspaceName=""
+        workspaces={[
+          {
+            workspace_id: "ws_alpha",
+            workspace_name: "alpha",
+            created_at: "2026-03-27T05:00:00Z",
+            updated_at: "2026-03-27T05:22:00Z",
+            active_session_summary: null,
+            pending_approval_count: 1,
+          },
+          {
+            workspace_id: "ws_beta",
+            workspace_name: "beta",
+            created_at: "2026-03-27T04:00:00Z",
+            updated_at: "2026-03-27T05:10:00Z",
+            active_session_summary: {
+              session_id: "thread_beta",
+              status: "running",
+              last_message_at: "2026-03-27T05:10:00Z",
+            },
+            pending_approval_count: 0,
+          },
+        ]}
+      />,
+    );
+
+    expect(markup).toContain("Navigation");
+    expect(markup).toContain("Switch workspace");
+    expect(markup).toContain("Create workspace");
+    expect(markup).toContain("1 approval");
+    expect(markup).toContain("Attention needed");
+    expect(markup).toContain("Active");
+    expect(markup).toContain("Recent");
+    expect(markup).toContain("Blocked: Needs response");
+    expect(markup).toContain("Resume here first");
+    expect(markup).toContain("Recently updated");
+    expect(markup).not.toContain("Home");
+  });
+
   it("renders thread context, pending request controls, and timeline state", () => {
     const markup = renderToStaticMarkup(
       <ChatView
@@ -30,21 +169,26 @@ describe("ChatView", () => {
         }}
         errorMessage={null}
         isCreatingThread={false}
+        isCreatingWorkspace={false}
         isInterruptingThread={false}
         isLoadingThread={false}
         isLoadingThreads={false}
+        isLoadingWorkspaces={false}
         isRespondingToRequest={false}
         isSendingMessage={false}
         messageDraft=""
         newThreadInput=""
+        onCreateWorkspace={() => {}}
         onApproveRequest={() => {}}
         onCreateThread={() => {}}
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
         onMessageDraftChange={() => {}}
         onNewThreadInputChange={() => {}}
+        onSelectWorkspace={() => {}}
         onSelectThread={() => {}}
         onSendMessage={() => {}}
+        onWorkspaceNameChange={() => {}}
         selectedRequestDetail={{
           request_id: "req_001",
           thread_id: "thread_001",
@@ -159,6 +303,17 @@ describe("ChatView", () => {
           },
         ]}
         workspaceId="ws_alpha"
+        workspaceName=""
+        workspaces={[
+          {
+            workspace_id: "ws_alpha",
+            workspace_name: "alpha",
+            created_at: "2026-03-27T05:00:00Z",
+            updated_at: "2026-03-27T05:22:00Z",
+            active_session_summary: null,
+            pending_approval_count: 1,
+          },
+        ]}
       />,
     );
 
@@ -177,21 +332,26 @@ describe("ChatView", () => {
         draftAssistantMessages={{}}
         errorMessage="Failed to interrupt the thread."
         isCreatingThread={false}
+        isCreatingWorkspace={false}
         isInterruptingThread={false}
         isLoadingThread={false}
         isLoadingThreads={false}
+        isLoadingWorkspaces={false}
         isRespondingToRequest={false}
         isSendingMessage={false}
         messageDraft=""
         newThreadInput=""
+        onCreateWorkspace={() => {}}
         onApproveRequest={() => {}}
         onCreateThread={() => {}}
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
         onMessageDraftChange={() => {}}
         onNewThreadInputChange={() => {}}
+        onSelectWorkspace={() => {}}
         onSelectThread={() => {}}
         onSendMessage={() => {}}
+        onWorkspaceNameChange={() => {}}
         selectedRequestDetail={null}
         selectedThreadId={null}
         selectedThreadView={null}
@@ -199,6 +359,8 @@ describe("ChatView", () => {
         streamEvents={[]}
         threads={[]}
         workspaceId="ws_alpha"
+        workspaceName=""
+        workspaces={[]}
       />,
     );
 
@@ -217,21 +379,26 @@ describe("ChatView", () => {
         draftAssistantMessages={{}}
         errorMessage={null}
         isCreatingThread={false}
+        isCreatingWorkspace={false}
         isInterruptingThread={false}
         isLoadingThread={false}
         isLoadingThreads={false}
+        isLoadingWorkspaces={false}
         isRespondingToRequest={false}
         isSendingMessage={false}
         messageDraft=""
         newThreadInput=""
+        onCreateWorkspace={() => {}}
         onApproveRequest={() => {}}
         onCreateThread={() => {}}
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
         onMessageDraftChange={() => {}}
         onNewThreadInputChange={() => {}}
+        onSelectWorkspace={() => {}}
         onSelectThread={() => {}}
         onSendMessage={() => {}}
+        onWorkspaceNameChange={() => {}}
         selectedRequestDetail={{
           request_id: "req_001",
           thread_id: "thread_001",
@@ -295,6 +462,8 @@ describe("ChatView", () => {
         streamEvents={[]}
         threads={[]}
         workspaceId="ws_alpha"
+        workspaceName=""
+        workspaces={[]}
       />,
     );
 
