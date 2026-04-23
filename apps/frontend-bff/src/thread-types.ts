@@ -113,6 +113,7 @@ export interface PublicComposer {
   accepting_user_input: boolean;
   interrupt_available: boolean;
   blocked_by_request: boolean;
+  input_unavailable_reason: string | null;
 }
 
 export interface PublicThreadView {

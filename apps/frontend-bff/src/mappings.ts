@@ -313,6 +313,7 @@ export function mapThreadView(
       accepting_user_input: view.thread.derived_hints.accepting_user_input,
       interrupt_available: view.thread.native_status.thread_status === "running",
       blocked_by_request: view.thread.derived_hints.has_pending_request,
+      input_unavailable_reason: view.thread.derived_hints.blocked_reason,
     },
     timeline: mapTimeline(timeline),
   };

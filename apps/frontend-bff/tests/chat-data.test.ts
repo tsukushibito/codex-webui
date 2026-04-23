@@ -168,6 +168,7 @@ describe("chat data access", () => {
             accepting_user_input: false,
             interrupt_available: true,
             blocked_by_request: true,
+            input_unavailable_reason: null,
           },
           timeline: {
             items: [],
