@@ -29,6 +29,36 @@ After the heading, keep the body concise:
 
 ## Entries
 
+## [2026-04-23] ingest | Issue #179 desktop state specification
+
+Source:
+
+- planner-approved docs-only sprint for Issue #179
+- `tasks/issue-179-desktop-state-spec/README.md`
+- Issue #179 body and comments inspected read-only for a desktop layout image asset or attachment
+- parent-checkout draft `.tmp/CodexWebUI_UX重視_作業計画書_v0_1.md`, which mentions `codexwebui_approval_interface_screenshot.png` as a filename but does not provide a maintained or normative image asset
+- `docs/specs/codex_webui_ui_layout_spec_v0_9.md`
+- `docs/requirements/codex_webui_mvp_requirements_v0_9.md`
+- `docs/specs/codex_webui_common_spec_v0_9.md`
+- `docs/specs/codex_webui_public_api_v0_9.md`
+- `docs/specs/codex_webui_internal_api_v0_9.md`
+- `docs/specs/codex_webui_app_server_contract_matrix_v0_9.md`
+- `docs/notes/codex_webui_agent_ui_benchmark_note_v0_1.md`
+
+Updated:
+
+- `docs/specs/codex_webui_ui_layout_spec_v0_9.md`
+- `docs/log.md`
+- `tasks/issue-179-desktop-state-spec/README.md`
+
+Notes:
+
+- added implementation-ready desktop region ownership rules for Navigation, Thread View, and Detail Surface while preserving the thread-first v0.9 model
+- added a desktop state matrix for waiting on input, in progress, waiting on approval, system error / failed turn, `notLoaded`, and open-required recovery
+- kept approval as thread-scoped request flow, kept resume and blocked cues as derived display cues, and explicitly rejected old Home / Chat / Approval primary page separation
+- no maintained desktop layout image asset was found in the repo or Issue #179; the only local draft reference found is the `.tmp` filename mention, which is not itself a maintained or normative asset
+- mobile behavior remains deferred to the existing v0.9 mobile reachability rules
+
 ## [2026-04-23] ingest | Agent UI benchmark note
 
 Source:

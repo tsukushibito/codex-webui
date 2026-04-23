@@ -218,6 +218,78 @@ On desktop, the detail surface must:
 
 The desktop layout must preserve side-by-side reading of the timeline and selected detail without forcing thread-context loss or separate screen navigation.
 
+### 5.5 Desktop region ownership
+
+Desktop implementation must use the existing two-state composition as the normative screen model:
+
+- default: `[ Navigation ] [ Thread View ]`
+- selected detail open: `[ Navigation ] [ Thread View ] [ Detail Surface ]`
+
+These are region responsibilities, not separate primary pages. The old Home / Chat / Approval primary page separation is explicitly rejected for v0.9 desktop implementation. Former Home-style return and discovery responsibilities belong to Navigation, conversation and intervention belong to Thread View, and expanded inspection belongs to Detail Surface.
+
+Navigation owns:
+
+- current workspace identity and workspace switching
+- current-workspace thread discovery
+- thread list row summaries
+- filters, sort, and priority-aware return order
+- lightweight badges for approval, error, failed, active, and similar states when those facts are available
+- resume cue and blocked cue display as derived lightweight signals
+- cross-workspace high-priority summaries through the workspace switcher, notifications, or equivalent lightweight affordances
+
+Thread View owns:
+
+- thread header
+- current activity
+- pending request summary and response affordances
+- timeline as the main body
+- single composer or first-input composer state
+- interrupt affordance when available
+- no-thread-selected, `notLoaded`, and open-required recovery presentation as thread opening or resume flow
+
+Detail Surface owns selected-item inspection only. It may show request detail, error detail, failure detail, selected timeline item detail, file or diff summaries, and long supporting content. It must not become an always-on activity monitor, a global approval inbox, or the only place where approval, error, failed-turn, resume, or blocked state is discoverable.
+
+### 5.6 Desktop state matrix
+
+The following matrix defines desktop state ownership for implementation. The listed states are user-facing interpretations of native facts, helper aggregates, and recent evidence; they are not new canonical WebUI lifecycle resources.
+
+| Desktop state | Navigation responsibility | Thread View responsibility | Detail Surface responsibility |
+| --- | --- | --- | --- |
+| waiting on input | Thread row remains selectable and may show no blocking badge; `resume_cue` may emphasize last viewed or recently updated threads according to priority order. | Header identifies the selected thread and workspace. Current activity states that input is accepted or that the thread is idle. Timeline remains visible. Composer is enabled as the normal continuation path. | Closed by default. Opens only if the user selects an existing timeline item, request resolution, file summary, or other detail affordance. |
+| in progress | Thread row shows active badge or equivalent lightweight state. Navigation may keep the active thread visible in priority-aware sorting without auto-switching away from another selected thread. | Header remains stable. Current activity summarizes execution, streaming, tool use, or progress. Timeline remains visible and updates in thread order. Composer availability follows native-derived availability; interrupt is visible when supported. | Closed by default. Opens only from user selection of current-activity detail, command/tool detail, timeline item, file summary, or similar detail affordance. |
+| waiting on approval | Thread row shows waiting approval badge and blocked cue when available. Resume cue priority follows the requirements-level order, where `waitingOnApproval` is highest priority. Navigation may expose filters or workspace summaries, but must not route the user to a global approval inbox. | Header remains in thread context. Current activity states that approval is required. A pending request summary appears inside `thread_view` with concise risk/summary information, approve/deny response affordances or a path to them, and a path to detail when minimum confirmation information does not fit inline. Timeline remains visible and includes the approval request. Normal composer must not compete with request-response controls. | Opens only when the user selects pending request detail or a targeted notification/badge/detail affordance. Detail may show minimum confirmation information before approve/deny, but response remains thread-scoped request flow rather than a separate Approval screen. |
+| system error / failed turn | Thread row shows error or failed badge and blocked cue when available. Resume cue priority emphasizes `systemError` before latest-turn failed, after waiting approval. Navigation may surface the condition through filters, sort, workspace summaries, banners, or toasts without auto-opening detail. | Header remains stable. Current activity summarizes the system error or latest failed turn and the next available recovery action when known. Timeline remains visible and includes the error, failed evidence, or recovery status in chronology. Composer availability follows native-derived recovery/input availability rather than a WebUI-owned failed state. | Closed by default. Opens when the user selects the error item, failed-turn item, current-activity detail, notification, or badge affordance. Detail owns expanded error/failure diagnostics and recovery guidance, but the thread remains selected and visible. |
+| `notLoaded` | Thread row remains selectable from Navigation and may carry resume cue emphasis based on persisted summary, updated time, or high-priority helper data when available. Navigation does not expose `notLoaded` as a separate primary destination. | Selecting the row targets `thread_view`. Thread View shows an opening, loading, or resume-in-progress state while the facade establishes the App Server thread view. Timeline may show a loading placeholder until reacquisition succeeds; once loaded, the normal timeline is shown. | Closed by default. The selected detail state is preserved only if still valid after the thread view loads; otherwise the Detail Surface remains closed or empty. |
+| open-required recovery | Navigation treats the thread as the same selected or resumable thread and may show lightweight unavailable or retry emphasis only if the public facade cannot complete recovery. It must not expose internal `thread_open_required` as a user-facing screen or resource. | Internal open-required recovery is absorbed by the facade as part of the same `thread_view` opening flow. Thread View may show opening, retrying, temporarily unavailable, or resume guidance according to the public result, but must not require the user to visit Home or a separate recovery page. | Closed by default. Opens only after a user selects available error/recovery detail from Thread View or a targeted notification/badge. Internal helper names such as `thread_open_required` are not shown as the primary user model. |
+
+### 5.7 Desktop ownership details
+
+Thread header belongs to Thread View. It identifies the selected thread, enough workspace context to make action scope clear, and high-level state when that state affects immediate action.
+
+Current activity belongs to Thread View. It is a pinned, derived summary for running, waiting on input, waiting on approval, system error, latest failed turn, opening, or temporarily unavailable conditions. It must be rebuilt from native facts, helper aggregates, and recent evidence rather than stored as standalone canonical state.
+
+Pending request summary belongs to Thread View. It is the default desktop approval intervention surface and must keep response/detail affordances inside `thread_view`. Navigation may advertise that approval is needed, and Detail Surface may inspect expanded confirmation detail, but neither replaces the thread-scoped request flow.
+
+Timeline belongs to Thread View and remains visible for waiting on input, in progress, waiting on approval, system error / failed turn, and loaded recovery states. During `notLoaded` or open-required recovery, Thread View may show an opening placeholder until timeline reacquisition succeeds. Error, failed-turn, approval request, and approval resolution evidence should remain represented in timeline chronology when available.
+
+Composer belongs to Thread View. There is one normal composer path for first input or selected-thread continuation. Request-response controls and interrupt controls may sit near current activity or the composer area, but they are not separate approval or task composers.
+
+Thread list row belongs to Navigation. The row is the compact discovery and return unit for a thread; it carries title, current-activity summary, updated time, badges, and lightweight resume/blocked cues when available.
+
+Badges belong primarily to Navigation and may also appear inside Thread View summaries. They are lightweight state markers, not canonical resources. At minimum, desktop rows must be able to distinguish approval, error, failed, and active situations when those facts are available.
+
+Blocked cue belongs to Navigation and may also be reflected in Thread View current activity. It is a derived display cue for intervention-needed states such as `waitingOnApproval`, `systemError`, or latest failed evidence. It must not be implemented as a standalone canonical resource or required standalone module.
+
+Resume cue belongs to Navigation and lightweight notifications. It is a derived return-priority cue based on native status, active flags, latest failure evidence, last viewed thread, updated time, and workspace context. It must not auto-switch the selected thread by itself and must not require a dedicated standalone resume module.
+
+### 5.8 Desktop image reference status
+
+No desktop layout image is normative unless a maintained source or Issue reference explicitly provides an image asset. A filename mention in an unmaintained `.tmp` draft is not itself a maintained or normative asset. If a desktop layout image is later added, its regions must map to these rules: left region as Navigation, center region as Thread View, and right selected-item region as Detail Surface. Image labels or visual affordances must not override the normative rejection of Home / Chat / Approval primary page separation, the thread-scoped approval flow, or the selection-driven Detail Surface rule.
+
+### 5.9 Mobile deferral for desktop states
+
+Issue #179 defines desktop state ownership only. Mobile remains governed by the existing v0.9 mobile reachability rules in section 6 and the v0.9 requirements. This desktop state matrix must not expand mobile behavior beyond that existing reachability model.
+
 ---
 
 ## 6. Mobile layout
