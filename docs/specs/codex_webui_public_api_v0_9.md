@@ -346,6 +346,13 @@ Rules:
     "kind": "waiting_on_approval",
     "label": "Approval required"
   },
+  "pending_request": {
+    "present": true,
+    "request_id": "req_001",
+    "request_kind": "approval",
+    "summary": "Run git push"
+  },
+  "latest_error_or_failure": null,
   "badge": {
     "kind": "approval_required",
     "label": "Approval required"
@@ -365,8 +372,13 @@ Rules:
 Rules:
 
 - `thread_list_item` is a projection and display helper, not a canonical resource
+- `thread_list_item` must carry or allow derivation of the minimum Navigation cue material for current activity, badge, blocked cue, resume cue, pending request presence, error or latest failed-turn presence, and `updated_at` sorting
+- `current_activity`, `pending_request`, `latest_error_or_failure`, `badge`, `blocked_cue`, and `resume_cue` are display cue materials only and must not become canonical resources
+- `pending_request.present=true` must identify the pending request enough for thread-context navigation or inline response affordance; if no request is pending, `pending_request` may be `null` or use `present=false` consistently for the endpoint
+- `latest_error_or_failure` should identify user-visible system error or latest failed-turn evidence when retained, but it remains derived evidence rather than an error resource
 - `badge`, `blocked_cue`, and `resume_cue` may be embedded
 - `resume_cue.priority_band` is a hint band, not a fixed total-order score
+- workspace thread lists sort by `updated_at` using the stable tie-breakers defined by `GET /api/v1/workspaces/{workspace_id}/threads`; Navigation cues must not replace that sorting contract
 
 ### 7.4 ThreadView
 
@@ -391,7 +403,8 @@ Rules:
   "composer": {
     "accepting_user_input": true,
     "interrupt_available": false,
-    "blocked_by_request": false
+    "blocked_by_request": false,
+    "input_unavailable_reason": null
   },
   "timeline": {
     "items": [],
@@ -410,6 +423,9 @@ Rules:
 - `composer` is a display model
 - `composer.accepting_user_input` is an availability hint, not the final server-side admission source
 - final input acceptance is determined at request time from native facts and request/recovery state
+- `thread_view` must include or reference the minimum helper shape for the thread snapshot, current activity, pending request summary, latest resolved request summary during retention, timeline slice, composer/input availability hints, interrupt availability, and open/load recovery outcome
+- `timeline` is a slice and must expose paging fields; it shares the `thread_id + sequence` ordering basis with `GET /api/v1/threads/{thread_id}/timeline` and the thread-scoped stream
+- open/load recovery is absorbed into this public read; browsers must see either a normal `thread_view` or a public error/degraded response, never internal `thread_open_required`
 
 ### 7.5 TimelineItem
 
@@ -446,6 +462,8 @@ Rules:
   "status": "pending",
   "risk_category": "external_side_effect",
   "summary": "Run git push",
+  "reason": "Remote repository will be updated.",
+  "operation_summary": "git push origin main",
   "requested_at": "2026-04-07T08:32:00Z"
 }
 ```
@@ -454,7 +472,8 @@ Rules:
 
 - pending request information is embedded in thread context
 - approval is not restored as a standalone canonical resource
-- `latest_resolved_request` may reuse the same identity fields plus `decision` and `responded_at` while the immediate recovery window remains open
+- `pending_request` must include enough identity and context fields to reach minimum confirmation information before response: `request_id`, `thread_id`, request kind, status, risk or classification, short summary, request time, and turn, item, operation, or reason fields when available
+- `latest_resolved_request` may reuse the same identity and context fields plus `decision` and `responded_at` while the immediate recovery window remains open
 - thread-context request helpers must let the browser navigate to `request_detail` for both pending and just-resolved requests during the retention window
 
 ### 7.7 RequestDetail
@@ -470,6 +489,7 @@ Rules:
   "risk_category": "external_side_effect",
   "summary": "Run git push",
   "reason": "Remote repository will be updated.",
+  "consequence": "The remote repository may receive new commits.",
   "operation_summary": "git push origin main",
   "requested_at": "2026-04-07T08:32:00Z",
   "responded_at": null,
@@ -488,6 +508,8 @@ Rules:
 
 - `request_detail` is a helper facade rather than a canonical resource
 - the public contract must preserve the minimum confirmation information needed before response
+- minimum confirmation information includes risk or classification, short summary, consequence or reason, operation summary when available, request time, thread reference, turn/item or equivalent context, status, and decision options
+- when resolved detail is retained, it must also include the retained decision and response time
 - `request_detail` must remain readable while the request is pending
 - `request_detail` should remain readable for at least the post-resolution recovery window while the thread context still supports safe reacquisition
 - `404 request_not_found` should be reserved for request identifiers that are no longer reachable, retained, or valid
@@ -626,8 +648,9 @@ Response `202 Accepted`:
 
 Idempotency rules:
 
-- the same `client_request_id` with the same request body may return the prior accepted result
+- the same `client_request_id` with the same request body must return the prior accepted result when the idempotency record is retained
 - the same `client_request_id` with a different body must return `409 idempotency_conflict`
+- the accepted result maps to the generated `thread_id`; retrying the same accepted first input must not create a duplicate thread
 
 #### `GET /api/v1/threads/{thread_id}`
 
@@ -643,7 +666,8 @@ Rules:
 - if the target thread is `notLoaded`, `frontend-bff` may internally absorb the internal `open` helper
 - when that internal helper succeeds, the public endpoint returns the normal `thread_view`
 - if open or load cannot be completed, the public endpoint may return `503 thread_temporarily_unavailable`
-- the public contract must not expose internal `thread_open_required`
+- the public contract must not expose internal `thread_open_required` as a public resource, screen, or user-facing state
+- public `GET /api/v1/threads/{thread_id}/view` absorbs internal open-required/open-helper handling as part of the same read flow
 
 #### `GET /api/v1/threads/{thread_id}/timeline`
 
@@ -767,10 +791,15 @@ Pending request exists:
   "thread_id": "thread_123",
   "pending_request": {
     "request_id": "req_001",
+    "thread_id": "thread_123",
+    "turn_id": "turn_456",
+    "item_id": "item_789",
     "request_kind": "approval",
     "status": "pending",
     "risk_category": "external_side_effect",
     "summary": "Run git push",
+    "reason": "Remote repository will be updated.",
+    "operation_summary": "git push origin main",
     "requested_at": "2026-04-07T08:32:00Z"
   },
   "latest_resolved_request": null,
@@ -803,6 +832,7 @@ Rules:
 
 - absence must be represented unambiguously as `pending_request: null`
 - request absence within thread context must not use `404`
+- missing, expired, invalid, or unreachable request detail remains resource-specific `404 request_not_found` on request-detail endpoints
 - `latest_resolved_request` is optional and may be present only during the immediate recovery window
 - a thread-context helper path for just-resolved requests is required while the recovery window remains open
 - when `pending_request` is non-null, `latest_resolved_request` must be `null`
@@ -911,7 +941,8 @@ Logical event envelope:
 Rules:
 
 - `thread_id + sequence` is the canonical public dedupe and ordering basis
-- if the client detects a gap, incompatible duplicate, or ambiguous state, it must reacquire via REST
+- if the client detects a gap, incompatible duplicate, pending-request transition mismatch, projection inconsistency, reconnect ambiguity, or other ambiguous state, it must reacquire via REST
+- SSE is not recovery authority
 - public SSE event names are facade event names for browsers and do not guarantee a one-to-one mapping with native App Server event names
 
 ### 9.3 Global notifications stream
@@ -962,6 +993,9 @@ The client should reacquire `thread_view` or `timeline` when it detects:
 - a mismatch between pending-request transitions and the visible thread state
 - a timeline convergence inconsistency
 - reconnect followed by ambiguous state
+- a projection inconsistency between current activity, pending request helpers, thread snapshot, or timeline evidence
+
+SSE is not recovery authority for these cases; REST reacquisition is.
 
 ### 10.5 Partial-failure degrade rule
 
@@ -976,6 +1010,13 @@ The browser-facing contract must prefer explicit REST retryable unavailability o
 ### 11.1 First-input start
 
 `POST /api/v1/workspaces/{workspace_id}/inputs` uses `client_request_id` for idempotency.
+
+Rules:
+
+- the same `client_request_id` with the same request body must return the prior accepted result when the idempotency record is retained
+- the same `client_request_id` with a different body must return `409 idempotency_conflict`
+- the retained accepted result maps to the generated `thread_id`, `turn_id`, and input item when available
+- retrying a successfully accepted first input must not create a duplicate thread
 
 ### 11.2 Existing-thread input
 

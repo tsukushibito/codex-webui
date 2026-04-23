@@ -384,10 +384,15 @@ If it detects:
 - a sequence gap
 - duplicate sequence with incompatible payload
 - request-started and request-resolved mismatch
+- pending-request transition mismatch between helper state and timeline or stream evidence
 - item delta that does not converge to a completed item
 - inconsistent `occurred_at` and `sequence` order
+- projection inconsistency across `thread_summary`, `thread_view_helper`, request helpers, or timeline items
+- reconnect ambiguity
 
 then REST reacquisition is the recovery authority.
+
+SSE is not recovery authority. Runtime and `frontend-bff` may use SSE as a live-update transport, but recovery from the above cases must reacquire REST state that preserves the `thread_id + sequence` ordering basis.
 
 ### 9.6 Global notifications
 
@@ -397,6 +402,24 @@ It may be a stream or an equivalent internal contract, but it must not become:
 
 - the canonical ordering source
 - the authoritative source of thread state
+
+### 9.7 `thread_summary`
+
+`thread_summary` is the internal read model backing public `thread_list_item` and Navigation cue derivation.
+
+It must include or make derivable at least:
+
+- thread reference and workspace reference
+- native status snapshot or equivalent status material
+- `updated_at` used for stable list sorting
+- current activity material
+- badge material
+- blocked cue material
+- resume cue material
+- pending request presence, including request identity when pending
+- error or latest failed-turn presence when retained
+
+These fields are Navigation cue material only. They must not become canonical resources separate from native thread, turn, item, request flow, and the internal `thread_id + sequence` ordering basis.
 
 ---
 
@@ -445,6 +468,19 @@ If a view requires a prior `open`, runtime may return `409 thread_open_required`
 
 This keeps public and internal contracts aligned without exposing internal helper concerns directly to browsers.
 
+`thread_view_helper` must include or reference the minimum helper shape needed by `frontend-bff`:
+
+- thread snapshot
+- current activity material
+- pending request summary when pending
+- latest resolved request summary while retained
+- timeline slice using the thread-scoped `sequence` ordering basis
+- composer or input availability hints
+- interrupt availability
+- open/load recovery result or error material
+
+`thread_view_helper` remains a helper aggregate. Public `GET /api/v1/threads/{thread_id}/view` absorbs any internal `thread_open_required` response by calling `open` and retrying or by mapping failure to public unavailability; it must not expose `thread_open_required` as a public resource, screen, or user-facing state.
+
 ### 10.5 Reserved helper slots
 
 The internal API may reserve helper slots for:
@@ -471,6 +507,12 @@ The success boundary requires:
 4. the `client_request_id -> thread_id` mapping is persisted
 
 Summary and projection updates may follow after that success boundary.
+
+Idempotency rules:
+
+- the same `client_request_id` with the same request body must return the prior accepted result while the idempotency mapping is retained
+- the same `client_request_id` with a different request body must return `409 idempotency_conflict`
+- the persisted mapping must bind the accepted input to the generated `thread_id` so retries cannot create duplicate native threads for one accepted first input
 
 ### 11.2 Existing-thread input
 
@@ -521,7 +563,7 @@ Approval-kind outcomes such as `approved` or `denied` belong in decision fields 
 
 `pending_request_summary` is the current helper view of a thread's pending request.
 
-It should include at least:
+It must include at least:
 
 - `request_id`
 - `thread_id`
@@ -531,6 +573,8 @@ It should include at least:
 - `status`
 - risk classification
 - a short summary
+- consequence or reason when available
+- operation summary when available
 - request time
 
 ### 12.5 `latest_resolved_request_summary`
@@ -556,13 +600,16 @@ It should include at least:
 It must include at least:
 
 - risk level or classification
+- short summary
 - operation summary
-- reason for response
+- consequence or reason for response
 - request time
 - thread reference
 - turn or item reference
 - current lifecycle status
+- supported decision options
 - response decision when already resolved and still retained
+- response time when already resolved and still retained
 
 ### 12.7 Lifetime and reachability
 
@@ -611,6 +658,9 @@ When a just-resolved request is still retained for recovery, the same endpoint m
   "pending_request": null,
   "latest_resolved_request": {
     "request_id": "req_001",
+    "thread_id": "thread_123",
+    "turn_id": "turn_456",
+    "item_id": "item_789",
     "request_kind": "approval",
     "status": "resolved",
     "decision": "approved",
