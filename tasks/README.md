@@ -73,6 +73,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Archived Task Packages
 
+- [issue-183-timeline-grouping](./archive/issue-183-timeline-grouping/README.md)
 - [issue-182-thread-view-composer](./archive/issue-182-thread-view-composer/README.md)
 - [issue-181-navigation-home-replacement](./archive/issue-181-navigation-home-replacement/README.md)
 - [issue-180-contract-audit](./archive/issue-180-contract-audit/README.md)

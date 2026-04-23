@@ -9,6 +9,7 @@ import type {
   PublicThreadView,
   PublicTimelineItem,
 } from "./thread-types";
+import { buildTimelineDisplayModel, type TimelineDisplayRow } from "./timeline-display-model";
 
 export interface ChatViewProps {
   workspaceId: string | null;
@@ -146,6 +147,10 @@ function timelineItemLabel(item: PublicTimelineItem) {
   return String(item.payload.content ?? item.payload.summary ?? item.kind);
 }
 
+function timelineRowClass(row: TimelineDisplayRow) {
+  return `timeline-row timeline-row-${row.density} timeline-row-${row.role}`;
+}
+
 function composerUnavailableReason(threadView: PublicThreadView | null) {
   if (!threadView) {
     return null;
@@ -204,7 +209,6 @@ export function ChatView({
   onApproveRequest,
   onDenyRequest,
 }: ChatViewProps) {
-  const draftEntries = Object.entries(draftAssistantMessages);
   const [isNavigationOpen, setIsNavigationOpen] = useState(false);
   const [detailSelection, setDetailSelection] = useState<ThreadDetailSelection | null>(null);
   const selectedWorkspace =
@@ -246,6 +250,11 @@ export function ChatView({
           (item) => item.timeline_item_id === detailSelection.timelineItemId,
         ) ?? null)
       : null;
+  const timelineModel = buildTimelineDisplayModel({
+    timelineItems: selectedThreadView?.timeline.items ?? [],
+    streamEvents,
+    draftAssistantMessages,
+  });
 
   useEffect(() => {
     setIsNavigationOpen(false);
@@ -581,62 +590,50 @@ export function ChatView({
             ) : null}
 
             <div className="chat-message-list">
-              {!isLoadingThread &&
-              selectedThreadView &&
-              selectedThreadView.timeline.items.length === 0 &&
-              draftEntries.length === 0 ? (
+              {!isLoadingThread && selectedThreadView && timelineModel.groups.length === 0 ? (
                 <p className="empty-state">
                   No timeline items yet. Start the thread or send follow-up input to continue.
                 </p>
               ) : null}
 
-              {selectedThreadView?.timeline.items.map((item) => (
-                <article className="chat-message assistant" key={item.timeline_item_id}>
-                  <div className="workspace-meta-row">
-                    <strong>{item.kind}</strong>
-                    <span className="workspace-meta">{formatTimestamp(item.occurred_at)}</span>
-                  </div>
-                  <p>{timelineItemLabel(item)}</p>
-                  <button
-                    className="secondary-link action-button inline-detail-button"
-                    onClick={() =>
-                      setDetailSelection({
-                        kind: "timeline_item_detail",
-                        timelineItemId: item.timeline_item_id,
-                      })
-                    }
-                    type="button"
-                  >
-                    Timeline item detail
-                  </button>
-                </article>
-              ))}
-
-              {draftEntries.map(([messageId, content]) => (
-                <article className="chat-message assistant" key={messageId}>
-                  <div className="workspace-meta-row">
-                    <strong>assistant streaming</strong>
-                    <span className="workspace-meta">Live</span>
-                  </div>
-                  <p>{content}…</p>
-                </article>
-              ))}
-
-              {streamEvents.map((event) => (
-                <article className="chat-message user" key={event.event_id}>
-                  <div className="workspace-meta-row">
-                    <strong>{event.event_type}</strong>
-                    <span className="workspace-meta">{formatTimestamp(event.occurred_at)}</span>
-                  </div>
-                  <p>
-                    {String(
-                      event.payload.content ??
-                        event.payload.summary ??
-                        event.payload.message ??
-                        event.event_type,
-                    )}
-                  </p>
-                </article>
+              {timelineModel.groups.map((group) => (
+                <section
+                  className={group.turnId ? "timeline-turn-group" : "timeline-ungrouped-item"}
+                  data-turn-id={group.turnId ?? undefined}
+                  key={group.id}
+                >
+                  {group.turnId ? (
+                    <div className="timeline-turn-label">
+                      <span>Turn</span>
+                      <strong>{group.turnId}</strong>
+                    </div>
+                  ) : null}
+                  {group.rows.map((row) => (
+                    <article className={timelineRowClass(row)} key={row.id}>
+                      <div className="workspace-meta-row">
+                        <strong>{row.label}</strong>
+                        <span className="workspace-meta">
+                          {row.isLive ? "Live" : formatTimestamp(row.occurredAt)}
+                        </span>
+                      </div>
+                      <p>{row.content}</p>
+                      {row.timelineItemId ? (
+                        <button
+                          className="secondary-link action-button inline-detail-button"
+                          onClick={() =>
+                            setDetailSelection({
+                              kind: "timeline_item_detail",
+                              timelineItemId: row.timelineItemId ?? "",
+                            })
+                          }
+                          type="button"
+                        >
+                          Timeline item detail
+                        </button>
+                      ) : null}
+                    </article>
+                  ))}
+                </section>
               ))}
             </div>
           </section>

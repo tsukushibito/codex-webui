@@ -274,6 +274,16 @@ describe("ChatView", () => {
               content: "Run git push",
             },
           },
+          {
+            event_id: "evt_stream_002",
+            thread_id: "thread_001",
+            event_type: "session.status_changed",
+            sequence: 3,
+            occurred_at: "2026-03-27T05:19:00Z",
+            payload: {
+              summary: "Tool output received",
+            },
+          },
         ]}
         threads={[
           {
@@ -324,6 +334,9 @@ describe("ChatView", () => {
     expect(markup).toContain("Please explain the diff.");
     expect(markup).toContain("Streaming update");
     expect(markup).toContain("approval.requested");
+    expect(markup).toContain("timeline-row-prominent");
+    expect(markup).toContain("session.status_changed");
+    expect(markup).toContain("timeline-row-compact");
     expect(markup.match(/<textarea/g) ?? []).toHaveLength(1);
     expect(markup).toContain('id="thread-composer-input"');
     expect(markup).not.toContain('id="thread-input"');
