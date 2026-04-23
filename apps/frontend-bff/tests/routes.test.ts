@@ -944,6 +944,7 @@ describe("frontend-bff route handlers", () => {
         accepting_user_input: true,
         interrupt_available: false,
         blocked_by_request: false,
+        input_unavailable_reason: null,
       },
       timeline: {
         items: [

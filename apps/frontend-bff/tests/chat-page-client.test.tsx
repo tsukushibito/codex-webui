@@ -117,6 +117,7 @@ function buildThreadView(overrides: Partial<PublicThreadView> = {}): PublicThrea
       accepting_user_input: true,
       interrupt_available: true,
       blocked_by_request: false,
+      input_unavailable_reason: null,
     },
     timeline: {
       items: [
@@ -326,6 +327,7 @@ describe("ChatPageClient", () => {
             accepting_user_input: true,
             interrupt_available: false,
             blocked_by_request: false,
+            input_unavailable_reason: null,
           },
           timeline: {
             items: [],
@@ -345,6 +347,7 @@ describe("ChatPageClient", () => {
             accepting_user_input: false,
             interrupt_available: true,
             blocked_by_request: false,
+            input_unavailable_reason: null,
           },
           timeline: {
             items: [
@@ -392,8 +395,9 @@ describe("ChatPageClient", () => {
     expect(container.textContent).toContain("Waiting for your input");
     expect(MockEventSource.instances[0]?.url).toBe("/api/v1/threads/thread_001/stream");
 
-    const textarea = container.querySelector("#message-input");
+    const textarea = container.querySelector("#thread-composer-input");
     expect(textarea).not.toBeNull();
+    expect(container.querySelectorAll("textarea")).toHaveLength(1);
 
     await act(async () => {
       const setTextareaValue = Object.getOwnPropertyDescriptor(
@@ -407,7 +411,7 @@ describe("ChatPageClient", () => {
     await flushUi();
 
     const sendButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Send reply",
+      (button) => button.textContent === "Send input",
     );
     expect(sendButton).not.toBeUndefined();
 
@@ -422,6 +426,7 @@ describe("ChatPageClient", () => {
       expect.stringMatching(/^input_followup_/),
     );
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
+    expect((textarea as HTMLTextAreaElement).value).toBe("");
     expect(container.textContent).toContain("Running");
     expect(container.textContent).toContain("Continue with the fix.");
   });
@@ -451,6 +456,7 @@ describe("ChatPageClient", () => {
         accepting_user_input: false,
         interrupt_available: true,
         blocked_by_request: false,
+        input_unavailable_reason: null,
       },
       timeline: {
         items: [
@@ -491,6 +497,7 @@ describe("ChatPageClient", () => {
         accepting_user_input: true,
         interrupt_available: false,
         blocked_by_request: false,
+        input_unavailable_reason: null,
       },
       timeline: {
         items: [
@@ -531,6 +538,7 @@ describe("ChatPageClient", () => {
         accepting_user_input: false,
         interrupt_available: true,
         blocked_by_request: false,
+        input_unavailable_reason: null,
       },
       timeline: {
         items: [
@@ -645,8 +653,9 @@ describe("ChatPageClient", () => {
       });
       await flushUi();
 
-      const firstInputTextarea = container.querySelector("#thread-input");
+      const firstInputTextarea = container.querySelector("#thread-composer-input");
       expect(firstInputTextarea).not.toBeNull();
+      expect(container.querySelectorAll("textarea")).toHaveLength(1);
 
       await act(async () => {
         const setTextareaValue = Object.getOwnPropertyDescriptor(
@@ -677,11 +686,13 @@ describe("ChatPageClient", () => {
       expect(container.textContent).toContain("Started thread thread_new.");
       expect(container.textContent).toContain("Waiting for your input");
 
-      const followUpTextarea = container.querySelector("#message-input");
+      const followUpTextarea = container.querySelector("#thread-composer-input");
       expect(followUpTextarea).not.toBeNull();
+      expect(container.querySelectorAll("textarea")).toHaveLength(1);
+      expect((followUpTextarea as HTMLTextAreaElement).value).toBe("");
 
       const sendButton = Array.from(container.querySelectorAll("button")).find(
-        (button) => button.textContent === "Send reply",
+        (button) => button.textContent === "Send input",
       );
       expect(sendButton).not.toBeUndefined();
       expect((sendButton as HTMLButtonElement).disabled).toBe(true);
@@ -796,6 +807,14 @@ describe("ChatPageClient", () => {
       });
       await flushUi();
 
+      expect(container.textContent).toContain(
+        "Select or create a workspace from Navigation before starting work.",
+      );
+      const disabledComposer = container.querySelector("#thread-composer-input");
+      expect(disabledComposer).not.toBeNull();
+      expect((disabledComposer as HTMLTextAreaElement).disabled).toBe(true);
+      expect(container.querySelectorAll("textarea")).toHaveLength(1);
+
       const workspaceInput = container.querySelector("#workspace-name");
       expect(workspaceInput).not.toBeNull();
 
@@ -824,8 +843,9 @@ describe("ChatPageClient", () => {
       expect(container.textContent).toContain("Created workspace created.");
       expect(container.textContent).toContain("Ask Codex");
 
-      const firstInputTextarea = container.querySelector("#thread-input");
+      const firstInputTextarea = container.querySelector("#thread-composer-input");
       expect(firstInputTextarea).not.toBeNull();
+      expect(container.querySelectorAll("textarea")).toHaveLength(1);
 
       await act(async () => {
         const setTextareaValue = Object.getOwnPropertyDescriptor(
@@ -1356,6 +1376,7 @@ describe("ChatPageClient", () => {
         accepting_user_input: false,
         interrupt_available: true,
         blocked_by_request: false,
+        input_unavailable_reason: null,
       },
     });
     const waitingThreadView = buildThreadView({
@@ -1377,6 +1398,7 @@ describe("ChatPageClient", () => {
         accepting_user_input: true,
         interrupt_available: false,
         blocked_by_request: false,
+        input_unavailable_reason: null,
       },
     });
 
@@ -1449,6 +1471,7 @@ describe("ChatPageClient", () => {
         accepting_user_input: true,
         interrupt_available: false,
         blocked_by_request: false,
+        input_unavailable_reason: null,
       },
     });
     const runningThreadView = buildThreadView({
@@ -1470,6 +1493,7 @@ describe("ChatPageClient", () => {
         accepting_user_input: false,
         interrupt_available: true,
         blocked_by_request: false,
+        input_unavailable_reason: null,
       },
       timeline: {
         items: [
@@ -1510,6 +1534,7 @@ describe("ChatPageClient", () => {
         accepting_user_input: true,
         interrupt_available: false,
         blocked_by_request: false,
+        input_unavailable_reason: null,
       },
       timeline: {
         items: [
@@ -1582,8 +1607,9 @@ describe("ChatPageClient", () => {
     });
     await flushUi();
 
-    const textarea = container.querySelector("#message-input");
+    const textarea = container.querySelector("#thread-composer-input");
     expect(textarea).not.toBeNull();
+    expect(container.querySelectorAll("textarea")).toHaveLength(1);
 
     await act(async () => {
       const setTextareaValue = Object.getOwnPropertyDescriptor(
@@ -1597,7 +1623,7 @@ describe("ChatPageClient", () => {
     await flushUi();
 
     const sendButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Send reply",
+      (button) => button.textContent === "Send input",
     );
     expect(sendButton).not.toBeUndefined();
 

@@ -35,18 +35,15 @@ describe("ChatView", () => {
         isLoadingWorkspaces={false}
         isRespondingToRequest={false}
         isSendingMessage={false}
-        messageDraft=""
-        newThreadInput=""
+        composerDraft=""
         onApproveRequest={() => {}}
-        onCreateThread={() => {}}
+        onSubmitComposer={() => {}}
         onCreateWorkspace={() => {}}
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
-        onMessageDraftChange={() => {}}
-        onNewThreadInputChange={() => {}}
+        onComposerDraftChange={() => {}}
         onSelectThread={() => {}}
         onSelectWorkspace={() => {}}
-        onSendMessage={() => {}}
         onWorkspaceNameChange={() => {}}
         selectedRequestDetail={null}
         selectedThreadId="thread_active"
@@ -157,6 +154,10 @@ describe("ChatView", () => {
     expect(markup).toContain("Blocked: Needs response");
     expect(markup).toContain("Resume here first");
     expect(markup).toContain("Recently updated");
+    expect(markup.match(/<textarea/g) ?? []).toHaveLength(1);
+    expect(markup).toContain('id="thread-composer-input"');
+    expect(markup).not.toContain('id="thread-input"');
+    expect(markup).not.toContain('id="message-input"');
     expect(markup).not.toContain("Home");
   });
 
@@ -176,18 +177,15 @@ describe("ChatView", () => {
         isLoadingWorkspaces={false}
         isRespondingToRequest={false}
         isSendingMessage={false}
-        messageDraft=""
-        newThreadInput=""
+        composerDraft=""
         onCreateWorkspace={() => {}}
         onApproveRequest={() => {}}
-        onCreateThread={() => {}}
+        onSubmitComposer={() => {}}
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
-        onMessageDraftChange={() => {}}
-        onNewThreadInputChange={() => {}}
+        onComposerDraftChange={() => {}}
         onSelectWorkspace={() => {}}
         onSelectThread={() => {}}
-        onSendMessage={() => {}}
         onWorkspaceNameChange={() => {}}
         selectedRequestDetail={{
           request_id: "req_001",
@@ -241,6 +239,7 @@ describe("ChatView", () => {
             accepting_user_input: false,
             interrupt_available: true,
             blocked_by_request: true,
+            input_unavailable_reason: null,
           },
           timeline: {
             items: [
@@ -320,9 +319,15 @@ describe("ChatView", () => {
     expect(markup).toContain("thread_001");
     expect(markup).toContain("Approval required");
     expect(markup).toContain("Approve request");
+    expect(markup).toContain("Input is paused while this thread waits for your approval response.");
+    expect(markup).toContain("Interrupt thread");
     expect(markup).toContain("Please explain the diff.");
     expect(markup).toContain("Streaming update");
     expect(markup).toContain("approval.requested");
+    expect(markup.match(/<textarea/g) ?? []).toHaveLength(1);
+    expect(markup).toContain('id="thread-composer-input"');
+    expect(markup).not.toContain('id="thread-input"');
+    expect(markup).not.toContain('id="message-input"');
   });
 
   it("renders transient feedback above the chat panels", () => {
@@ -339,18 +344,15 @@ describe("ChatView", () => {
         isLoadingWorkspaces={false}
         isRespondingToRequest={false}
         isSendingMessage={false}
-        messageDraft=""
-        newThreadInput=""
+        composerDraft=""
         onCreateWorkspace={() => {}}
         onApproveRequest={() => {}}
-        onCreateThread={() => {}}
+        onSubmitComposer={() => {}}
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
-        onMessageDraftChange={() => {}}
-        onNewThreadInputChange={() => {}}
+        onComposerDraftChange={() => {}}
         onSelectWorkspace={() => {}}
         onSelectThread={() => {}}
-        onSendMessage={() => {}}
         onWorkspaceNameChange={() => {}}
         selectedRequestDetail={null}
         selectedThreadId={null}
@@ -386,18 +388,15 @@ describe("ChatView", () => {
         isLoadingWorkspaces={false}
         isRespondingToRequest={false}
         isSendingMessage={false}
-        messageDraft=""
-        newThreadInput=""
+        composerDraft=""
         onCreateWorkspace={() => {}}
         onApproveRequest={() => {}}
-        onCreateThread={() => {}}
+        onSubmitComposer={() => {}}
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
-        onMessageDraftChange={() => {}}
-        onNewThreadInputChange={() => {}}
+        onComposerDraftChange={() => {}}
         onSelectWorkspace={() => {}}
         onSelectThread={() => {}}
-        onSendMessage={() => {}}
         onWorkspaceNameChange={() => {}}
         selectedRequestDetail={{
           request_id: "req_001",
@@ -451,6 +450,7 @@ describe("ChatView", () => {
             accepting_user_input: true,
             interrupt_available: false,
             blocked_by_request: false,
+            input_unavailable_reason: null,
           },
           timeline: {
             items: [],
@@ -472,5 +472,76 @@ describe("ChatView", () => {
     expect(markup).toContain("Reopen request detail");
     expect(markup).not.toContain("Approve request");
     expect(markup).not.toContain("Deny request");
+  });
+
+  it("renders recovery input-unavailable reason as the single disabled composer state", () => {
+    const markup = renderToStaticMarkup(
+      <ChatView
+        connectionState="idle"
+        draftAssistantMessages={{}}
+        errorMessage={null}
+        isCreatingThread={false}
+        isCreatingWorkspace={false}
+        isInterruptingThread={false}
+        isLoadingThread={false}
+        isLoadingThreads={false}
+        isLoadingWorkspaces={false}
+        isRespondingToRequest={false}
+        isSendingMessage={false}
+        composerDraft="Follow up after recovery."
+        onCreateWorkspace={() => {}}
+        onApproveRequest={() => {}}
+        onSubmitComposer={() => {}}
+        onDenyRequest={() => {}}
+        onInterruptThread={() => {}}
+        onComposerDraftChange={() => {}}
+        onSelectWorkspace={() => {}}
+        onSelectThread={() => {}}
+        onWorkspaceNameChange={() => {}}
+        selectedRequestDetail={null}
+        selectedThreadId="thread_001"
+        selectedThreadView={{
+          thread: {
+            thread_id: "thread_001",
+            workspace_id: "ws_alpha",
+            native_status: {
+              thread_status: "idle",
+              active_flags: [],
+              latest_turn_status: "failed",
+            },
+            updated_at: "2026-03-27T05:22:00Z",
+          },
+          current_activity: {
+            kind: "latest_turn_failed",
+            label: "Latest turn failed",
+          },
+          pending_request: null,
+          latest_resolved_request: null,
+          composer: {
+            accepting_user_input: false,
+            interrupt_available: false,
+            blocked_by_request: false,
+            input_unavailable_reason: "recovery_pending",
+          },
+          timeline: {
+            items: [],
+            next_cursor: null,
+            has_more: false,
+          },
+        }}
+        statusMessage={null}
+        streamEvents={[]}
+        threads={[]}
+        workspaceId="ws_alpha"
+        workspaceName=""
+        workspaces={[]}
+      />,
+    );
+
+    expect(markup).toContain("Input unavailable: recovery pending.");
+    expect(markup.match(/<textarea/g) ?? []).toHaveLength(1);
+    expect(markup).toContain("disabled");
+    expect(markup).not.toContain('id="thread-input"');
+    expect(markup).not.toContain('id="message-input"');
   });
 });

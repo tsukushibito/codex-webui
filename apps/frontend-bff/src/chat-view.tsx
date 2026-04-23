@@ -31,16 +31,13 @@ export interface ChatViewProps {
   errorMessage: string | null;
   statusMessage: string | null;
   workspaceName: string;
-  newThreadInput: string;
-  messageDraft: string;
+  composerDraft: string;
   onWorkspaceNameChange: (value: string) => void;
-  onNewThreadInputChange: (value: string) => void;
-  onMessageDraftChange: (value: string) => void;
-  onCreateThread: () => void;
+  onComposerDraftChange: (value: string) => void;
+  onSubmitComposer: () => void;
   onCreateWorkspace: () => void;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectThread: (threadId: string) => void;
-  onSendMessage: () => void;
   onInterruptThread: () => void;
   onApproveRequest: () => void;
   onDenyRequest: () => void;
@@ -149,6 +146,32 @@ function timelineItemLabel(item: PublicTimelineItem) {
   return String(item.payload.content ?? item.payload.summary ?? item.kind);
 }
 
+function composerUnavailableReason(threadView: PublicThreadView | null) {
+  if (!threadView) {
+    return null;
+  }
+
+  if (threadView.composer.blocked_by_request || threadView.pending_request) {
+    return "Input is paused while this thread waits for your approval response.";
+  }
+
+  if (threadView.current_activity.kind === "running") {
+    return threadView.composer.interrupt_available
+      ? "Codex is running. Interrupt is available if you need to regain control."
+      : "Codex is running. New input will be available when the turn finishes.";
+  }
+
+  if (threadView.composer.input_unavailable_reason) {
+    return `Input unavailable: ${formatMachineLabel(threadView.composer.input_unavailable_reason)}.`;
+  }
+
+  if (!threadView.composer.accepting_user_input) {
+    return "Input is not available for the current thread state.";
+  }
+
+  return null;
+}
+
 export function ChatView({
   workspaceId,
   workspaces,
@@ -170,16 +193,13 @@ export function ChatView({
   errorMessage,
   statusMessage,
   workspaceName,
-  newThreadInput,
-  messageDraft,
+  composerDraft,
   onWorkspaceNameChange,
-  onNewThreadInputChange,
-  onMessageDraftChange,
-  onCreateThread,
+  onComposerDraftChange,
+  onSubmitComposer,
   onCreateWorkspace,
   onSelectWorkspace,
   onSelectThread,
-  onSendMessage,
   onInterruptThread,
   onApproveRequest,
   onDenyRequest,
@@ -190,6 +210,36 @@ export function ChatView({
   const selectedWorkspace =
     workspaces.find((workspace) => workspace.workspace_id === workspaceId) ?? null;
   const threadGroups = groupThreads(threads);
+  const hasSelectedThread = selectedThreadId !== null;
+  const isOpeningSelectedThread = hasSelectedThread && !selectedThreadView;
+  const isStartingThread = !hasSelectedThread;
+  const isSubmittingComposer = isCreatingThread || isSendingMessage;
+  const unavailableReason = composerUnavailableReason(selectedThreadView);
+  const isThreadAcceptingInput = selectedThreadView?.composer.accepting_user_input ?? false;
+  const isComposerDisabled =
+    !workspaceId ||
+    isOpeningSelectedThread ||
+    isSubmittingComposer ||
+    (selectedThreadView ? !isThreadAcceptingInput : false) ||
+    composerDraft.trim().length === 0;
+  const composerLabel = isStartingThread ? "Ask Codex" : "Send input";
+  const composerPlaceholder = !workspaceId
+    ? "Select a workspace before asking Codex."
+    : isStartingThread
+      ? "Describe the task to start a new thread."
+      : "Continue the current thread.";
+  const composerSubmitLabel = isSubmittingComposer
+    ? isStartingThread
+      ? "Starting thread..."
+      : "Sending..."
+    : isStartingThread
+      ? "Start thread"
+      : "Send input";
+  const composerGuidance = !workspaceId
+    ? "Select or create a workspace from Navigation before starting work."
+    : isOpeningSelectedThread
+      ? "Opening the selected thread before accepting input."
+      : unavailableReason;
   const selectedTimelineItem =
     detailSelection?.kind === "timeline_item_detail"
       ? (selectedThreadView?.timeline.items.find(
@@ -372,15 +422,28 @@ export function ChatView({
                 <span className="status-badge success">
                   {selectedThreadView.current_activity.label}
                 </span>
+              ) : isOpeningSelectedThread ? (
+                <span className="status-badge">Opening</span>
+              ) : workspaceId ? (
+                <span className="status-badge">Ready to start</span>
               ) : null}
             </div>
-            <h2>{selectedThreadView?.thread.thread_id ?? "Select a thread"}</h2>
+            <h2>
+              {selectedThreadView?.thread.thread_id ??
+                (isOpeningSelectedThread
+                  ? "Opening thread"
+                  : workspaceId
+                    ? "New thread"
+                    : "Select workspace")}
+            </h2>
             <p className="workspace-meta">
               {selectedThreadView
                 ? `Updated ${formatTimestamp(selectedThreadView.thread.updated_at)}`
-                : workspaceId
-                  ? "Ask Codex to start a new thread, or pick a thread from Navigation."
-                  : "Select or create a workspace from Navigation before starting work."}
+                : isOpeningSelectedThread
+                  ? `Loading ${selectedThreadId}.`
+                  : workspaceId
+                    ? "Ask Codex to start a new thread, or pick a thread from Navigation."
+                    : "Select or create a workspace from Navigation before starting work."}
             </p>
             <div className="hero-metrics thread-context-metrics">
               <span className="metric-chip">Workspace: {workspaceId}</span>
@@ -404,30 +467,28 @@ export function ChatView({
             </div>
           </header>
 
-          {workspaceId && !selectedThreadView ? (
-            <div className="create-form first-input-card">
-              <label className="form-label" htmlFor="thread-input">
-                Ask Codex
-                <textarea
-                  className="chat-textarea"
-                  id="thread-input"
-                  name="thread-input"
-                  onChange={(event) => onNewThreadInputChange(event.target.value)}
-                  placeholder="Describe the task to start a new thread."
-                  rows={4}
-                  value={newThreadInput}
-                />
-              </label>
-              <button
-                className="submit-button"
-                disabled={isCreatingThread || newThreadInput.trim().length === 0}
-                onClick={onCreateThread}
-                type="button"
-              >
-                {isCreatingThread ? "Starting thread..." : "Start thread"}
-              </button>
+          <div className="current-activity-card">
+            <div className="workspace-meta-row">
+              <strong>Current activity</strong>
+              <span className="status-badge">
+                {selectedThreadView?.current_activity.label ??
+                  (isOpeningSelectedThread
+                    ? "Opening"
+                    : workspaceId
+                      ? "Ready for first input"
+                      : "Workspace required")}
+              </span>
             </div>
-          ) : null}
+            <p className="workspace-meta">
+              {selectedThreadView
+                ? formatMachineLabel(selectedThreadView.current_activity.kind)
+                : isOpeningSelectedThread
+                  ? "Thread details are loading."
+                  : workspaceId
+                    ? "First input will create a new thread in this workspace."
+                    : "Choose a workspace to enable the composer."}
+            </p>
+          </div>
 
           {selectedThreadView?.pending_request ? (
             <div className="request-detail-card pending-request-card">
@@ -496,16 +557,18 @@ export function ChatView({
             </div>
           ) : null}
 
-          <div className="workspace-actions">
-            <button
-              className="secondary-link action-button"
-              disabled={!selectedThreadView?.composer.interrupt_available || isInterruptingThread}
-              onClick={onInterruptThread}
-              type="button"
-            >
-              {isInterruptingThread ? "Interrupting..." : "Interrupt thread"}
-            </button>
-          </div>
+          {selectedThreadView?.composer.interrupt_available ? (
+            <div className="workspace-actions thread-interrupt-actions">
+              <button
+                className="secondary-link action-button"
+                disabled={isInterruptingThread}
+                onClick={onInterruptThread}
+                type="button"
+              >
+                {isInterruptingThread ? "Interrupting..." : "Interrupt thread"}
+              </button>
+            </div>
+          ) : null}
 
           <section className="timeline-section" aria-label="Timeline">
             <header>
@@ -578,30 +641,43 @@ export function ChatView({
             </div>
           </section>
 
-          <div className="chat-composer">
-            <label className="form-label" htmlFor="message-input">
-              Send follow-up input
+          <div className="chat-composer" data-composer-mode={isStartingThread ? "start" : "send"}>
+            <label className="form-label" htmlFor="thread-composer-input">
+              {composerLabel}
               <textarea
                 className="chat-textarea"
-                id="message-input"
-                name="message-input"
-                onChange={(event) => onMessageDraftChange(event.target.value)}
-                placeholder="Continue the current thread."
+                disabled={
+                  !workspaceId ||
+                  isOpeningSelectedThread ||
+                  isSubmittingComposer ||
+                  Boolean(unavailableReason)
+                }
+                id="thread-composer-input"
+                name="thread-composer-input"
+                onChange={(event) => onComposerDraftChange(event.target.value)}
+                placeholder={composerPlaceholder}
                 rows={4}
-                value={messageDraft}
+                value={composerDraft}
               />
             </label>
+            {composerGuidance ? (
+              <p className="composer-guidance" role="status">
+                {composerGuidance}
+              </p>
+            ) : (
+              <p className="composer-guidance" role="status">
+                {isStartingThread
+                  ? "First input starts a new thread in this workspace."
+                  : "Input will continue the selected thread."}
+              </p>
+            )}
             <button
               className="submit-button"
-              disabled={
-                !selectedThreadView?.composer.accepting_user_input ||
-                isSendingMessage ||
-                messageDraft.trim().length === 0
-              }
-              onClick={onSendMessage}
+              disabled={isComposerDisabled}
+              onClick={onSubmitComposer}
               type="button"
             >
-              {isSendingMessage ? "Sending..." : "Send reply"}
+              {composerSubmitLabel}
             </button>
           </div>
         </section>

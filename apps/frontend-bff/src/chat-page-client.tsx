@@ -116,8 +116,7 @@ export function ChatPageClient() {
   );
   const [streamEvents, setStreamEvents] = useState<PublicThreadStreamEvent[]>([]);
   const [draftAssistantMessages, setDraftAssistantMessages] = useState<Record<string, string>>({});
-  const [newThreadInput, setNewThreadInput] = useState("");
-  const [messageDraft, setMessageDraft] = useState("");
+  const [composerDraft, setComposerDraft] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isLoadingThreads, setIsLoadingThreads] = useState(false);
@@ -519,14 +518,33 @@ export function ChatPageClient() {
     };
   }, [workspaceId]);
 
-  async function handleCreateThread() {
-    if (!workspaceId) {
-      setErrorMessage("Choose or create a workspace before starting a thread.");
+  async function handleSubmitComposer() {
+    const trimmedDraft = composerDraft.trim();
+    if (trimmedDraft.length === 0) {
       return;
     }
 
-    const trimmedInput = newThreadInput.trim();
-    if (trimmedInput.length === 0) {
+    if (selectedThreadId) {
+      setIsSendingMessage(true);
+      setErrorMessage(null);
+      setStatusMessage(null);
+
+      try {
+        await sendThreadInput(selectedThreadId, trimmedDraft, createClientId("input_followup"));
+        setComposerDraft("");
+        setStatusMessage("Input accepted. Waiting for thread updates.");
+        await refreshSelectedThreadAndList(selectedThreadId);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Failed to send input.");
+      } finally {
+        setIsSendingMessage(false);
+      }
+
+      return;
+    }
+
+    if (!workspaceId) {
+      setErrorMessage("Choose or create a workspace before starting a thread.");
       return;
     }
 
@@ -537,13 +555,13 @@ export function ChatPageClient() {
     try {
       const result = await startThreadFromChat(
         workspaceId,
-        trimmedInput,
+        trimmedDraft,
         createClientId("input_start"),
       );
       logLiveChatDebug("chat-stream", "created thread from chat", {
         thread_id: result.thread.thread_id,
       });
-      setNewThreadInput("");
+      setComposerDraft("");
       setStatusMessage(`Started thread ${result.thread.thread_id}.`);
       updateSelectedThreadId(result.thread.thread_id, "create_thread_success");
       await refreshThreads(result.thread.thread_id);
@@ -604,32 +622,6 @@ export function ChatPageClient() {
       setErrorMessage(error instanceof Error ? error.message : "Failed to create workspace.");
     } finally {
       setIsCreatingWorkspace(false);
-    }
-  }
-
-  async function handleSendMessage() {
-    if (!selectedThreadId) {
-      return;
-    }
-
-    const trimmedDraft = messageDraft.trim();
-    if (trimmedDraft.length === 0) {
-      return;
-    }
-
-    setIsSendingMessage(true);
-    setErrorMessage(null);
-    setStatusMessage(null);
-
-    try {
-      await sendThreadInput(selectedThreadId, trimmedDraft, createClientId("input_followup"));
-      setMessageDraft("");
-      setStatusMessage("Input accepted. Waiting for thread updates.");
-      await refreshSelectedThreadAndList(selectedThreadId);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to send input.");
-    } finally {
-      setIsSendingMessage(false);
     }
   }
 
@@ -694,18 +686,15 @@ export function ChatPageClient() {
       isLoadingWorkspaces={isLoadingWorkspaces}
       isRespondingToRequest={isRespondingToRequest}
       isSendingMessage={isSendingMessage}
-      messageDraft={messageDraft}
-      newThreadInput={newThreadInput}
+      composerDraft={composerDraft}
       onApproveRequest={() => void handleRequestDecision("approved")}
-      onCreateThread={() => void handleCreateThread()}
+      onComposerDraftChange={setComposerDraft}
       onCreateWorkspace={() => void handleCreateWorkspace()}
-      onMessageDraftChange={setMessageDraft}
-      onNewThreadInputChange={setNewThreadInput}
       onDenyRequest={() => void handleRequestDecision("denied")}
       onInterruptThread={() => void handleInterruptThread()}
       onSelectWorkspace={(nextWorkspaceId) => void handleSelectWorkspace(nextWorkspaceId)}
       onSelectThread={(threadId) => updateSelectedThreadId(threadId, "user_select_thread")}
-      onSendMessage={() => void handleSendMessage()}
+      onSubmitComposer={() => void handleSubmitComposer()}
       onWorkspaceNameChange={setWorkspaceName}
       selectedRequestDetail={selectedRequestDetail}
       selectedThreadId={selectedThreadId}
