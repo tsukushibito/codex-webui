@@ -1,7 +1,7 @@
-import { HomePageClient } from "@/src/home-page-client";
+import { ChatPageClient } from "@/src/chat-page-client";
 
 export const dynamic = "force-dynamic";
 
 export default function HomePage() {
-  return <HomePageClient />;
+  return <ChatPageClient />;
 }

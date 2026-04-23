@@ -4,9 +4,12 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import {
+  createWorkspaceFromChat,
   interruptThreadFromChat,
+  listChatWorkspaces,
   listWorkspaceThreads,
   loadChatThreadBundle,
+  type PublicWorkspaceSummary,
   respondToPendingRequest,
   sendThreadInput,
   startThreadFromChat,
@@ -75,10 +78,36 @@ function hasStreamSequenceInconsistency(
   return maxSequence > 0 && nextEvent.sequence > maxSequence + 1;
 }
 
+function chooseDefaultWorkspaceId(workspaces: PublicWorkspaceSummary[]) {
+  return (
+    workspaces.toSorted((left, right) => right.updated_at.localeCompare(left.updated_at))[0]
+      ?.workspace_id ?? null
+  );
+}
+
+function replaceChatUrl(workspaceId: string | null, threadId: string | null) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const params = new URLSearchParams();
+  if (workspaceId) {
+    params.set("workspaceId", workspaceId);
+  }
+  if (threadId) {
+    params.set("threadId", threadId);
+  }
+
+  const nextUrl = params.size > 0 ? `/chat?${params.toString()}` : "/chat";
+  window.history.replaceState(null, "", nextUrl);
+}
+
 export function ChatPageClient() {
   const searchParams = useSearchParams();
-  const workspaceId = searchParams.get("workspaceId");
+  const initialWorkspaceId = searchParams.get("workspaceId");
   const initialThreadId = searchParams.get("threadId");
+  const [workspaces, setWorkspaces] = useState<PublicWorkspaceSummary[]>([]);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(initialWorkspaceId);
   const [threads, setThreads] = useState<PublicThreadListItem[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(initialThreadId);
   const [selectedThreadView, setSelectedThreadView] = useState<PublicThreadView | null>(null);
@@ -92,6 +121,9 @@ export function ChatPageClient() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isLoadingThreads, setIsLoadingThreads] = useState(false);
+  const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
+  const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
+  const [workspaceName, setWorkspaceName] = useState("");
   const [isLoadingThread, setIsLoadingThread] = useState(false);
   const [isCreatingThread, setIsCreatingThread] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
@@ -119,6 +151,31 @@ export function ChatPageClient() {
     });
     selectedThreadIdRef.current = nextThreadId;
     setSelectedThreadId(nextThreadId);
+    replaceChatUrl(workspaceId, nextThreadId);
+  }
+
+  async function refreshWorkspaces(preferredWorkspaceId?: string | null) {
+    const nextPreferredWorkspaceId = preferredWorkspaceId ?? workspaceId;
+    setIsLoadingWorkspaces(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await listChatWorkspaces();
+      setWorkspaces(response.items);
+
+      const nextWorkspaceId =
+        nextPreferredWorkspaceId &&
+        response.items.some((workspace) => workspace.workspace_id === nextPreferredWorkspaceId)
+          ? nextPreferredWorkspaceId
+          : chooseDefaultWorkspaceId(response.items);
+
+      setWorkspaceId(nextWorkspaceId);
+      replaceChatUrl(nextWorkspaceId, selectedThreadIdRef.current);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to load workspaces.");
+    } finally {
+      setIsLoadingWorkspaces(false);
+    }
   }
 
   async function convergeStartedThreadSendability(threadId: string) {
@@ -177,13 +234,10 @@ export function ChatPageClient() {
       const nextSelectedThreadId =
         preferredThreadId && response.items.some((thread) => thread.thread_id === preferredThreadId)
           ? preferredThreadId
-          : selectedThreadId &&
-              response.items.some((thread) => thread.thread_id === selectedThreadId)
-            ? selectedThreadId
-            : initialThreadId &&
-                response.items.some((thread) => thread.thread_id === initialThreadId)
-              ? initialThreadId
-              : (response.items[0]?.thread_id ?? null);
+          : selectedThreadIdRef.current &&
+              response.items.some((thread) => thread.thread_id === selectedThreadIdRef.current)
+            ? selectedThreadIdRef.current
+            : null;
 
       updateSelectedThreadId(nextSelectedThreadId, "refresh_threads", {
         refresh_id: refreshId,
@@ -246,8 +300,12 @@ export function ChatPageClient() {
   }
 
   useEffect(() => {
+    void refreshWorkspaces(initialWorkspaceId);
+  }, []);
+
+  useEffect(() => {
     void refreshThreads(initialThreadId);
-  }, [workspaceId, initialThreadId]);
+  }, [workspaceId]);
 
   useEffect(() => {
     selectedThreadIdRef.current = selectedThreadId;
@@ -463,7 +521,7 @@ export function ChatPageClient() {
 
   async function handleCreateThread() {
     if (!workspaceId) {
-      setErrorMessage("Choose a workspace from Home before starting a thread.");
+      setErrorMessage("Choose or create a workspace before starting a thread.");
       return;
     }
 
@@ -494,6 +552,58 @@ export function ChatPageClient() {
       setErrorMessage(error instanceof Error ? error.message : "Failed to start a new thread.");
     } finally {
       setIsCreatingThread(false);
+    }
+  }
+
+  async function handleSelectWorkspace(nextWorkspaceId: string) {
+    if (nextWorkspaceId === workspaceId) {
+      return;
+    }
+
+    setWorkspaceId(nextWorkspaceId);
+    setThreads([]);
+    updateSelectedThreadId(null, "user_select_workspace", {
+      workspace_id: nextWorkspaceId,
+    });
+    setSelectedThreadView(null);
+    setSelectedRequestDetail(null);
+    setStreamEvents([]);
+    streamEventsRef.current = [];
+    setDraftAssistantMessages({});
+    setStatusMessage(null);
+    setErrorMessage(null);
+    replaceChatUrl(nextWorkspaceId, null);
+  }
+
+  async function handleCreateWorkspace() {
+    const trimmedName = workspaceName.trim();
+    if (trimmedName.length === 0) {
+      return;
+    }
+
+    setIsCreatingWorkspace(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+
+    try {
+      const workspace = await createWorkspaceFromChat(trimmedName);
+      setWorkspaceName("");
+      setStatusMessage(`Created workspace ${workspace.workspace_name}.`);
+      setWorkspaces((currentWorkspaces) => [
+        workspace,
+        ...currentWorkspaces.filter((item) => item.workspace_id !== workspace.workspace_id),
+      ]);
+      setWorkspaceId(workspace.workspace_id);
+      setThreads([]);
+      updateSelectedThreadId(null, "create_workspace_success", {
+        workspace_id: workspace.workspace_id,
+      });
+      replaceChatUrl(workspace.workspace_id, null);
+      void refreshWorkspaces(workspace.workspace_id);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to create workspace.");
+    } finally {
+      setIsCreatingWorkspace(false);
     }
   }
 
@@ -577,21 +687,26 @@ export function ChatPageClient() {
       draftAssistantMessages={draftAssistantMessages}
       errorMessage={errorMessage}
       isCreatingThread={isCreatingThread}
+      isCreatingWorkspace={isCreatingWorkspace}
       isInterruptingThread={isInterruptingThread}
       isLoadingThread={isLoadingThread}
       isLoadingThreads={isLoadingThreads}
+      isLoadingWorkspaces={isLoadingWorkspaces}
       isRespondingToRequest={isRespondingToRequest}
       isSendingMessage={isSendingMessage}
       messageDraft={messageDraft}
       newThreadInput={newThreadInput}
       onApproveRequest={() => void handleRequestDecision("approved")}
       onCreateThread={() => void handleCreateThread()}
+      onCreateWorkspace={() => void handleCreateWorkspace()}
       onMessageDraftChange={setMessageDraft}
       onNewThreadInputChange={setNewThreadInput}
       onDenyRequest={() => void handleRequestDecision("denied")}
       onInterruptThread={() => void handleInterruptThread()}
+      onSelectWorkspace={(nextWorkspaceId) => void handleSelectWorkspace(nextWorkspaceId)}
       onSelectThread={(threadId) => updateSelectedThreadId(threadId, "user_select_thread")}
       onSendMessage={() => void handleSendMessage()}
+      onWorkspaceNameChange={setWorkspaceName}
       selectedRequestDetail={selectedRequestDetail}
       selectedThreadId={selectedThreadId}
       selectedThreadView={selectedThreadView}
@@ -599,6 +714,8 @@ export function ChatPageClient() {
       streamEvents={streamEvents}
       threads={threads}
       workspaceId={workspaceId}
+      workspaceName={workspaceName}
+      workspaces={workspaces}
     />
   );
 }

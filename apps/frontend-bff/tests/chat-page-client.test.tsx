@@ -19,7 +19,9 @@ const searchParams = new URLSearchParams({
 });
 
 const chatDataMocks = vi.hoisted(() => ({
+  createWorkspaceFromChat: vi.fn(),
   interruptThreadFromChat: vi.fn(),
+  listChatWorkspaces: vi.fn(),
   listWorkspaceThreads: vi.fn(),
   loadChatThreadBundle: vi.fn(),
   respondToPendingRequest: vi.fn(),
@@ -48,7 +50,9 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("../src/chat-data", () => ({
+  createWorkspaceFromChat: chatDataMocks.createWorkspaceFromChat,
   interruptThreadFromChat: chatDataMocks.interruptThreadFromChat,
+  listChatWorkspaces: chatDataMocks.listChatWorkspaces,
   listWorkspaceThreads: chatDataMocks.listWorkspaceThreads,
   loadChatThreadBundle: chatDataMocks.loadChatThreadBundle,
   respondToPendingRequest: chatDataMocks.respondToPendingRequest,
@@ -75,6 +79,18 @@ function buildThreadListItem(overrides: Partial<PublicThreadListItem> = {}): Pub
     badge: null,
     blocked_cue: null,
     resume_cue: null,
+    ...overrides,
+  };
+}
+
+function buildWorkspace(overrides: Record<string, unknown> = {}) {
+  return {
+    workspace_id: "ws_alpha",
+    workspace_name: "alpha",
+    created_at: "2026-03-27T05:00:00Z",
+    updated_at: "2026-03-27T05:22:00Z",
+    active_session_summary: null,
+    pending_approval_count: 0,
     ...overrides,
   };
 }
@@ -232,12 +248,19 @@ describe("ChatPageClient", () => {
     root = createRoot(container);
     MockEventSource.instances = [];
 
+    chatDataMocks.createWorkspaceFromChat.mockReset();
     chatDataMocks.interruptThreadFromChat.mockReset();
+    chatDataMocks.listChatWorkspaces.mockReset();
     chatDataMocks.listWorkspaceThreads.mockReset();
     chatDataMocks.loadChatThreadBundle.mockReset();
     chatDataMocks.respondToPendingRequest.mockReset();
     chatDataMocks.sendThreadInput.mockReset();
     chatDataMocks.startThreadFromChat.mockReset();
+    chatDataMocks.listChatWorkspaces.mockResolvedValue({
+      items: [buildWorkspace()],
+      next_cursor: null,
+      has_more: false,
+    });
   });
 
   afterEach(async () => {
@@ -637,7 +660,7 @@ describe("ChatPageClient", () => {
       await flushUi();
 
       const startThreadButton = Array.from(container.querySelectorAll("button")).find(
-        (button) => button.textContent === "Start new thread",
+        (button) => button.textContent === "Start thread",
       );
       expect(startThreadButton).not.toBeUndefined();
 
@@ -693,6 +716,154 @@ describe("ChatPageClient", () => {
         searchParams.set("threadId", originalThreadId);
       } else {
         searchParams.delete("threadId");
+      }
+    }
+  });
+
+  it("creates a workspace from Navigation and starts first input in that workspace", async () => {
+    const originalThreadId = searchParams.get("threadId");
+    const originalWorkspaceId = searchParams.get("workspaceId");
+    searchParams.delete("threadId");
+    searchParams.delete("workspaceId");
+
+    chatDataMocks.listChatWorkspaces
+      .mockResolvedValueOnce({
+        items: [],
+        next_cursor: null,
+        has_more: false,
+      })
+      .mockResolvedValue({
+        items: [
+          buildWorkspace({
+            workspace_id: "ws_created",
+            workspace_name: "created",
+            updated_at: "2026-03-27T05:30:00Z",
+          }),
+        ],
+        next_cursor: null,
+        has_more: false,
+      });
+    chatDataMocks.createWorkspaceFromChat.mockResolvedValue(
+      buildWorkspace({
+        workspace_id: "ws_created",
+        workspace_name: "created",
+        updated_at: "2026-03-27T05:30:00Z",
+      }),
+    );
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [],
+      next_cursor: null,
+      has_more: false,
+    });
+    chatDataMocks.startThreadFromChat.mockResolvedValue(
+      buildAcceptedInputResponse({
+        accepted: {
+          thread_id: "thread_created",
+          turn_id: "turn_created_001",
+          input_item_id: "item_created_001",
+        },
+        thread: {
+          thread_id: "thread_created",
+          workspace_id: "ws_created",
+          native_status: {
+            thread_status: "running",
+            active_flags: ["turn_active"],
+            latest_turn_status: "running",
+          },
+          updated_at: "2026-03-27T05:31:00Z",
+        },
+      }),
+    );
+    chatDataMocks.loadChatThreadBundle.mockResolvedValue({
+      view: buildThreadView({
+        thread: {
+          thread_id: "thread_created",
+          workspace_id: "ws_created",
+          native_status: {
+            thread_status: "running",
+            active_flags: ["turn_active"],
+            latest_turn_status: "running",
+          },
+          updated_at: "2026-03-27T05:31:00Z",
+        },
+      }),
+      pendingRequestDetail: null,
+    });
+
+    try {
+      await act(async () => {
+        root.render(<ChatPageClient />);
+      });
+      await flushUi();
+
+      const workspaceInput = container.querySelector("#workspace-name");
+      expect(workspaceInput).not.toBeNull();
+
+      await act(async () => {
+        const setInputValue = Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          "value",
+        )?.set;
+
+        setInputValue?.call(workspaceInput as HTMLInputElement, "created");
+        workspaceInput!.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await flushUi();
+
+      const createWorkspaceButton = Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "Create workspace",
+      );
+      expect(createWorkspaceButton).not.toBeUndefined();
+
+      await act(async () => {
+        createWorkspaceButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      await flushUi();
+
+      expect(chatDataMocks.createWorkspaceFromChat).toHaveBeenCalledWith("created");
+      expect(container.textContent).toContain("Created workspace created.");
+      expect(container.textContent).toContain("Ask Codex");
+
+      const firstInputTextarea = container.querySelector("#thread-input");
+      expect(firstInputTextarea).not.toBeNull();
+
+      await act(async () => {
+        const setTextareaValue = Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value",
+        )?.set;
+
+        setTextareaValue?.call(firstInputTextarea as HTMLTextAreaElement, "Start scoped work.");
+        firstInputTextarea!.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await flushUi();
+
+      const startThreadButton = Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "Start thread",
+      );
+      expect(startThreadButton).not.toBeUndefined();
+
+      await act(async () => {
+        startThreadButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      await flushUi();
+
+      expect(chatDataMocks.startThreadFromChat).toHaveBeenCalledWith(
+        "ws_created",
+        "Start scoped work.",
+        expect.stringMatching(/^input_start_/),
+      );
+    } finally {
+      if (originalThreadId) {
+        searchParams.set("threadId", originalThreadId);
+      } else {
+        searchParams.delete("threadId");
+      }
+
+      if (originalWorkspaceId) {
+        searchParams.set("workspaceId", originalWorkspaceId);
+      } else {
+        searchParams.delete("workspaceId");
       }
     }
   });

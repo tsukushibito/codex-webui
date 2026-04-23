@@ -73,6 +73,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Archived Task Packages
 
+- [issue-181-navigation-home-replacement](./archive/issue-181-navigation-home-replacement/README.md)
 - [issue-180-contract-audit](./archive/issue-180-contract-audit/README.md)
 - [issue-179-desktop-state-spec](./archive/issue-179-desktop-state-spec/README.md)
 - [issue-178-benchmark-agent-uis](./archive/issue-178-benchmark-agent-uis/README.md)

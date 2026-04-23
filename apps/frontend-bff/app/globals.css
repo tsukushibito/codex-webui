@@ -38,7 +38,8 @@ a {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -143,7 +144,8 @@ select {
   padding-top: 8px;
 }
 
-.workspace-switcher select {
+.workspace-switcher select,
+.workspace-switcher input {
   width: 100%;
   border: 1px solid rgba(35, 24, 15, 0.14);
   border-radius: 14px;
@@ -152,7 +154,8 @@ select {
   padding: 10px 12px;
 }
 
-.workspace-switcher select:focus {
+.workspace-switcher select:focus,
+.workspace-switcher input:focus {
   outline: 2px solid rgba(184, 77, 36, 0.22);
   outline-offset: 1px;
 }
@@ -434,6 +437,50 @@ select {
   max-height: 28rem;
   overflow-y: auto;
   padding-right: 4px;
+}
+
+.thread-list-group {
+  display: grid;
+  gap: 8px;
+}
+
+.thread-list-group h3 {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.workspace-option-list,
+.workspace-create-form {
+  display: grid;
+  gap: 8px;
+}
+
+.workspace-option-card {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.68);
+  padding: 12px;
+  color: var(--text-main);
+  text-align: left;
+  cursor: pointer;
+}
+
+.workspace-option-card.active {
+  border-color: rgba(184, 77, 36, 0.4);
+  background: rgba(243, 223, 209, 0.45);
+}
+
+.first-input-card {
+  border: 1px solid rgba(35, 24, 15, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.58);
+  padding: 14px;
 }
 
 .thread-summary-card {

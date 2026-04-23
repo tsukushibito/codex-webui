@@ -1,5 +1,6 @@
 import type { PublicListResponse } from "./chat-types";
 import { isErrorEnvelope } from "./errors";
+import type { HomeResponse } from "./runtime-types";
 import type {
   PublicRequestDetail,
   PublicRequestResponseResult,
@@ -10,6 +11,7 @@ import type {
 } from "./thread-types";
 
 type FetchLike = typeof fetch;
+export type PublicWorkspaceSummary = HomeResponse["workspaces"][number];
 
 async function readJson<T>(response: Response) {
   const payload = (await response.json()) as unknown;
@@ -34,6 +36,32 @@ export async function listWorkspaceThreads(workspaceId: string, fetchImpl: Fetch
   });
 
   return readJson<PublicListResponse<PublicThreadListItem>>(response);
+}
+
+export async function listChatWorkspaces(fetchImpl: FetchLike = fetch) {
+  const response = await fetchImpl("/api/v1/workspaces", {
+    cache: "no-store",
+    headers: {
+      accept: "application/json",
+    },
+  });
+
+  return readJson<PublicListResponse<PublicWorkspaceSummary>>(response);
+}
+
+export async function createWorkspaceFromChat(workspaceName: string, fetchImpl: FetchLike = fetch) {
+  const response = await fetchImpl("/api/v1/workspaces", {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      workspace_name: workspaceName,
+    }),
+  });
+
+  return readJson<PublicWorkspaceSummary>(response);
 }
 
 export async function startThreadFromChat(
