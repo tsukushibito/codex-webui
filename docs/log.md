@@ -29,6 +29,27 @@ After the heading, keep the body concise:
 
 ## Entries
 
+## [2026-04-23] ingest | Issue #180 contract audit
+
+Source:
+
+- approved sprint slice for Issue #180
+- `tasks/issue-180-contract-audit/README.md`
+- v0.9 public, internal, and common API specs
+
+Updated:
+
+- `docs/specs/codex_webui_public_api_v0_9.md`
+- `docs/specs/codex_webui_internal_api_v0_9.md`
+- `docs/specs/codex_webui_common_spec_v0_9.md`
+- `docs/log.md`
+- `tasks/issue-180-contract-audit/README.md`
+
+Notes:
+
+- tightened maintained contracts for thread Navigation cue material, `thread_view` helper shape, request-helper identity and confirmation fields, pending-request absence semantics, ordering and REST reacquisition triggers, first-input idempotency, and public absorption of internal open-required handling
+- preserved approval as thread-scoped request flow and did not add standalone canonical approval resources or a required global approval inbox
+
 ## [2026-04-23] ingest | Issue #179 desktop state specification
 
 Source:

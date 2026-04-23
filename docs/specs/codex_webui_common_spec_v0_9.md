@@ -302,6 +302,8 @@ This document does not freeze the default sort for each resource.
 
 Thread-scoped event, timeline, and request-flow representations must have a stable ordering basis that supports deduplication and reacquisition convergence.
 
+For the maintained v0.9 public and internal contracts, that basis is `thread_id + sequence`.
+
 Implementations must provide at least one of:
 
 - a monotonic thread-comparable ordering key
