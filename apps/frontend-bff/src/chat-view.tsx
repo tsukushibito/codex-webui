@@ -15,6 +15,10 @@ export interface ChatViewProps {
   workspaceId: string | null;
   workspaces: PublicWorkspaceSummary[];
   threads: PublicThreadListItem[];
+  backgroundPriorityNotice: {
+    threadId: string;
+    reason: string;
+  } | null;
   selectedThreadId: string | null;
   selectedThreadView: PublicThreadView | null;
   selectedRequestDetail: PublicRequestDetail | null;
@@ -39,6 +43,7 @@ export interface ChatViewProps {
   onCreateWorkspace: () => void;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectThread: (threadId: string) => void;
+  onOpenBackgroundPriorityThread: (threadId: string) => void;
   onInterruptThread: () => void;
   onApproveRequest: () => void;
   onDenyRequest: () => void;
@@ -181,6 +186,7 @@ export function ChatView({
   workspaceId,
   workspaces,
   threads,
+  backgroundPriorityNotice,
   selectedThreadId,
   selectedThreadView,
   selectedRequestDetail,
@@ -205,6 +211,7 @@ export function ChatView({
   onCreateWorkspace,
   onSelectWorkspace,
   onSelectThread,
+  onOpenBackgroundPriorityThread,
   onInterruptThread,
   onApproveRequest,
   onDenyRequest,
@@ -297,6 +304,28 @@ export function ChatView({
               </p>
             ) : null}
           </div>
+        ) : null}
+        {backgroundPriorityNotice ? (
+          <section aria-live="polite" className="background-priority-notice" role="status">
+            <div className="workspace-meta-row">
+              <strong>Background thread needs attention</strong>
+              <span className="status-badge warning">High priority</span>
+            </div>
+            <p>
+              <strong>{backgroundPriorityNotice.threadId}</strong>
+              {" needs attention now."}
+            </p>
+            <p className="workspace-meta">Reason: {backgroundPriorityNotice.reason}</p>
+            <div className="workspace-actions">
+              <button
+                className="primary-link action-button compact-button"
+                onClick={() => onOpenBackgroundPriorityThread(backgroundPriorityNotice.threadId)}
+                type="button"
+              >
+                Open thread
+              </button>
+            </div>
+          </section>
         ) : null}
 
         <section

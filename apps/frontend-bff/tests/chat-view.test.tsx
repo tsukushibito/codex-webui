@@ -24,6 +24,7 @@ describe("ChatView", () => {
   it("renders Navigation workspace switching, creation, and grouped thread cues", () => {
     const markup = renderToStaticMarkup(
       <ChatView
+        backgroundPriorityNotice={null}
         connectionState="idle"
         draftAssistantMessages={{}}
         errorMessage={null}
@@ -41,6 +42,7 @@ describe("ChatView", () => {
         onCreateWorkspace={() => {}}
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
+        onOpenBackgroundPriorityThread={() => {}}
         onComposerDraftChange={() => {}}
         onSelectThread={() => {}}
         onSelectWorkspace={() => {}}
@@ -164,6 +166,7 @@ describe("ChatView", () => {
   it("renders thread context, pending request controls, and timeline state", () => {
     const markup = renderToStaticMarkup(
       <ChatView
+        backgroundPriorityNotice={null}
         connectionState="live"
         draftAssistantMessages={{
           draft_001: "Streaming update",
@@ -183,6 +186,7 @@ describe("ChatView", () => {
         onSubmitComposer={() => {}}
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
+        onOpenBackgroundPriorityThread={() => {}}
         onComposerDraftChange={() => {}}
         onSelectWorkspace={() => {}}
         onSelectThread={() => {}}
@@ -346,6 +350,7 @@ describe("ChatView", () => {
   it("renders transient feedback above the chat panels", () => {
     const markup = renderToStaticMarkup(
       <ChatView
+        backgroundPriorityNotice={null}
         connectionState="live"
         draftAssistantMessages={{}}
         errorMessage="Failed to interrupt the thread."
@@ -363,6 +368,7 @@ describe("ChatView", () => {
         onSubmitComposer={() => {}}
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
+        onOpenBackgroundPriorityThread={() => {}}
         onComposerDraftChange={() => {}}
         onSelectWorkspace={() => {}}
         onSelectThread={() => {}}
@@ -390,6 +396,7 @@ describe("ChatView", () => {
   it("renders latest resolved request recovery affordance without response controls", () => {
     const markup = renderToStaticMarkup(
       <ChatView
+        backgroundPriorityNotice={null}
         connectionState="idle"
         draftAssistantMessages={{}}
         errorMessage={null}
@@ -407,6 +414,7 @@ describe("ChatView", () => {
         onSubmitComposer={() => {}}
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
+        onOpenBackgroundPriorityThread={() => {}}
         onComposerDraftChange={() => {}}
         onSelectWorkspace={() => {}}
         onSelectThread={() => {}}
@@ -487,9 +495,57 @@ describe("ChatView", () => {
     expect(markup).not.toContain("Deny request");
   });
 
+  it("renders a targeted background-priority notice with a direct thread action", () => {
+    const markup = renderToStaticMarkup(
+      <ChatView
+        backgroundPriorityNotice={{
+          threadId: "thread_background",
+          reason: "Needs response",
+        }}
+        connectionState="live"
+        draftAssistantMessages={{}}
+        errorMessage={null}
+        isCreatingThread={false}
+        isCreatingWorkspace={false}
+        isInterruptingThread={false}
+        isLoadingThread={false}
+        isLoadingThreads={false}
+        isLoadingWorkspaces={false}
+        isRespondingToRequest={false}
+        isSendingMessage={false}
+        composerDraft=""
+        onCreateWorkspace={() => {}}
+        onApproveRequest={() => {}}
+        onSubmitComposer={() => {}}
+        onDenyRequest={() => {}}
+        onInterruptThread={() => {}}
+        onOpenBackgroundPriorityThread={() => {}}
+        onComposerDraftChange={() => {}}
+        onSelectWorkspace={() => {}}
+        onSelectThread={() => {}}
+        onWorkspaceNameChange={() => {}}
+        selectedRequestDetail={null}
+        selectedThreadId="thread_001"
+        selectedThreadView={null}
+        statusMessage="High-priority background thread needs attention."
+        streamEvents={[]}
+        threads={[]}
+        workspaceId="ws_alpha"
+        workspaceName=""
+        workspaces={[]}
+      />,
+    );
+
+    expect(markup).toContain("Background thread needs attention");
+    expect(markup).toContain("thread_background");
+    expect(markup).toContain("Reason: Needs response");
+    expect(markup).toContain("Open thread");
+  });
+
   it("renders recovery input-unavailable reason as the single disabled composer state", () => {
     const markup = renderToStaticMarkup(
       <ChatView
+        backgroundPriorityNotice={null}
         connectionState="idle"
         draftAssistantMessages={{}}
         errorMessage={null}
@@ -507,6 +563,7 @@ describe("ChatView", () => {
         onSubmitComposer={() => {}}
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
+        onOpenBackgroundPriorityThread={() => {}}
         onComposerDraftChange={() => {}}
         onSelectWorkspace={() => {}}
         onSelectThread={() => {}}

@@ -102,6 +102,15 @@ function replaceChatUrl(workspaceId: string | null, threadId: string | null) {
   window.history.replaceState(null, "", nextUrl);
 }
 
+function derivePriorityReason(thread: PublicThreadListItem) {
+  return (
+    thread.blocked_cue?.label ??
+    thread.resume_cue?.label ??
+    thread.badge?.label ??
+    thread.current_activity.label
+  );
+}
+
 export function ChatPageClient() {
   const searchParams = useSearchParams();
   const initialWorkspaceId = searchParams.get("workspaceId");
@@ -119,6 +128,10 @@ export function ChatPageClient() {
   const [composerDraft, setComposerDraft] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [backgroundPriorityNotice, setBackgroundPriorityNotice] = useState<{
+    threadId: string;
+    reason: string;
+  } | null>(null);
   const [isLoadingThreads, setIsLoadingThreads] = useState(false);
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
@@ -214,7 +227,7 @@ export function ChatPageClient() {
     if (!workspaceId) {
       setThreads([]);
       setSelectedThreadId(null);
-      return;
+      return null;
     }
 
     const refreshId = threadListRefreshIdRef.current + 1;
@@ -241,10 +254,12 @@ export function ChatPageClient() {
       updateSelectedThreadId(nextSelectedThreadId, "refresh_threads", {
         refresh_id: refreshId,
       });
+      return response.items;
     } catch (error) {
       if (threadListRefreshIdRef.current === refreshId) {
         setErrorMessage(error instanceof Error ? error.message : "Failed to load threads.");
       }
+      return null;
     } finally {
       if (threadListRefreshIdRef.current === refreshId) {
         setIsLoadingThreads(false);
@@ -323,6 +338,7 @@ export function ChatPageClient() {
       setStreamEvents([]);
       streamEventsRef.current = [];
       setDraftAssistantMessages({});
+      setBackgroundPriorityNotice(null);
       setConnectionState("idle");
       return;
     }
@@ -501,11 +517,29 @@ export function ChatPageClient() {
 
       const currentThreadId = selectedThreadIdRef.current;
       if (currentThreadId && event.thread_id === currentThreadId) {
+        setBackgroundPriorityNotice(null);
         void refreshSelectedThreadAndList(currentThreadId);
         return;
       }
 
-      void refreshThreads(currentThreadId);
+      void refreshThreads(currentThreadId).then((refreshedThreads) => {
+        if (!event.high_priority) {
+          return;
+        }
+
+        const targetThread =
+          refreshedThreads?.find((thread) => thread.thread_id === event.thread_id) ?? null;
+
+        if (!targetThread) {
+          setBackgroundPriorityNotice(null);
+          return;
+        }
+
+        setBackgroundPriorityNotice({
+          threadId: targetThread.thread_id,
+          reason: derivePriorityReason(targetThread),
+        });
+      });
     };
 
     notifications.onerror = () => {
@@ -588,6 +622,7 @@ export function ChatPageClient() {
     setStreamEvents([]);
     streamEventsRef.current = [];
     setDraftAssistantMessages({});
+    setBackgroundPriorityNotice(null);
     setStatusMessage(null);
     setErrorMessage(null);
     replaceChatUrl(nextWorkspaceId, null);
@@ -613,6 +648,7 @@ export function ChatPageClient() {
       ]);
       setWorkspaceId(workspace.workspace_id);
       setThreads([]);
+      setBackgroundPriorityNotice(null);
       updateSelectedThreadId(null, "create_workspace_success", {
         workspace_id: workspace.workspace_id,
       });
@@ -673,8 +709,16 @@ export function ChatPageClient() {
     }
   }
 
+  function handleSelectThread(threadId: string, reason: string) {
+    setBackgroundPriorityNotice((currentNotice) =>
+      currentNotice?.threadId === threadId ? null : currentNotice,
+    );
+    updateSelectedThreadId(threadId, reason);
+  }
+
   return (
     <ChatView
+      backgroundPriorityNotice={backgroundPriorityNotice}
       connectionState={connectionState}
       draftAssistantMessages={draftAssistantMessages}
       errorMessage={errorMessage}
@@ -691,9 +735,12 @@ export function ChatPageClient() {
       onComposerDraftChange={setComposerDraft}
       onCreateWorkspace={() => void handleCreateWorkspace()}
       onDenyRequest={() => void handleRequestDecision("denied")}
+      onOpenBackgroundPriorityThread={(threadId) =>
+        handleSelectThread(threadId, "background_priority_notice")
+      }
       onInterruptThread={() => void handleInterruptThread()}
       onSelectWorkspace={(nextWorkspaceId) => void handleSelectWorkspace(nextWorkspaceId)}
-      onSelectThread={(threadId) => updateSelectedThreadId(threadId, "user_select_thread")}
+      onSelectThread={(threadId) => handleSelectThread(threadId, "user_select_thread")}
       onSubmitComposer={() => void handleSubmitComposer()}
       onWorkspaceNameChange={setWorkspaceName}
       selectedRequestDetail={selectedRequestDetail}
