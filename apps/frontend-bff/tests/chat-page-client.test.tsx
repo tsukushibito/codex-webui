@@ -1133,26 +1133,96 @@ describe("ChatPageClient", () => {
     );
   });
 
-  it("uses global notification events as refresh triggers and high-priority signals", async () => {
-    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
-      items: [
-        buildThreadListItem(),
-        buildThreadListItem({
-          thread_id: "thread_background",
-          resume_cue: {
-            reason_kind: "waiting_on_approval",
-            priority_band: "highest",
-            label: "Resume here first",
+  it("shows a targeted notice for a background high-priority thread and opens it on demand", async () => {
+    chatDataMocks.listWorkspaceThreads
+      .mockResolvedValueOnce({
+        items: [
+          buildThreadListItem(),
+          buildThreadListItem({
+            thread_id: "thread_background",
+            native_status: {
+              thread_status: "waiting_input",
+              active_flags: ["waiting_on_request"],
+              latest_turn_status: null,
+            },
+            current_activity: {
+              kind: "waiting_on_approval",
+              label: "Approval required",
+            },
+            blocked_cue: {
+              kind: "approval_required",
+              label: "Needs response",
+            },
+            resume_cue: {
+              reason_kind: "waiting_on_approval",
+              priority_band: "highest",
+              label: "Resume here first",
+            },
+          }),
+        ],
+        next_cursor: null,
+        has_more: false,
+      })
+      .mockResolvedValueOnce({
+        items: [
+          buildThreadListItem(),
+          buildThreadListItem({
+            thread_id: "thread_background",
+            native_status: {
+              thread_status: "waiting_input",
+              active_flags: ["waiting_on_request"],
+              latest_turn_status: null,
+            },
+            current_activity: {
+              kind: "waiting_on_approval",
+              label: "Approval required",
+            },
+            blocked_cue: {
+              kind: "approval_required",
+              label: "Needs response",
+            },
+            resume_cue: {
+              reason_kind: "waiting_on_approval",
+              priority_band: "highest",
+              label: "Resume here first",
+            },
+          }),
+        ],
+        next_cursor: null,
+        has_more: false,
+      });
+    chatDataMocks.loadChatThreadBundle
+      .mockResolvedValueOnce({
+        view: buildThreadView(),
+        pendingRequestDetail: null,
+      })
+      .mockResolvedValueOnce({
+        view: buildThreadView({
+          thread: {
+            thread_id: "thread_background",
+            workspace_id: "ws_alpha",
+            native_status: {
+              thread_status: "waiting_input",
+              active_flags: ["waiting_on_request"],
+              latest_turn_status: null,
+            },
+            updated_at: "2026-03-27T05:25:00Z",
+          },
+          current_activity: {
+            kind: "waiting_on_approval",
+            label: "Approval required",
+          },
+          composer: {
+            accepting_user_input: false,
+            interrupt_available: false,
+            blocked_by_request: true,
+            input_unavailable_reason: null,
           },
         }),
-      ],
-      next_cursor: null,
-      has_more: false,
-    });
-    chatDataMocks.loadChatThreadBundle.mockResolvedValue({
-      view: buildThreadView(),
-      pendingRequestDetail: null,
-    });
+        pendingRequestDetail: buildPendingRequestDetail({
+          thread_id: "thread_background",
+        }),
+      });
 
     await act(async () => {
       root.render(<ChatPageClient />);
@@ -1180,8 +1250,167 @@ describe("ChatPageClient", () => {
 
     expect(chatDataMocks.listWorkspaceThreads).toHaveBeenCalledTimes(2);
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("thread_001");
     expect(container.textContent).toContain("High-priority background thread needs attention.");
-    expect(container.textContent).toContain("Resume here first");
+    expect(container.textContent).toContain("Background thread needs attention");
+    expect(container.textContent).toContain("Reason: Needs response");
+
+    const openThreadButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Open thread",
+    );
+    expect(openThreadButton).not.toBeUndefined();
+
+    await act(async () => {
+      openThreadButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushUi();
+
+    expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
+    expect(
+      Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "Open thread",
+      ),
+    ).toBeUndefined();
+    expect(container.textContent).toContain("thread_background");
+    expect(container.textContent).toContain("Approval required");
+  });
+
+  it("refreshes the selected thread for a high-priority current-thread notification without a background notice", async () => {
+    chatDataMocks.listWorkspaceThreads
+      .mockResolvedValueOnce({
+        items: [buildThreadListItem()],
+        next_cursor: null,
+        has_more: false,
+      })
+      .mockResolvedValueOnce({
+        items: [
+          buildThreadListItem({
+            updated_at: "2026-03-27T05:25:00Z",
+            current_activity: {
+              kind: "waiting_on_approval",
+              label: "Approval required",
+            },
+            blocked_cue: {
+              kind: "approval_required",
+              label: "Needs response",
+            },
+          }),
+        ],
+        next_cursor: null,
+        has_more: false,
+      });
+    chatDataMocks.loadChatThreadBundle
+      .mockResolvedValueOnce({
+        view: buildThreadView(),
+        pendingRequestDetail: null,
+      })
+      .mockResolvedValueOnce({
+        view: buildThreadView({
+          current_activity: {
+            kind: "waiting_on_approval",
+            label: "Approval required",
+          },
+          pending_request: {
+            request_id: "req_selected",
+            thread_id: "thread_001",
+            turn_id: "turn_001",
+            item_id: "item_001",
+            request_kind: "approval",
+            status: "pending",
+            risk_category: "external_side_effect",
+            summary: "Run git push",
+            requested_at: "2026-03-27T05:25:00Z",
+          },
+          composer: {
+            accepting_user_input: false,
+            interrupt_available: true,
+            blocked_by_request: true,
+            input_unavailable_reason: null,
+          },
+        }),
+        pendingRequestDetail: buildPendingRequestDetail(),
+      });
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    const notifications = MockEventSource.instances.find(
+      (instance) => instance.url === "/api/v1/notifications/stream",
+    );
+
+    await act(async () => {
+      notifications?.onmessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify({
+            thread_id: "thread_001",
+            event_type: "approval.requested",
+            occurred_at: "2026-03-27T05:25:00Z",
+            high_priority: true,
+          }),
+        }),
+      );
+    });
+    await flushUi();
+
+    expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain("Approval required");
+    expect(container.textContent).not.toContain("Background thread needs attention");
+    expect(
+      Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "Open thread",
+      ),
+    ).toBeUndefined();
+  });
+
+  it("keeps the generic high-priority status when the refreshed workspace list does not include the target thread", async () => {
+    chatDataMocks.listWorkspaceThreads
+      .mockResolvedValueOnce({
+        items: [buildThreadListItem()],
+        next_cursor: null,
+        has_more: false,
+      })
+      .mockResolvedValueOnce({
+        items: [buildThreadListItem()],
+        next_cursor: null,
+        has_more: false,
+      });
+    chatDataMocks.loadChatThreadBundle.mockResolvedValue({
+      view: buildThreadView(),
+      pendingRequestDetail: null,
+    });
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    const notifications = MockEventSource.instances.find(
+      (instance) => instance.url === "/api/v1/notifications/stream",
+    );
+
+    await act(async () => {
+      notifications?.onmessage?.(
+        new MessageEvent("message", {
+          data: JSON.stringify({
+            thread_id: "thread_missing",
+            event_type: "approval.requested",
+            occurred_at: "2026-03-27T05:25:00Z",
+            high_priority: true,
+          }),
+        }),
+      );
+    });
+    await flushUi();
+
+    expect(container.textContent).toContain("High-priority background thread needs attention.");
+    expect(container.textContent).not.toContain("Background thread needs attention");
+    expect(
+      Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "Open thread",
+      ),
+    ).toBeUndefined();
   });
 
   it("keeps the final assistant message visible after completion refresh", async () => {

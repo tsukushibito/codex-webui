@@ -395,6 +395,20 @@ textarea {
   gap: 10px;
 }
 
+.background-priority-notice {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid rgba(143, 91, 20, 0.2);
+  border-radius: 18px;
+  background: rgba(255, 248, 231, 0.92);
+  box-shadow: var(--shadow);
+}
+
+.background-priority-notice p {
+  margin: 0;
+}
+
 .chat-panel {
   display: grid;
   gap: 14px;
