@@ -205,6 +205,14 @@ export async function mockChatFlow(page: Page) {
       });
     }
 
+    if (pathname === "/api/v1/workspaces" && request.method() === "GET") {
+      return json(route, {
+        items: workspaceCreated ? [workspace] : [],
+        next_cursor: null,
+        has_more: false,
+      });
+    }
+
     if (pathname === "/api/v1/workspaces" && request.method() === "POST") {
       workspaceCreated = true;
       return json(route, workspace, 201);
@@ -561,6 +569,27 @@ export async function mockApprovalFlow(page: Page) {
                     priority_band: "medium" as const,
                     label: "Active now",
                   },
+          },
+        ],
+        next_cursor: null,
+        has_more: false,
+      });
+    }
+
+    if (pathname === "/api/v1/workspaces" && request.method() === "GET") {
+      return json(route, {
+        items: [
+          {
+            workspace_id: "ws_alpha",
+            workspace_name: "alpha",
+            created_at: "2026-04-05T02:20:00Z",
+            updated_at: resolution === "pending" ? requestedAt : resolvedAt,
+            active_session_summary: {
+              session_id: "thread_001",
+              status: resolution === "pending" ? "waiting_approval" : "running",
+              last_message_at: resolution === "pending" ? null : resolvedAt,
+            },
+            pending_approval_count: resolution === "pending" ? 1 : 0,
           },
         ],
         next_cursor: null,
