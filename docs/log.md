@@ -1,6 +1,6 @@
 # Codex WebUI LLM Wiki Log
 
-Last updated: 2026-04-23
+Last updated: 2026-04-24
 
 ## Purpose
 
@@ -28,6 +28,35 @@ After the heading, keep the body concise:
 - short note on what changed or remains deferred
 
 ## Entries
+
+## [2026-04-24] ingest | Issue #186 UX renewal validation gates
+
+Source:
+
+- approved sprint slice for Issue #186
+- `tasks/issue-186-validation-gates/README.md`
+- `docs/codex_webui_mvp_roadmap_v0_1.md`
+- `docs/requirements/codex_webui_mvp_requirements_v0_9.md`
+- `docs/specs/codex_webui_common_spec_v0_9.md`
+- `docs/specs/codex_webui_public_api_v0_9.md`
+- `docs/specs/codex_webui_ui_layout_spec_v0_9.md`
+- `apps/frontend-bff/e2e/chat-flow.spec.ts`
+- `apps/frontend-bff/e2e/approval-flow.spec.ts`
+- `apps/frontend-bff/tests/chat-page-client.test.tsx`
+- `apps/frontend-bff/tests/home-page-client.test.tsx`
+
+Updated:
+
+- `docs/validation/codex_webui_ux_renewal_validation_gates_v0_1.md`
+- `docs/index.md`
+- `docs/log.md`
+- `tasks/issue-186-validation-gates/README.md`
+
+Notes:
+
+- added a maintained validation source for UX renewal E2E gates, UX regression gates, desktop visual inspection expectations, mobile reachability checks, and a gate-to-evidence coverage map
+- kept roadmap, requirements, and UI/spec documents as the normative source instead of duplicating behavior contracts into the validation page
+- linked the maintained validation page into wiki navigation so later sessions can find the current browser and inspection gates directly
 
 ## [2026-04-23] ingest | Issue #180 contract audit
 

@@ -14,7 +14,7 @@ async function runRequestDecisionFlow(
   await mockApprovalFlow(page);
 
   await page.goto("/chat?workspaceId=ws_alpha&threadId=thread_001");
-  await expect(page.getByRole("heading", { name: "Chat", exact: true })).toBeVisible();
+  await expect(page.locator("header.chat-topbar h1")).toHaveText("alpha");
   await expect(page.getByRole("heading", { name: "thread_001", exact: true })).toBeVisible();
   await expect(page.locator(".request-detail-card")).toBeVisible();
   await expect(page.getByText("Apply the prepared deployment plan.")).toBeVisible();
@@ -25,7 +25,7 @@ async function runRequestDecisionFlow(
   await expect(
     page.getByText(`${decision === "approved" ? "Approved" : "Denied"} req_001.`),
   ).toBeVisible();
-  await expect(page.getByText(`Latest request: ${decision}`)).toBeVisible();
+  await expect(page.getByText(`Decision: ${decision}`)).toBeVisible();
   await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
 }
 
