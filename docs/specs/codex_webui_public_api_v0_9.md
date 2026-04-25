@@ -289,6 +289,25 @@ Rules:
 
 This rule defines relative priority bands, not a fixed numeric score contract.
 
+### 6.9 `Recommended` workspace thread-list ordering
+
+`Recommended` is the public default sort for `GET /api/v1/workspaces/{workspace_id}/threads`.
+
+Rules:
+
+- `Recommended` applies only within the addressed workspace thread list; it does not define a cross-workspace global queue
+- `frontend-bff` owns the public `Recommended` ranking contract and must apply it from internal helper inputs plus app-owned last-viewed context when available
+- `Recommended` must preserve these ranking bands in descending priority:
+  1. thread with a pending request requiring response
+  2. thread with retained system-error evidence
+  3. thread with retained latest failed-turn evidence
+  4. thread currently active
+  5. last viewed thread in the same workspace when it is not already in a higher band
+  6. all remaining threads by recency
+- a thread that matches multiple bands must use its highest-priority band only
+- ordering inside each band must be deterministic: `updated_at desc, thread_id desc`
+- `Recommended` is a workspace-list ordering contract, not a replacement canonical thread state or a UI-only sort invented in layout code
+
 ---
 
 ## 7. Public read models
@@ -315,6 +334,7 @@ Rules:
 {
   "thread_id": "thread_123",
   "workspace_id": "ws_alpha",
+  "title": "Investigate build failure",
   "native_status": {
     "thread_status": "idle",
     "active_flags": [],
@@ -327,6 +347,7 @@ Rules:
 Rules:
 
 - `thread` is a native-backed facade
+- `title` is a public thread field used by Navigation rows and the thread header; it must be exposed by the public API rather than derived only from browser-local heuristics
 - `native_status` exposes a stable subset of native status information
 - public APIs must not restore v0.8-style canonical WebUI statuses such as `waiting_input` or `waiting_approval`
 
@@ -336,6 +357,7 @@ Rules:
 {
   "thread_id": "thread_123",
   "workspace_id": "ws_alpha",
+  "title": "Investigate build failure",
   "native_status": {
     "thread_status": "active",
     "active_flags": ["waitingOnApproval"],
@@ -372,13 +394,15 @@ Rules:
 Rules:
 
 - `thread_list_item` is a projection and display helper, not a canonical resource
+- `thread_list_item.title` is required and is the public title used by Navigation thread rows
 - `thread_list_item` must carry or allow derivation of the minimum Navigation cue material for current activity, badge, blocked cue, resume cue, pending request presence, error or latest failed-turn presence, and `updated_at` sorting
 - `current_activity`, `pending_request`, `latest_error_or_failure`, `badge`, `blocked_cue`, and `resume_cue` are display cue materials only and must not become canonical resources
 - `pending_request.present=true` must identify the pending request enough for thread-context navigation or inline response affordance; if no request is pending, `pending_request` may be `null` or use `present=false` consistently for the endpoint
 - `latest_error_or_failure` should identify user-visible system error or latest failed-turn evidence when retained, but it remains derived evidence rather than an error resource
 - `badge`, `blocked_cue`, and `resume_cue` may be embedded
 - `resume_cue.priority_band` is a hint band, not a fixed total-order score
-- workspace thread lists sort by `updated_at` using the stable tie-breakers defined by `GET /api/v1/workspaces/{workspace_id}/threads`; Navigation cues must not replace that sorting contract
+- workspace thread lists must support the `Recommended` ordering contract defined in section 6.9
+- explicit recency sorts still use the stable tie-breakers defined by `GET /api/v1/workspaces/{workspace_id}/threads`; Navigation cues must not replace those contracts
 
 ### 7.4 ThreadView
 
@@ -387,6 +411,7 @@ Rules:
   "thread": {
     "thread_id": "thread_123",
     "workspace_id": "ws_alpha",
+    "title": "Investigate build failure",
     "native_status": {
       "thread_status": "idle",
       "active_flags": [],
@@ -421,6 +446,7 @@ Rules:
 - `current_activity` is a display model
 - `pending_request` and `latest_resolved_request` are thread-context helpers rather than standalone resources
 - `composer` is a display model
+- `thread_view.thread.title` is required so the thread header can render from public thread data rather than a UI-only local derivation
 - `composer.accepting_user_input` is an availability hint, not the final server-side admission source
 - final input acceptance is determined at request time from native facts and request/recovery state
 - `thread_view` must include or reference the minimum helper shape for the thread snapshot, current activity, pending request summary, latest resolved request summary during retention, timeline slice, composer/input availability hints, interrupt availability, and open/load recovery outcome
@@ -507,12 +533,13 @@ Rules:
 Rules:
 
 - `request_detail` is a helper facade rather than a canonical resource
-- the public contract must preserve the minimum confirmation information needed before response
-- minimum confirmation information includes risk or classification, short summary, consequence or reason, operation summary when available, request time, thread reference, turn/item or equivalent context, status, and decision options
+- the public contract must preserve the P0 minimum confirmation information needed before response
+- P0 minimum confirmation information is mandatory in MVP and includes risk or classification, short summary, consequence or reason, operation summary when available, request time, thread reference, turn/item or equivalent context, status, and decision options
+- richer file, diff, or expanded artifact detail is P1-compatible later expansion and must not be required for approve or deny in MVP
 - when resolved detail is retained, it must also include the retained decision and response time
 - `request_detail` must remain readable while the request is pending
-- `request_detail` should remain readable for at least the post-resolution recovery window while the thread context still supports safe reacquisition
-- `404 request_not_found` should be reserved for request identifiers that are no longer reachable, retained, or valid
+- `request_detail` must remain readable during the just-resolved recovery window while thread-context helper retention keeps the request reachable after reload or reconnect
+- `404 request_not_found` is reserved for request identifiers that are expired, unreachable, invalid, or no longer retained; plain thread-context absence is not `request_not_found`
 
 ### 7.8 HomeOverview
 
@@ -596,15 +623,17 @@ Query parameters:
 
 - `limit`
 - `cursor`
-- `sort`, default `-updated_at`
+- `sort`, default `recommended`
 
 Allowed `sort` values:
 
+- `recommended`
 - `updated_at`
 - `-updated_at`
 
 Paging and sort rules:
 
+- `sort=recommended` uses the workspace-scoped ranking contract defined in section 6.9
 - `sort=updated_at` uses stable ordering `updated_at asc, thread_id asc`
 - `sort=-updated_at` uses stable ordering `updated_at desc, thread_id desc`
 - cursor paging must respect the chosen stable ordering
@@ -636,6 +665,7 @@ Response `202 Accepted`:
   "thread": {
     "thread_id": "thread_123",
     "workspace_id": "ws_alpha",
+    "title": "Please investigate the build failure.",
     "native_status": {
       "thread_status": "active",
       "active_flags": [],
@@ -714,6 +744,7 @@ Response `202 Accepted`:
   "thread": {
     "thread_id": "thread_123",
     "workspace_id": "ws_alpha",
+    "title": "Investigate build failure",
     "native_status": {
       "thread_status": "active",
       "active_flags": [],
@@ -832,9 +863,10 @@ Rules:
 
 - absence must be represented unambiguously as `pending_request: null`
 - request absence within thread context must not use `404`
+- `pending_request: null` with `latest_resolved_request: null` means no currently reachable request helper exists in thread context; it does not mean the thread is missing and it does not itself imply `request_not_found`
 - missing, expired, invalid, or unreachable request detail remains resource-specific `404 request_not_found` on request-detail endpoints
 - `latest_resolved_request` is optional and may be present only during the immediate recovery window
-- a thread-context helper path for just-resolved requests is required while the recovery window remains open
+- a thread-context helper path for just-resolved requests is required while the recovery window remains open, including reload or reconnect while helper retention still applies
 - when `pending_request` is non-null, `latest_resolved_request` must be `null`
 - when `latest_resolved_request` is non-null, `pending_request` must be `null`
 
@@ -846,7 +878,7 @@ Rules:
 
 - this endpoint is a helper facade for safe request reading
 - it does not define a standalone canonical request resource
-- it should remain readable for the pending period and the immediate resolved recovery window while the request is still retained and reachable
+- it must remain readable for the pending period and the immediate resolved recovery window while the request is still retained and reachable from thread context
 - once retention or reachability no longer applies, it may return `404 request_not_found`
 
 #### `POST /api/v1/requests/{request_id}/response`

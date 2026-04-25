@@ -467,3 +467,24 @@ Notes:
 - reduced workflow duplication in the repo skill so `AGENTS.md`, `docs/README.md`, and the adoption note remain the primary references
 - clarified that `docs/index.md` should be refreshed when navigation, discoverability, or content summaries materially change
 - updated the adoption note to reflect that issues `#116` and `#117` are complete and that follow-up is now maintenance-oriented
+
+## [2026-04-25] ingest | issue-198 UX source-boundary v0.9 doc alignment
+
+Source:
+
+- Issue `#198`
+- `tasks/issue-198-ux-source-boundaries/README.md`
+- maintained v0.9 public/internal/layout specs
+
+Updated:
+
+- `docs/specs/codex_webui_public_api_v0_9.md`
+- `docs/specs/codex_webui_internal_api_v0_9.md`
+- `docs/specs/codex_webui_ui_layout_spec_v0_9.md`
+- `docs/log.md`
+
+Notes:
+
+- made public thread `title` exposure explicit for Navigation rows and thread header
+- fixed workspace-scoped public `Recommended` ordering semantics and aligned internal helper inputs
+- clarified P0 request-detail confirmation scope and just-resolved request-detail recovery reachability

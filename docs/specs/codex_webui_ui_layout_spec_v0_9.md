@@ -394,7 +394,9 @@ Abstract labels such as `Blocked` should not be the only primary entrypoint when
 
 Navigation should provide a default priority-aware sort such as `Recommended`, plus explicit recency or alpha alternatives.
 
-The UI may treat `Recommended` as the default return-priority ordering, but the canonical ranking semantics, tie-break rules, and scope boundaries must be fixed in requirements or API specifications rather than invented only in layout implementation.
+Navigation must treat public `Recommended` as the default workspace thread-list ordering defined by `docs/specs/codex_webui_public_api_v0_9.md`.
+
+Layout implementation must not invent its own ranking owner, workspace scope, ranking bands, or tie-break rules for `Recommended`.
 
 On reconnect or revisit, desktop Navigation should make the top resume-priority candidates visible or directly reachable according to the requirements-level priority order:
 
@@ -595,11 +597,13 @@ When request detail is available before response, and during any supported post-
 
 If post-resolution detail is supported, decision and response time should also be shown when available.
 
+The required MVP baseline is the P0 minimum confirmation information defined by the maintained public and internal API specifications. Richer file or diff detail may appear later, but it is not the minimum approval gate for v0.9.
+
 ### 10.5 Recovery-window dependency
 
-The UI layout assumes a post-resolution recovery window may exist for reopening recently resolved request detail from thread context.
+The UI layout depends on the maintained public and internal API guarantee that pending request detail and just-resolved request detail remain reachable from thread context during the retained recovery window.
 
-However, the guarantee scope for that recovery window, including reload or reconnect expectations, must be fixed outside this layout specification in requirements or API specifications.
+When that API-level reachability ends, request-detail expiry is handled by API `request_not_found` behavior rather than by a layout-defined fallback state.
 
 ---
 
@@ -730,8 +734,6 @@ The following patterns are not the intended v0.9 layout direction:
 
 This specification intentionally depends on other maintained documents for the following guarantees:
 
-- the canonical semantics for `Recommended` sort, including ranking order, workspace scope, and tie-break behavior
-- the canonical guarantee range for approval-resolution recovery windows
+- the canonical semantics for `Recommended` sort, as defined by `docs/specs/codex_webui_public_api_v0_9.md`
+- the canonical guarantee range for approval-resolution recovery reachability, as defined by `docs/specs/codex_webui_public_api_v0_9.md` and `docs/specs/codex_webui_internal_api_v0_9.md`
 - any canonical wording or API treatment for resume-priority and intervention-needed helper cues
-
-Until those are fixed elsewhere, layout implementation may support the intended UX direction but must not silently hard-code conflicting canonical semantics.
