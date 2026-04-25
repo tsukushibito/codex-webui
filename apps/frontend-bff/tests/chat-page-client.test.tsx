@@ -961,6 +961,10 @@ describe("ChatPageClient", () => {
     expect(container.textContent).toContain("Run git push");
     expect(container.textContent).toContain("Codex requests permission to push changes to remote.");
     expect(container.textContent).toContain("Operation: git push origin main");
+    expect(container.textContent).not.toContain("Approvals");
+    expect(container.textContent).not.toContain("Home");
+    expect(container.textContent).not.toContain("ReasonReason");
+    expect(container.textContent).not.toContain("OperationOperation");
 
     const requestDetailButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Request detail",
@@ -1224,6 +1228,17 @@ describe("ChatPageClient", () => {
             kind: "waiting_on_approval",
             label: "Approval required",
           },
+          pending_request: {
+            request_id: "req_background",
+            thread_id: "thread_background",
+            turn_id: "turn_background",
+            item_id: "item_background",
+            request_kind: "approval",
+            status: "pending",
+            risk_category: "external_side_effect",
+            summary: "Run git push",
+            requested_at: "2026-03-27T05:25:00Z",
+          },
           composer: {
             accepting_user_input: false,
             interrupt_available: false,
@@ -1266,6 +1281,7 @@ describe("ChatPageClient", () => {
     expect(container.textContent).toContain("High-priority background thread needs attention.");
     expect(container.textContent).toContain("Background thread needs attention");
     expect(container.textContent).toContain("Reason: Needs response");
+    expect(container.textContent).not.toContain("Request detail");
 
     const openThreadButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Open thread",
@@ -1285,6 +1301,55 @@ describe("ChatPageClient", () => {
     ).toBeUndefined();
     expect(container.textContent).toContain("thread_background");
     expect(container.textContent).toContain("Approval required");
+    expect(container.textContent).toContain("Approve request");
+    expect(container.textContent).toContain("Deny request");
+  });
+
+  it("keeps opening recovery inside thread view without auto-opening detail", async () => {
+    const pendingThread = createDeferred<{
+      view: PublicThreadView;
+      pendingRequestDetail: PublicRequestDetail | null;
+    }>();
+
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [buildThreadListItem()],
+      next_cursor: null,
+      has_more: false,
+    });
+    chatDataMocks.loadChatThreadBundle.mockReturnValue(pendingThread.promise);
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    expect(container.textContent).toContain("Opening thread");
+    expect(container.textContent).toContain(
+      "Opening this thread and restoring its latest context.",
+    );
+    expect(container.textContent).toContain(
+      "Opening this thread and restoring its latest timeline",
+    );
+    expect(container.textContent).not.toContain("Request detail");
+    expect(container.textContent).not.toContain("Timeline item detail");
+    expect(
+      Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "Threads",
+      ),
+    ).not.toBeUndefined();
+
+    await act(async () => {
+      pendingThread.resolve({
+        view: buildThreadView(),
+        pendingRequestDetail: null,
+      });
+    });
+    await flushUi();
+
+    expect(container.textContent).toContain("Investigate build");
+    expect(container.textContent).not.toContain(
+      "Opening this thread and restoring its latest timeline",
+    );
   });
 
   it("refreshes the selected thread for a high-priority current-thread notification without a background notice", async () => {
