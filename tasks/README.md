@@ -69,7 +69,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Current Active Tasks
 
-- `None`
+- [issue-215-first-input-composer](./issue-215-first-input-composer/README.md)
 
 ## Archived Task Packages
 
