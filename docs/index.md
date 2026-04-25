@@ -1,6 +1,6 @@
 # Codex WebUI LLM Wiki Index
 
-Last updated: 2026-04-24
+Last updated: 2026-04-25
 
 ## Purpose
 
@@ -29,6 +29,8 @@ Read this file first when you need to locate maintained knowledge across source-
 - [docs/notes/README.md](./notes/README.md): note-page placement, naming, and promotion rules
 - [docs/notes/codex_webui_agent_ui_benchmark_note_v0_1.md](./notes/codex_webui_agent_ui_benchmark_note_v0_1.md): structural benchmark note for agent and assistant UI families, mapping reusable interaction lessons to CodexWebUI v0.9 `thread_view`, timeline, Navigation, Detail Surface, request-flow, resume, and mobile responsibilities
 - [docs/notes/codex_webui_github_projects_operations_synthesis_note_v0_1.md](./notes/codex_webui_github_projects_operations_synthesis_note_v0_1.md): reusable GitHub Issue and Project operation guidance, including sub-issue, `gh api`, and Project audit pitfalls seen in this repo
+- [docs/notes/codex_webui_target_ui_design_note_v0_1.md](./notes/codex_webui_target_ui_design_note_v0_1.md): maintained decomposition of the current target desktop/mobile UI reference for the v0.9 UX refresh, including Navigation, Thread View, Detail Surface, and visual-direction cues
+- [docs/notes/codex_webui_ux_refresh_execution_order_synthesis_note_v0_1.md](./notes/codex_webui_ux_refresh_execution_order_synthesis_note_v0_1.md): recommended dependency order for the current UX refresh follow-up issues, mapping the reviewed plan to concrete execution sequencing
 
 ## Cross-cutting guidance
 

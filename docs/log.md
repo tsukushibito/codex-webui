@@ -1,6 +1,6 @@
 # Codex WebUI LLM Wiki Log
 
-Last updated: 2026-04-24
+Last updated: 2026-04-25
 
 ## Purpose
 
@@ -28,6 +28,28 @@ After the heading, keep the body concise:
 - short note on what changed or remains deferred
 
 ## Entries
+
+## [2026-04-25] ingest | target UI reference and UX refresh execution order
+
+Source:
+
+- user-provided chat attachment from 2026-04-25 used as the current visual target UI reference
+- `.tmp/codex_webui_v0_9_ux_improvement_plan.md`
+- GitHub parent issue `#175`
+- GitHub follow-up issues `#198` through `#203`
+
+Updated:
+
+- `docs/notes/codex_webui_target_ui_design_note_v0_1.md`
+- `docs/notes/codex_webui_ux_refresh_execution_order_synthesis_note_v0_1.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- added a maintained design note that decomposes the current target desktop/mobile UI reference into Navigation, Thread View, Detail Surface, mobile reachability, and visual-direction expectations
+- recorded the current reviewed execution order for the UX refresh follow-up line so implementation can proceed in the same dependency order as the reviewed plan and GitHub Project setup
+- kept the note pages non-normative and pointed behavior ownership back to maintained requirements and specs
 
 ## [2026-04-24] ingest | Issue #186 UX renewal validation gates
 
