@@ -18,7 +18,11 @@ This note is a maintained design reference, not a normative specification. The n
 
 The visual source for this note is the user-provided chat attachment from 2026-04-25 that depicts a desktop shell plus a mobile companion view for `Codex WebUI v0.9`.
 
-The repo does not currently store that binary attachment as a tracked asset. This note preserves the reusable implementation-facing decomposition of that visual target.
+The same image is now preserved in the repository as a tracked reference asset:
+
+- `artifacts/visual-inspection/2026-04-24T23-29-37Z-spec-ideal-ui/codex-webui-spec-ideal-screen.png`
+
+This note preserves the reusable implementation-facing decomposition of that visual target.
 
 ## Primary composition
 
@@ -147,4 +151,3 @@ When using this note during implementation, interpret the target in this order:
 1. maintained requirements and specs define behavior
 2. this note defines the intended visual and structural outcome
 3. `.tmp/codex_webui_v0_9_ux_improvement_plan.md` defines the current reviewed execution framing
-

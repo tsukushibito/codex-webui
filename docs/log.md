@@ -50,6 +50,7 @@ Notes:
 - added a maintained design note that decomposes the current target desktop/mobile UI reference into Navigation, Thread View, Detail Surface, mobile reachability, and visual-direction expectations
 - recorded the current reviewed execution order for the UX refresh follow-up line so implementation can proceed in the same dependency order as the reviewed plan and GitHub Project setup
 - kept the note pages non-normative and pointed behavior ownership back to maintained requirements and specs
+- preserved the target UI image itself under `artifacts/visual-inspection/2026-04-24T23-29-37Z-spec-ideal-ui/codex-webui-spec-ideal-screen.png` so later sessions can inspect the exact visual reference from the repository
 
 ## [2026-04-24] ingest | Issue #186 UX renewal validation gates
 
