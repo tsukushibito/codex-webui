@@ -960,7 +960,7 @@ describe("ChatPageClient", () => {
 
     expect(container.textContent).toContain("Run git push");
     expect(container.textContent).toContain("Codex requests permission to push changes to remote.");
-    expect(container.textContent).not.toContain("Operation: git push origin main");
+    expect(container.textContent).toContain("Operation: git push origin main");
 
     const requestDetailButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Request detail",
