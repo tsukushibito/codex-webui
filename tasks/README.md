@@ -73,6 +73,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Archived Task Packages
 
+- [issue-205-mobile-responsive-polish](./archive/issue-205-mobile-responsive-polish/README.md)
 - [issue-204-desktop-shell-polish](./archive/issue-204-desktop-shell-polish/README.md)
 - [issue-203-ux-regression-coverage](./archive/issue-203-ux-regression-coverage/README.md)
 - [issue-202-thread-surface-detail](./archive/issue-202-thread-surface-detail/README.md)

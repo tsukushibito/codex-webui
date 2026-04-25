@@ -790,15 +790,15 @@ export function ChatView({
                     <dt>Requested</dt>
                     <dd>{formatTimestamp(selectedRequestDetail.requested_at)}</dd>
                   </div>
-                  <div>
+                  <div className="request-context-field">
                     <dt>Thread</dt>
                     <dd>{selectedRequestDetail.thread_id}</dd>
                   </div>
-                  <div>
+                  <div className="request-context-field">
                     <dt>Turn</dt>
                     <dd>{selectedRequestDetail.turn_id ?? "Not available"}</dd>
                   </div>
-                  <div>
+                  <div className="request-context-field">
                     <dt>Item</dt>
                     <dd>{selectedRequestDetail.item_id}</dd>
                   </div>

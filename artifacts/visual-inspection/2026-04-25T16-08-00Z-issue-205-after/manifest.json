@@ -1,0 +1,10 @@
+{
+  "route": "/chat?workspaceId=ws_mobile&threadId=thread_approval",
+  "viewport": "mobile-chromium-360x800",
+  "metrics": {
+    "scrollWidth": 360,
+    "clientWidth": 360,
+    "hasHorizontalOverflow": false,
+    "hiddenContextFields": true
+  }
+}
