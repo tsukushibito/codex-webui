@@ -365,7 +365,7 @@ export function ChatView({
             <p className="eyebrow">Navigation</p>
             <h2>{selectedWorkspace?.workspace_name ?? "Select workspace"}</h2>
             <p className="workspace-meta">
-              {workspaceId ? `Workspace: ${workspaceId}` : "Choose or create a workspace."}
+              {workspaceId ? "Workspace scope active" : "Choose or create a workspace."}
             </p>
           </header>
 
@@ -503,7 +503,7 @@ export function ChatView({
             </h2>
             <p className="workspace-meta">
               {selectedThreadView
-                ? `Workspace ${selectedThreadView.thread.workspace_id} - Updated ${formatTimestamp(
+                ? `Workspace ${selectedWorkspace?.workspace_name ?? selectedThreadView.thread.workspace_id} - Updated ${formatTimestamp(
                     selectedThreadView.thread.updated_at,
                   )}`
                 : isOpeningSelectedThread
@@ -513,7 +513,9 @@ export function ChatView({
                     : "Select or create a workspace from Navigation before starting work."}
             </p>
             <div className="hero-metrics thread-context-metrics">
-              <span className="metric-chip">Workspace: {workspaceId}</span>
+              <span className="metric-chip">
+                Workspace: {selectedWorkspace?.workspace_name ?? workspaceId}
+              </span>
               <span className="metric-chip">
                 Stream:{" "}
                 {connectionState === "live"

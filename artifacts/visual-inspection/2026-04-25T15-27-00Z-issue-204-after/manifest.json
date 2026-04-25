@@ -1,0 +1,21 @@
+{
+  "baseUrl": "http://127.0.0.1:3010",
+  "captures": [
+    {
+      "file": "artifacts/visual-inspection/2026-04-25T15-27-00Z-issue-204-after/desktop-chromium-chat-workspace.png",
+      "fullPage": true,
+      "profile": "desktop-chromium",
+      "route": "/chat?workspaceId=ws_341eebca05da46b0acb8c8a9e172c672",
+      "url": "http://127.0.0.1:3010/chat?workspaceId=ws_341eebca05da46b0acb8c8a9e172c672"
+    },
+    {
+      "file": "artifacts/visual-inspection/2026-04-25T15-27-00Z-issue-204-after/mobile-chromium-chat-workspace.png",
+      "fullPage": true,
+      "profile": "mobile-chromium",
+      "route": "/chat?workspaceId=ws_341eebca05da46b0acb8c8a9e172c672",
+      "url": "http://127.0.0.1:3010/chat?workspaceId=ws_341eebca05da46b0acb8c8a9e172c672"
+    }
+  ],
+  "createdAt": "2026-04-25T15:24:14.992Z",
+  "waitMs": 1500
+}
