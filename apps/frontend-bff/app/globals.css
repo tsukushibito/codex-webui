@@ -801,12 +801,29 @@ textarea {
 }
 
 @media (max-width: 719px) {
+  body {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.58), transparent 18rem),
+      linear-gradient(180deg, #f8f3ea 0%, #eee6d8 100%);
+  }
+
+  .chat-shell {
+    gap: 10px;
+    padding: 10px;
+  }
+
   .chat-topbar {
     align-items: flex-start;
+    gap: 10px;
+  }
+
+  .chat-topbar h1 {
+    font-size: 1.28rem;
+    overflow-wrap: anywhere;
   }
 
   .chat-topbar-actions {
-    max-width: 50%;
+    max-width: 44%;
   }
 
   .thread-navigation.open,
@@ -818,8 +835,128 @@ textarea {
     max-width: calc(100vw - 24px);
   }
 
+  .thread-detail-surface {
+    inset: auto 10px 10px;
+    max-height: min(82vh, 650px);
+    border-radius: 20px;
+    background: #fffdf8;
+    box-shadow:
+      0 0 0 9999px rgba(35, 24, 15, 0.22),
+      0 18px 48px rgba(35, 24, 15, 0.24);
+    padding: 16px;
+  }
+
+  .thread-detail-surface header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: -16px -16px 0;
+    border-bottom: 1px solid rgba(35, 24, 15, 0.08);
+    background: #fffdf8;
+    padding: 16px;
+  }
+
   .thread-view-card {
     min-height: auto;
+  }
+
+  .workspace-card,
+  .create-card {
+    border-radius: 18px;
+    padding: 14px;
+  }
+
+  .workspace-card header,
+  .create-card header {
+    gap: 6px;
+  }
+
+  .workspace-card h2,
+  .create-card h2 {
+    font-size: 1.1rem;
+    line-height: 1.15;
+  }
+
+  .workspace-meta-row {
+    align-items: flex-start;
+  }
+
+  .metric-chip,
+  .status-badge {
+    padding: 6px 10px;
+    font-size: 0.82rem;
+  }
+
+  .thread-context-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .thread-context-metrics .metric-chip,
+  .thread-context-metrics .compact-link {
+    width: 100%;
+  }
+
+  .current-activity-card,
+  .request-detail-card,
+  .chat-composer {
+    border-radius: 16px;
+    padding: 12px;
+  }
+
+  .pending-request-card {
+    gap: 10px;
+  }
+
+  .pending-request-card .workspace-actions,
+  .request-detail-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .thread-detail-surface .request-context-field,
+  .thread-detail-surface .request-operation-summary {
+    display: none;
+  }
+
+  .request-detail-actions > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .pending-request-card .workspace-actions > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .thread-interrupt-actions {
+    margin-top: 8px;
+  }
+
+  .timeline-section {
+    gap: 10px;
+  }
+
+  .timeline-turn-group {
+    padding-left: 9px;
+  }
+
+  .timeline-row {
+    border-radius: 13px;
+    padding: 11px 12px;
+  }
+
+  .timeline-row-primary {
+    padding: 13px;
+  }
+
+  .timeline-row-compact {
+    padding: 8px 10px;
+  }
+
+  .chat-textarea {
+    min-height: 96px;
+    border-radius: 14px;
   }
 
   .primary-link,
@@ -827,6 +964,10 @@ textarea {
   .submit-button {
     max-width: 100%;
     white-space: normal;
+    padding: 10px 12px;
+    border-radius: 14px;
+    line-height: 1.2;
+    text-align: center;
   }
 }
 

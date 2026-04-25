@@ -1,0 +1,10 @@
+{
+  "route": "/chat?workspaceId=ws_mobile&threadId=thread_approval",
+  "viewport": "mobile-chromium-360x800",
+  "metrics": {
+    "scrollWidth": 360,
+    "clientWidth": 360,
+    "hasHorizontalOverflow": false,
+    "bodyText": "THREAD_VIEW\n\nMobile QA\nThreads\n\nCURRENT THREAD\n\nApproval required\nShip mobile polish\n\nWorkspace Mobile QA - Updated Apr 26, 2026, 12:50 AM\n\nWorkspace: Mobile QA\nStream: reacquiring\nThreads: 1\nRefresh\nCurrent activity\nApproval required\n\nCodex is paused until you approve or deny the request below.\n\nPending request\nexternal side effect\n\nPublish mobile UI polish\n\nCodex requests permission to push the responsive UI changes to the remote branch.\n\nOperation: git push origin issue-205-mobile-responsive-polish\n\nRequested Apr 26, 2026, 12:50 AM\n\nApprove request\nDeny request\nRequest detail\nInterrupt thread\n\nTIMELINE\n\nThread context\nTURN\nturn_mobile\nYou\nApr 26, 2026, 12:50 AM\n\nPrepare the responsive polish PR.\n\nTimeline item detail\nThread update\nApr 26, 2026, 12:50 AM\n\nI will tighten the header, approval controls, and composer.\n\nTimeline item detail\nRequest needs attention\nApr 26, 2026, 12:50 AM\n\nCodex requests permission to push the responsive UI changes to the remote branch.\n\nTimeline item detail\nSend input\n\nInput is paused while this thread waits for your approval response.\n\nSend input\n\nDETAIL\n\nClose\nRequest detail\npending\nexternal side effect\n\nPublish mobile UI polish\n\nREASON\nCodex requests permission to push the responsive UI changes to the remote branch.\nOPERATION\ngit push origin issue-205-mobile-responsive-polish\nREQUESTED\nApr 26, 2026, 12:50 AM\nTHREAD\nthread_approval\nTURN\nturn_mobile\nITEM\nitem_mobile\n\nOperation: git push origin issue-205-mobile-responsive-polish\n\nApprove request\nDeny request"
+  }
+}
