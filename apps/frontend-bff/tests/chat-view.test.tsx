@@ -342,10 +342,12 @@ describe("ChatView", () => {
     expect(markup).toContain("Interrupt thread");
     expect(markup).toContain("Please explain the diff.");
     expect(markup).toContain("Streaming update");
-    expect(markup).toContain("approval.requested");
+    expect(markup).toContain("Request needs attention");
     expect(markup).toContain("timeline-row-prominent");
-    expect(markup).toContain("session.status_changed");
+    expect(markup).toContain("Status update");
     expect(markup).toContain("timeline-row-compact");
+    expect(markup).not.toContain("approval.requested");
+    expect(markup).not.toContain("session.status_changed");
     expect(markup.match(/<textarea/g) ?? []).toHaveLength(1);
     expect(markup).toContain('id="thread-composer-input"');
     expect(markup).not.toContain('id="thread-input"');

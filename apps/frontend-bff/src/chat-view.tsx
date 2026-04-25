@@ -249,7 +249,7 @@ export function ChatView({
   const composerGuidance = !workspaceId
     ? "Select or create a workspace from Navigation before starting work."
     : isOpeningSelectedThread
-      ? "Opening the selected thread before accepting input."
+      ? "Opening this thread and restoring its latest context."
       : unavailableReason;
   const selectedTimelineItem =
     detailSelection?.kind === "timeline_item_detail"
@@ -615,7 +615,11 @@ export function ChatView({
             </header>
 
             {isLoadingThread ? (
-              <p className="workspace-status">Refreshing thread detail...</p>
+              <p className="workspace-status">
+                {selectedThreadId
+                  ? "Opening this thread and restoring its latest timeline..."
+                  : "Preparing thread view..."}
+              </p>
             ) : null}
 
             <div className="chat-message-list">
