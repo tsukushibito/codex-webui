@@ -339,10 +339,13 @@ describe("ChatView", () => {
       />,
     );
 
-    expect(markup).toContain("thread_001");
+    expect(markup).toContain("Approval thread");
+    expect(markup).toContain("Workspace ws_alpha");
     expect(markup).toContain("Approval required");
+    expect(markup).toContain("Codex is paused until you approve or deny the request below.");
     expect(markup).toContain("Approve request");
     expect(markup).toContain("Input is paused while this thread waits for your approval response.");
+    expect(markup).toContain("Operation: git push origin main");
     expect(markup).toContain("Interrupt thread");
     expect(markup).toContain("Please explain the diff.");
     expect(markup).toContain("Streaming update");

@@ -182,6 +182,32 @@ function composerUnavailableReason(threadView: PublicThreadView | null) {
   return null;
 }
 
+function currentActivitySummary(
+  threadView: PublicThreadView | null,
+  isOpeningSelectedThread: boolean,
+) {
+  if (!threadView) {
+    return isOpeningSelectedThread
+      ? "Opening this thread and restoring its latest context."
+      : "First input will create a new thread in this workspace.";
+  }
+
+  switch (threadView.current_activity.kind) {
+    case "waiting_on_approval":
+      return "Codex is paused until you approve or deny the request below.";
+    case "running":
+      return "Codex is working in this thread; watch the timeline for progress.";
+    case "waiting_on_user_input":
+      return "This thread is ready for your next input.";
+    case "system_error":
+      return "A system error needs review before this thread can continue.";
+    case "latest_turn_failed":
+      return "The latest turn failed; review the timeline or detail before retrying.";
+    default:
+      return formatMachineLabel(threadView.current_activity.kind);
+  }
+}
+
 export function ChatView({
   workspaceId,
   workspaces,
@@ -468,7 +494,7 @@ export function ChatView({
               ) : null}
             </div>
             <h2>
-              {selectedThreadView?.thread.thread_id ??
+              {selectedThreadView?.thread.title ??
                 (isOpeningSelectedThread
                   ? "Opening thread"
                   : workspaceId
@@ -477,7 +503,9 @@ export function ChatView({
             </h2>
             <p className="workspace-meta">
               {selectedThreadView
-                ? `Updated ${formatTimestamp(selectedThreadView.thread.updated_at)}`
+                ? `Workspace ${selectedThreadView.thread.workspace_id} - Updated ${formatTimestamp(
+                    selectedThreadView.thread.updated_at,
+                  )}`
                 : isOpeningSelectedThread
                   ? `Loading ${selectedThreadId}.`
                   : workspaceId
@@ -519,13 +547,9 @@ export function ChatView({
               </span>
             </div>
             <p className="workspace-meta">
-              {selectedThreadView
-                ? formatMachineLabel(selectedThreadView.current_activity.kind)
-                : isOpeningSelectedThread
-                  ? "Thread details are loading."
-                  : workspaceId
-                    ? "First input will create a new thread in this workspace."
-                    : "Choose a workspace to enable the composer."}
+              {workspaceId
+                ? currentActivitySummary(selectedThreadView, isOpeningSelectedThread)
+                : "Choose a workspace to enable the composer."}
             </p>
           </div>
 
@@ -540,6 +564,11 @@ export function ChatView({
               <p>{selectedThreadView.pending_request.summary}</p>
               {selectedRequestDetail ? (
                 <p className="workspace-meta">{selectedRequestDetail.reason}</p>
+              ) : null}
+              {selectedRequestDetail?.operation_summary ? (
+                <p className="workspace-meta">
+                  Operation: {selectedRequestDetail.operation_summary}
+                </p>
               ) : null}
               <p className="workspace-meta">
                 Requested {formatTimestamp(selectedThreadView.pending_request.requested_at)}
