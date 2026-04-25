@@ -1,0 +1,21 @@
+{
+  "baseUrl": "http://127.0.0.1:3000",
+  "captures": [
+    {
+      "file": "artifacts/visual-inspection/ui-gap-analysis-selected-thread/desktop-chromium-selected-thread.png",
+      "fullPage": true,
+      "profile": "desktop-chromium",
+      "route": "/chat?workspaceId=ws_17daf81ea5774a298734540e1df3f7b2&threadId=019dc6d3-f084-7b02-aaa9-79e3982030cf",
+      "url": "http://127.0.0.1:3000/chat?workspaceId=ws_17daf81ea5774a298734540e1df3f7b2&threadId=019dc6d3-f084-7b02-aaa9-79e3982030cf"
+    },
+    {
+      "file": "artifacts/visual-inspection/ui-gap-analysis-selected-thread/mobile-chromium-selected-thread.png",
+      "fullPage": true,
+      "profile": "mobile-chromium",
+      "route": "/chat?workspaceId=ws_17daf81ea5774a298734540e1df3f7b2&threadId=019dc6d3-f084-7b02-aaa9-79e3982030cf",
+      "url": "http://127.0.0.1:3000/chat?workspaceId=ws_17daf81ea5774a298734540e1df3f7b2&threadId=019dc6d3-f084-7b02-aaa9-79e3982030cf"
+    }
+  ],
+  "createdAt": "2026-04-25T23:07:02.881Z",
+  "waitMs": 750
+}

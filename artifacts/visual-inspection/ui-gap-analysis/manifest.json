@@ -1,0 +1,21 @@
+{
+  "baseUrl": "http://127.0.0.1:3000",
+  "captures": [
+    {
+      "file": "artifacts/visual-inspection/ui-gap-analysis/desktop-chromium-chat.png",
+      "fullPage": true,
+      "profile": "desktop-chromium",
+      "route": "/chat",
+      "url": "http://127.0.0.1:3000/chat"
+    },
+    {
+      "file": "artifacts/visual-inspection/ui-gap-analysis/mobile-chromium-chat.png",
+      "fullPage": true,
+      "profile": "mobile-chromium",
+      "route": "/chat",
+      "url": "http://127.0.0.1:3000/chat"
+    }
+  ],
+  "createdAt": "2026-04-25T23:00:11.321Z",
+  "waitMs": 750
+}

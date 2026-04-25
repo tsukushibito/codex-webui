@@ -1,6 +1,6 @@
 # Codex WebUI LLM Wiki Log
 
-Last updated: 2026-04-25
+Last updated: 2026-04-26
 
 ## Purpose
 
@@ -28,6 +28,50 @@ After the heading, keep the body concise:
 - short note on what changed or remains deferred
 
 ## Entries
+
+## [2026-04-26] query | additional current UI UX gaps
+
+Source:
+
+- user follow-up asking whether high-impact UX improvements were missing from the current UI gap note
+- maintained v0.9 thread-first UI direction
+- prior local source reading of `apps/frontend-bff/src/chat-view.tsx`, `apps/frontend-bff/src/chat-page-client.tsx`, and timeline display behavior
+
+Updated:
+
+- `docs/notes/codex_webui_current_ui_gap_analysis_note_v0_1.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- added interaction feedback and recovery gaps that were not primarily visual: post-submit state progression, scroll anchoring, thread title and summary quality, unread/background update cues, recovery CTAs, keyboard affordances, inline approval confirmation, and artifact extraction
+- expanded the highest-impact fix order so these flow-level UX improvements are considered alongside structural layout and visual hierarchy work
+
+## [2026-04-26] query | current thread UI gap analysis
+
+Source:
+
+- user request to review current UI problems beyond the initial target-image comparison
+- local visual captures under `artifacts/visual-inspection/ui-gap-analysis/`
+- local visual captures under `artifacts/visual-inspection/ui-gap-analysis-selected-thread/`
+- `apps/frontend-bff/src/chat-view.tsx`
+- `apps/frontend-bff/src/chat-page-client.tsx`
+- `apps/frontend-bff/src/timeline-display-model.ts`
+- `apps/frontend-bff/app/globals.css`
+- maintained v0.9 UI target and layout documents
+
+Updated:
+
+- `docs/notes/codex_webui_current_ui_gap_analysis_note_v0_1.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- added a maintained note summarizing current UI gaps around new-thread creation, timeline noise, detail surface, composer reachability, navigation, current activity, approval flow, mobile density, and visual language
+- linked the note from the wiki index so future UX follow-up work can reuse the findings instead of rediscovering them from chat
+- kept the note non-normative and pointed implementation behavior back to the maintained requirements and UI layout spec
 
 ## [2026-04-25] ingest | target UI reference and UX refresh execution order
 
