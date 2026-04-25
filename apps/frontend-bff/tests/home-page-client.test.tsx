@@ -105,6 +105,7 @@ describe("HomePageClient", () => {
         resume_candidates: [
           {
             thread_id: "thread_approval",
+            title: "Approval thread",
             workspace_id: "ws_alpha",
             native_status: {
               thread_status: "running",
@@ -185,6 +186,7 @@ describe("HomePageClient", () => {
         resume_candidates: [
           {
             thread_id: "thread_beta",
+            title: "Beta failed thread",
             workspace_id: "ws_beta",
             native_status: {
               thread_status: "idle",

@@ -66,6 +66,7 @@ function buildThreadListItem(overrides: Partial<PublicThreadListItem> = {}): Pub
   return {
     thread_id: "thread_001",
     workspace_id: "ws_alpha",
+    title: "Investigate build",
     native_status: {
       thread_status: "running",
       active_flags: ["waiting_on_request"],
@@ -100,6 +101,7 @@ function buildThreadView(overrides: Partial<PublicThreadView> = {}): PublicThrea
     thread: {
       thread_id: "thread_001",
       workspace_id: "ws_alpha",
+      title: "Investigate build",
       native_status: {
         thread_status: "running",
         active_flags: ["waiting_on_request"],
@@ -191,6 +193,7 @@ function buildAcceptedInputResponse(
     thread: {
       thread_id: "thread_001",
       workspace_id: "ws_alpha",
+      title: "Investigate build",
       native_status: {
         thread_status: "running",
         active_flags: ["waiting_on_request"],
@@ -312,6 +315,7 @@ describe("ChatPageClient", () => {
           thread: {
             thread_id: "thread_001",
             workspace_id: "ws_alpha",
+            title: "Investigate build",
             native_status: {
               thread_status: "waiting_input",
               active_flags: [],
@@ -441,6 +445,7 @@ describe("ChatPageClient", () => {
       thread: {
         thread_id: "thread_new",
         workspace_id: "ws_alpha",
+        title: "Start a new thread",
         native_status: {
           thread_status: "running",
           active_flags: ["turn_active"],
@@ -482,6 +487,7 @@ describe("ChatPageClient", () => {
       thread: {
         thread_id: "thread_new",
         workspace_id: "ws_alpha",
+        title: "Start a new thread",
         native_status: {
           thread_status: "waiting_input",
           active_flags: [],
@@ -523,6 +529,7 @@ describe("ChatPageClient", () => {
       thread: {
         thread_id: "thread_new",
         workspace_id: "ws_alpha",
+        title: "Start a new thread",
         native_status: {
           thread_status: "running",
           active_flags: ["turn_active"],
@@ -608,6 +615,7 @@ describe("ChatPageClient", () => {
         thread: {
           thread_id: "thread_new",
           workspace_id: "ws_alpha",
+          title: "Start a new thread",
           native_status: {
             thread_status: "running",
             active_flags: ["turn_active"],
@@ -637,6 +645,7 @@ describe("ChatPageClient", () => {
         thread: {
           thread_id: "thread_new",
           workspace_id: "ws_alpha",
+          title: "Start a new thread",
           native_status: {
             thread_status: "running",
             active_flags: ["turn_active"],
@@ -776,6 +785,7 @@ describe("ChatPageClient", () => {
         thread: {
           thread_id: "thread_created",
           workspace_id: "ws_created",
+          title: "Created workspace thread",
           native_status: {
             thread_status: "running",
             active_flags: ["turn_active"],
@@ -790,6 +800,7 @@ describe("ChatPageClient", () => {
         thread: {
           thread_id: "thread_created",
           workspace_id: "ws_created",
+          title: "Created workspace thread",
           native_status: {
             thread_status: "running",
             active_flags: ["turn_active"],
@@ -1201,6 +1212,7 @@ describe("ChatPageClient", () => {
           thread: {
             thread_id: "thread_background",
             workspace_id: "ws_alpha",
+            title: "Background work",
             native_status: {
               thread_status: "waiting_input",
               active_flags: ["waiting_on_request"],
@@ -1590,6 +1602,7 @@ describe("ChatPageClient", () => {
       thread: {
         thread_id: "thread_001",
         workspace_id: "ws_alpha",
+        title: "Investigate build",
         native_status: {
           thread_status: "running",
           active_flags: [],
@@ -1612,6 +1625,7 @@ describe("ChatPageClient", () => {
       thread: {
         thread_id: "thread_001",
         workspace_id: "ws_alpha",
+        title: "Investigate build",
         native_status: {
           thread_status: "waiting_input",
           active_flags: [],
@@ -1685,6 +1699,7 @@ describe("ChatPageClient", () => {
       thread: {
         thread_id: "thread_001",
         workspace_id: "ws_alpha",
+        title: "Investigate build",
         native_status: {
           thread_status: "waiting_input",
           active_flags: [],
@@ -1707,6 +1722,7 @@ describe("ChatPageClient", () => {
       thread: {
         thread_id: "thread_001",
         workspace_id: "ws_alpha",
+        title: "Investigate build",
         native_status: {
           thread_status: "running",
           active_flags: [],
@@ -1748,6 +1764,7 @@ describe("ChatPageClient", () => {
       thread: {
         thread_id: "thread_001",
         workspace_id: "ws_alpha",
+        title: "Investigate build",
         native_status: {
           thread_status: "waiting_input",
           active_flags: [],

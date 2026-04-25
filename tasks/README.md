@@ -73,6 +73,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Archived Task Packages
 
+- [issue-199-bff-title-helpers](./archive/issue-199-bff-title-helpers/README.md)
 - [issue-198-ux-source-boundaries](./archive/issue-198-ux-source-boundaries/README.md)
 - [issue-183-timeline-grouping](./archive/issue-183-timeline-grouping/README.md)
 - [issue-182-thread-view-composer](./archive/issue-182-thread-view-composer/README.md)

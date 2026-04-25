@@ -27,6 +27,7 @@ describe("chat data access", () => {
           {
             thread_id: "thread_001",
             workspace_id: "ws_alpha",
+            title: "Investigate build",
             native_status: {
               thread_status: "running",
               active_flags: [],
@@ -49,7 +50,7 @@ describe("chat data access", () => {
 
     const result = await listWorkspaceThreads("ws_alpha", fetchMock);
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/v1/workspaces/ws_alpha/threads?sort=-updated_at", {
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/workspaces/ws_alpha/threads?sort=recommended", {
       cache: "no-store",
       headers: {
         accept: "application/json",
@@ -72,6 +73,7 @@ describe("chat data access", () => {
             thread: {
               thread_id: "thread_002",
               workspace_id: "ws_alpha",
+              title: "Investigate build",
               native_status: {
                 thread_status: "running",
                 active_flags: [],
@@ -94,6 +96,7 @@ describe("chat data access", () => {
             thread: {
               thread_id: "thread_002",
               workspace_id: "ws_alpha",
+              title: "Investigate build",
               native_status: {
                 thread_status: "running",
                 active_flags: [],
@@ -131,6 +134,7 @@ describe("chat data access", () => {
           thread: {
             thread_id: "thread_001",
             workspace_id: "ws_alpha",
+            title: "Investigate build",
             native_status: {
               thread_status: "running",
               active_flags: ["waiting_on_request"],
@@ -267,6 +271,7 @@ describe("chat data access", () => {
           thread: {
             thread_id: "thread_001",
             workspace_id: "ws_alpha",
+            title: "Investigate build",
             native_status: {
               thread_status: "running",
               active_flags: [],
@@ -280,6 +285,7 @@ describe("chat data access", () => {
         jsonResponse({
           thread_id: "thread_001",
           workspace_id: "ws_alpha",
+          title: "Investigate build",
           native_status: {
             thread_status: "idle",
             active_flags: [],

@@ -28,7 +28,7 @@ async function readJson<T>(response: Response) {
 }
 
 export async function listWorkspaceThreads(workspaceId: string, fetchImpl: FetchLike = fetch) {
-  const response = await fetchImpl(`/api/v1/workspaces/${workspaceId}/threads?sort=-updated_at`, {
+  const response = await fetchImpl(`/api/v1/workspaces/${workspaceId}/threads?sort=recommended`, {
     cache: "no-store",
     headers: {
       accept: "application/json",

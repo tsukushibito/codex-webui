@@ -188,6 +188,7 @@ export function mapThread(thread: RuntimeThreadSummary) {
   return {
     thread_id: thread.thread_id,
     workspace_id: thread.workspace_id,
+    title: thread.title,
     native_status: thread.native_status,
     updated_at: thread.updated_at,
   };
