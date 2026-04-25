@@ -65,7 +65,7 @@ describe("timeline display model", () => {
     const modelRows = rows(model);
     expect(modelRows).toHaveLength(1);
     expect(modelRows[0]).toMatchObject({
-      label: "assistant streaming",
+      label: "Codex is responding",
       content: "Hi there...",
       density: "primary",
       role: "assistant",
@@ -103,7 +103,7 @@ describe("timeline display model", () => {
     });
     expect(rows(beforeRest)).toHaveLength(1);
     expect(rows(beforeRest)[0]).toMatchObject({
-      label: "message.assistant.completed",
+      label: "Codex",
       content: "Final answer.",
       isLive: false,
     });
@@ -210,10 +210,48 @@ describe("timeline display model", () => {
     expect(rows(model)).toEqual([
       expect.objectContaining({
         id: "stream:status_001",
-        label: "session.status_changed",
+        label: "Status update",
         content: "Running tool",
         density: "compact",
       }),
+    ]);
+  });
+
+  it("uses user-facing labels instead of raw event or item kinds in primary timeline rows", () => {
+    const model = buildTimelineDisplayModel({
+      timelineItems: [
+        timelineItem({
+          timeline_item_id: "user_001",
+          kind: "message.user",
+          payload: {
+            content: "Run the checks.",
+          },
+        }),
+        timelineItem({
+          timeline_item_id: "request_001",
+          sequence: 2,
+          kind: "approval.requested",
+          payload: {
+            summary: "Approve git push",
+          },
+        }),
+        timelineItem({
+          timeline_item_id: "failure_001",
+          sequence: 3,
+          kind: "turn.failed",
+          payload: {
+            summary: "Command failed",
+          },
+        }),
+      ],
+      streamEvents: [],
+      draftAssistantMessages: {},
+    });
+
+    expect(rows(model).map((row) => row.label)).toEqual([
+      "You",
+      "Request needs attention",
+      "Turn failed",
     ]);
   });
 });

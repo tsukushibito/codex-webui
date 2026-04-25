@@ -33,6 +33,46 @@ function asNonEmptyString(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+function timelineDisplayLabel(kind: string, isLive = false) {
+  if (kind.startsWith("message.user")) {
+    return "You";
+  }
+
+  if (kind.startsWith("message.assistant")) {
+    return isLive ? "Codex is responding" : "Codex";
+  }
+
+  if (kind.includes("approval") || kind.includes("request")) {
+    if (kind.includes("resolved") || kind.includes("responded")) {
+      return "Request resolved";
+    }
+
+    return "Request needs attention";
+  }
+
+  if (kind.includes("error")) {
+    return "System error";
+  }
+
+  if (kind.includes("failed")) {
+    return "Turn failed";
+  }
+
+  if (kind.includes("file")) {
+    return "File update";
+  }
+
+  if (kind.includes("status")) {
+    return "Status update";
+  }
+
+  if (kind.includes("tool") || kind.includes("command")) {
+    return "Tool activity";
+  }
+
+  return "Thread update";
+}
+
 function payloadText(payload: Record<string, unknown>) {
   return (
     asNonEmptyString(payload.content) ??
@@ -177,7 +217,7 @@ export function buildTimelineDisplayModel({
       turnId: item.turn_id,
       sequence: item.sequence,
       occurredAt: item.occurred_at,
-      label: item.kind,
+      label: timelineDisplayLabel(item.kind),
       content,
       density: classifyTimelineDensity(item.kind),
       role: timelineRole(item),
@@ -260,7 +300,7 @@ export function buildTimelineDisplayModel({
       turnId: group.turnId,
       sequence: group.completedSequence ?? group.firstSequence,
       occurredAt: group.completedAt ?? group.occurredAt,
-      label: isCompleted ? "message.assistant.completed" : "assistant streaming",
+      label: timelineDisplayLabel("message.assistant.completed", !isCompleted),
       content: isCompleted ? content : `${content}...`,
       density: "primary",
       role: "assistant",
@@ -279,7 +319,7 @@ export function buildTimelineDisplayModel({
       turnId: null,
       sequence: Number.MAX_SAFE_INTEGER,
       occurredAt: null,
-      label: "assistant streaming",
+      label: timelineDisplayLabel("message.assistant.delta", true),
       content: `${content}...`,
       density: "primary",
       role: "assistant",
@@ -305,7 +345,7 @@ export function buildTimelineDisplayModel({
       turnId: payloadTurnId(event.payload),
       sequence: event.sequence,
       occurredAt: event.occurred_at,
-      label: event.event_type,
+      label: timelineDisplayLabel(event.event_type),
       content: streamEventContent(event),
       density: classifyTimelineDensity(event.event_type),
       role: eventRole(event),
