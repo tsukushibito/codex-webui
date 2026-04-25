@@ -55,6 +55,7 @@ describe("ChatView", () => {
         threads={[
           {
             thread_id: "thread_approval",
+            title: "Approval thread",
             workspace_id: "ws_alpha",
             native_status: {
               thread_status: "running",
@@ -82,6 +83,7 @@ describe("ChatView", () => {
           },
           {
             thread_id: "thread_active",
+            title: "Active thread",
             workspace_id: "ws_alpha",
             native_status: {
               thread_status: "running",
@@ -99,6 +101,7 @@ describe("ChatView", () => {
           },
           {
             thread_id: "thread_recent",
+            title: "Recent thread",
             workspace_id: "ws_alpha",
             native_status: {
               thread_status: "waiting_input",
@@ -215,6 +218,7 @@ describe("ChatView", () => {
         selectedThreadView={{
           thread: {
             thread_id: "thread_001",
+            title: "Approval thread",
             workspace_id: "ws_alpha",
             native_status: {
               thread_status: "running",
@@ -292,6 +296,7 @@ describe("ChatView", () => {
         threads={[
           {
             thread_id: "thread_001",
+            title: "Approval thread",
             workspace_id: "ws_alpha",
             native_status: {
               thread_status: "running",
@@ -443,6 +448,7 @@ describe("ChatView", () => {
         selectedThreadView={{
           thread: {
             thread_id: "thread_001",
+            title: "Resolved request thread",
             workspace_id: "ws_alpha",
             native_status: {
               thread_status: "waiting_input",
@@ -573,6 +579,7 @@ describe("ChatView", () => {
         selectedThreadView={{
           thread: {
             thread_id: "thread_001",
+            title: "Failed thread",
             workspace_id: "ws_alpha",
             native_status: {
               thread_status: "idle",

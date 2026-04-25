@@ -353,7 +353,7 @@ export async function getHome(_request: Request) {
     const threadResults = await Promise.all(
       workspaceResult.body.items.map((workspace) =>
         runtimeClient.requestJson<ListResponse<RuntimeThreadSummary>>(
-          `/api/v1/workspaces/${workspace.workspace_id}/threads?sort=-updated_at`,
+          `/api/v1/workspaces/${workspace.workspace_id}/threads?sort=recommended`,
         ),
       ),
     );

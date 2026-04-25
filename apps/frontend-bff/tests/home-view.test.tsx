@@ -51,6 +51,7 @@ describe("HomeView", () => {
           resume_candidates: [
             {
               thread_id: "thread_approval",
+              title: "Approval thread",
               workspace_id: "ws_alpha",
               native_status: {
                 thread_status: "running",
@@ -78,6 +79,7 @@ describe("HomeView", () => {
             },
             {
               thread_id: "thread_failed",
+              title: "Failed thread",
               workspace_id: "ws_beta",
               native_status: {
                 thread_status: "idle",

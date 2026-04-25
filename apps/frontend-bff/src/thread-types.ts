@@ -1,6 +1,7 @@
 export interface PublicThread {
   thread_id: string;
   workspace_id: string;
+  title: string;
   native_status: {
     thread_status: string;
     active_flags: string[];

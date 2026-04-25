@@ -230,7 +230,7 @@ describe("frontend-bff route handlers", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "http://127.0.0.1:3001/api/v1/workspaces/ws_alpha/threads?sort=-updated_at",
+      "http://127.0.0.1:3001/api/v1/workspaces/ws_alpha/threads?sort=recommended",
       expect.objectContaining({
         cache: "no-store",
       }),
@@ -255,6 +255,7 @@ describe("frontend-bff route handlers", () => {
         {
           thread_id: "thread_approval",
           workspace_id: "ws_alpha",
+          title: "Needs approval",
           native_status: {
             thread_status: "running",
             active_flags: ["waiting_on_request"],
@@ -282,6 +283,7 @@ describe("frontend-bff route handlers", () => {
         {
           thread_id: "thread_failed",
           workspace_id: "ws_alpha",
+          title: "Failed turn",
           native_status: {
             thread_status: "idle",
             active_flags: [],
@@ -309,6 +311,7 @@ describe("frontend-bff route handlers", () => {
         {
           thread_id: "thread_active",
           workspace_id: "ws_alpha",
+          title: "Still running",
           native_status: {
             thread_status: "running",
             active_flags: [],
@@ -421,6 +424,7 @@ describe("frontend-bff route handlers", () => {
         {
           thread_id: "thread_001",
           workspace_id: "ws_alpha",
+          title: "Investigate build",
           native_status: {
             thread_status: "running",
             active_flags: ["waiting_on_request"],
@@ -488,6 +492,7 @@ describe("frontend-bff route handlers", () => {
     expect(await response.json()).toEqual({
       thread_id: "thread_001",
       workspace_id: "ws_alpha",
+      title: "Investigate build",
       native_status: {
         thread_status: "idle",
         active_flags: [],
@@ -555,6 +560,7 @@ describe("frontend-bff route handlers", () => {
       thread: {
         thread_id: "thread_002",
         workspace_id: "ws_alpha",
+        title: "Investigate build",
         native_status: {
           thread_status: "running",
           active_flags: [],
@@ -631,6 +637,7 @@ describe("frontend-bff route handlers", () => {
       thread: {
         thread_id: "thread_001",
         workspace_id: "ws_alpha",
+        title: "Investigate build",
         native_status: {
           thread_status: "running",
           active_flags: [],
@@ -683,6 +690,7 @@ describe("frontend-bff route handlers", () => {
     expect(await response.json()).toEqual({
       thread_id: "thread_001",
       workspace_id: "ws_alpha",
+      title: "Investigate build",
       native_status: {
         thread_status: "idle",
         active_flags: [],
@@ -764,6 +772,7 @@ describe("frontend-bff route handlers", () => {
       thread: {
         thread_id: "thread_001",
         workspace_id: "ws_alpha",
+        title: "Investigate build",
         native_status: {
           thread_status: "running",
           active_flags: [],
@@ -927,6 +936,7 @@ describe("frontend-bff route handlers", () => {
       thread: {
         thread_id: "thread_001",
         workspace_id: "ws_alpha",
+        title: "Investigate build",
         native_status: {
           thread_status: "idle",
           active_flags: [],
