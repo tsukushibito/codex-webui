@@ -156,6 +156,10 @@ describe("ChatView", () => {
     expect(markup).toContain("Attention needed");
     expect(markup).toContain("Active");
     expect(markup).toContain("Recent");
+    expect(markup).toContain("Approval thread");
+    expect(markup).toContain("Active thread");
+    expect(markup).toContain("Recent thread");
+    expect(markup).toContain("Thread ref: thread_approval");
     expect(markup).toContain("Blocked: Needs response");
     expect(markup).toContain("Resume here first");
     expect(markup).toContain("Recently updated");

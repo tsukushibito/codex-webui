@@ -426,7 +426,7 @@ export function ChatView({
                         {thread.current_activity.label}
                       </span>
                     </div>
-                    <strong>{thread.thread_id}</strong>
+                    <strong>{thread.title}</strong>
                     {thread.badge ? (
                       <span className="workspace-meta">
                         {formatMachineLabel(thread.badge.label)}
@@ -440,6 +440,7 @@ export function ChatView({
                     <span className="workspace-meta">
                       Updated {formatTimestamp(thread.updated_at)}
                     </span>
+                    <span className="workspace-meta">Thread ref: {thread.thread_id}</span>
                     {thread.resume_cue ? (
                       <span className="workspace-meta">
                         {formatMachineLabel(thread.resume_cue.label)}
