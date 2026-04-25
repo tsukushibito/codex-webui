@@ -340,7 +340,7 @@ describe("ChatView", () => {
     );
 
     expect(markup).toContain("Approval thread");
-    expect(markup).toContain("Workspace ws_alpha");
+    expect(markup).toContain("Workspace alpha");
     expect(markup).toContain("Approval required");
     expect(markup).toContain("Codex is paused until you approve or deny the request below.");
     expect(markup).toContain("Approve request");
