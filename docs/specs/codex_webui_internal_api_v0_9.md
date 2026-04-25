@@ -410,6 +410,7 @@ It may be a stream or an equivalent internal contract, but it must not become:
 It must include or make derivable at least:
 
 - thread reference and workspace reference
+- thread title material for public Navigation rows and thread header display
 - native status snapshot or equivalent status material
 - `updated_at` used for stable list sorting
 - current activity material
@@ -418,6 +419,8 @@ It must include or make derivable at least:
 - resume cue material
 - pending request presence, including request identity when pending
 - error or latest failed-turn presence when retained
+- internal ranking inputs needed for public workspace `Recommended` ordering: pending-request presence, retained error or failed-turn evidence, active-thread signal, and deterministic recency tie-break material
+- any app-owned last-viewed marker used by the public `Recommended` contract must remain helper metadata rather than canonical thread state
 
 These fields are Navigation cue material only. They must not become canonical resources separate from native thread, turn, item, request flow, and the internal `thread_id + sequence` ordering basis.
 
@@ -577,6 +580,8 @@ It must include at least:
 - operation summary when available
 - request time
 
+`pending_request_summary` is the internal source for the public P0 confirmation contract. Richer file or diff detail may be added later, but it must not be required for approve or deny in MVP.
+
 ### 12.5 `latest_resolved_request_summary`
 
 `latest_resolved_request_summary` is the thread-context helper view for a just-resolved request that remains retained during the immediate recovery window.
@@ -592,6 +597,8 @@ It should include at least:
 - response decision
 - request time
 - response time
+
+While retained, this helper must keep the just-resolved request detail reachable from thread context across normal refresh, reconnect, or reload flows.
 
 ### 12.6 `request_detail_view`
 
@@ -611,12 +618,17 @@ It must include at least:
 - response decision when already resolved and still retained
 - response time when already resolved and still retained
 
+Rules:
+
+- the required MVP payload is the P0 minimum confirmation set needed before approve or deny
+- richer file, diff, or expanded artifact detail is optional later expansion and must not become a required MVP dependency
+
 ### 12.7 Lifetime and reachability
 
 At minimum:
 
 - pending requests must be reachable from thread context
-- just-resolved requests must remain reachable from thread context long enough for reconnect and re-response safety
+- just-resolved requests must remain reachable from thread context long enough for reconnect, reload, and re-response safety during the retained recovery window
 - after helper retention expires, endpoint-specific not-found behavior may apply
 
 The thread-context helper may be surfaced through `thread_view_helper`, request-related timeline items carrying `request_id`, and `GET /api/v1/threads/{thread_id}/pending_request`.
@@ -647,6 +659,11 @@ Example no-pending response:
 ```
 
 This must not be overloaded to mean that the request namespace or thread is missing.
+
+Thread-context absence and request-detail expiry are distinct cases:
+
+- `pending_request: null` plus `latest_resolved_request: null` means no request helper is currently reachable in that thread context
+- `request_not_found` is reserved for request-detail reads whose helper retention or identity is no longer reachable
 
 When `pending_request` is non-null, `latest_resolved_request` must be `null`.
 
