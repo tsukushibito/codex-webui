@@ -69,10 +69,11 @@ Each active task package `README.md` must include at least the following section
 
 ## Current Active Tasks
 
-- [issue-217-navigation-return-surface](./issue-217-navigation-return-surface/README.md)
+- `None`
 
 ## Archived Task Packages
 
+- [issue-217-navigation-return-surface](./archive/issue-217-navigation-return-surface/README.md)
 - [issue-216-timeline-chronology](./archive/issue-216-timeline-chronology/README.md)
 - [issue-215-first-input-composer](./archive/issue-215-first-input-composer/README.md)
 - [issue-205-mobile-responsive-polish](./archive/issue-205-mobile-responsive-polish/README.md)

@@ -12,6 +12,7 @@ Archive entries preserve the work instructions that were used at the time, while
 
 ## Packages
 
+- [issue-217-navigation-return-surface](./issue-217-navigation-return-surface/README.md)
 - [issue-216-timeline-chronology](./issue-216-timeline-chronology/README.md)
 - [issue-215-first-input-composer](./issue-215-first-input-composer/README.md)
 - [issue-182-thread-view-composer](./issue-182-thread-view-composer/README.md)

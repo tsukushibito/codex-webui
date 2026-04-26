@@ -97,38 +97,67 @@ function formatMachineLabel(value: string | null | undefined) {
   return value ? value.replaceAll("_", " ") : "Not available";
 }
 
-function hasAttentionCue(thread: PublicThreadListItem) {
-  return (
-    thread.blocked_cue !== null ||
-    thread.resume_cue?.priority_band === "highest" ||
-    thread.current_activity.kind === "waiting_on_approval" ||
-    thread.current_activity.kind === "system_error" ||
-    thread.current_activity.kind === "latest_turn_failed"
-  );
-}
-
 function isActiveThread(thread: PublicThreadListItem) {
   return thread.current_activity.kind === "running";
 }
 
-function groupThreads(threads: PublicThreadListItem[]) {
-  const attentionNeeded = threads.filter(hasAttentionCue);
-  const active = threads.filter(
-    (thread) =>
-      isActiveThread(thread) &&
-      !attentionNeeded.some((item) => item.thread_id === thread.thread_id),
+function isWaitingApprovalThread(thread: PublicThreadListItem) {
+  return (
+    thread.current_activity.kind === "waiting_on_approval" ||
+    thread.blocked_cue?.kind === "approval_required" ||
+    thread.badge?.kind === "approval"
   );
-  const recent = threads.filter(
-    (thread) =>
-      !attentionNeeded.some((item) => item.thread_id === thread.thread_id) &&
-      !active.some((item) => item.thread_id === thread.thread_id),
-  );
+}
 
-  return [
-    { label: "Attention needed", threads: attentionNeeded },
-    { label: "Active", threads: active },
-    { label: "Recent", threads: recent },
-  ].filter((group) => group.threads.length > 0);
+function isErrorOrFailedThread(thread: PublicThreadListItem) {
+  return (
+    thread.current_activity.kind === "system_error" ||
+    thread.current_activity.kind === "latest_turn_failed" ||
+    thread.native_status.latest_turn_status === "failed"
+  );
+}
+
+function isRecentThread(thread: PublicThreadListItem) {
+  return (
+    !isActiveThread(thread) && !isWaitingApprovalThread(thread) && !isErrorOrFailedThread(thread)
+  );
+}
+
+type ThreadFilterId = "all" | "active" | "waiting_approval" | "errors_failed" | "recent";
+
+function filterThreads(threads: PublicThreadListItem[], filterId: ThreadFilterId) {
+  switch (filterId) {
+    case "active":
+      return threads.filter(isActiveThread);
+    case "waiting_approval":
+      return threads.filter(isWaitingApprovalThread);
+    case "errors_failed":
+      return threads.filter(isErrorOrFailedThread);
+    case "recent":
+      return threads.filter(isRecentThread);
+    default:
+      return threads;
+  }
+}
+
+function summarizeThreadActivity(thread: PublicThreadListItem) {
+  if (thread.blocked_cue) {
+    return thread.blocked_cue.label;
+  }
+
+  if (thread.badge) {
+    return thread.badge.label;
+  }
+
+  if (thread.resume_cue) {
+    return thread.resume_cue.label;
+  }
+
+  return thread.current_activity.label;
+}
+
+function threadCueLabel(thread: PublicThreadListItem) {
+  return thread.blocked_cue?.label ?? thread.resume_cue?.label ?? thread.badge?.label ?? null;
 }
 
 function workspaceSummary(workspace: PublicWorkspaceSummary) {
@@ -246,9 +275,25 @@ export function ChatView({
 }: ChatViewProps) {
   const [isNavigationOpen, setIsNavigationOpen] = useState(false);
   const [detailSelection, setDetailSelection] = useState<ThreadDetailSelection | null>(null);
+  const [selectedFilterId, setSelectedFilterId] = useState<ThreadFilterId>("all");
   const selectedWorkspace =
     workspaces.find((workspace) => workspace.workspace_id === workspaceId) ?? null;
-  const threadGroups = groupThreads(threads);
+  const visibleThreads = filterThreads(threads, selectedFilterId);
+  const threadFilters: Array<{ id: ThreadFilterId; label: string; count: number }> = [
+    { id: "all", label: "All", count: threads.length },
+    { id: "active", label: "Active", count: threads.filter(isActiveThread).length },
+    {
+      id: "waiting_approval",
+      label: "Waiting approval",
+      count: threads.filter(isWaitingApprovalThread).length,
+    },
+    {
+      id: "errors_failed",
+      label: "Errors / Failed",
+      count: threads.filter(isErrorOrFailedThread).length,
+    },
+    { id: "recent", label: "Recent", count: threads.filter(isRecentThread).length },
+  ];
   const hasSelectedThread = selectedThreadId !== null;
   const isOpeningSelectedThread = hasSelectedThread && !selectedThreadView;
   const isStartingThread = !hasSelectedThread;
@@ -295,6 +340,10 @@ export function ChatView({
     setIsNavigationOpen(false);
     setDetailSelection(null);
   }, [selectedThreadId]);
+
+  useEffect(() => {
+    setSelectedFilterId("all");
+  }, [workspaceId]);
 
   function selectThread(threadId: string) {
     onSelectThread(threadId);
@@ -453,50 +502,82 @@ export function ChatView({
               <p className="empty-state">No threads yet. Use Ask Codex in Thread View.</p>
             ) : null}
 
-            {threadGroups.map((group) => (
-              <section className="thread-list-group" key={group.label}>
-                <h3>{group.label}</h3>
-                {group.threads.map((thread) => (
+            {workspaceId && threads.length > 0 ? (
+              <div className="thread-filter-bar" role="tablist" aria-label="Thread filters">
+                {threadFilters.map((filter) => (
                   <button
                     className={
-                      selectedThreadId === thread.thread_id
-                        ? "thread-summary-card active"
-                        : "thread-summary-card"
+                      selectedFilterId === filter.id
+                        ? "thread-filter-chip active"
+                        : "thread-filter-chip"
                     }
-                    key={thread.thread_id}
-                    onClick={() => selectThread(thread.thread_id)}
+                    key={filter.id}
+                    onClick={() => setSelectedFilterId(filter.id)}
+                    role="tab"
+                    aria-selected={selectedFilterId === filter.id}
                     type="button"
                   >
-                    <div className="workspace-meta-row">
-                      <p className="eyebrow">Thread</p>
+                    <span>{filter.label}</span>
+                    <span className="thread-filter-count">{filter.count}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {workspaceId &&
+            !isLoadingThreads &&
+            threads.length > 0 &&
+            visibleThreads.length === 0 ? (
+              <p className="empty-state">No threads match this filter.</p>
+            ) : null}
+
+            {visibleThreads.map((thread) => {
+              const isSelected = selectedThreadId === thread.thread_id;
+              const rowCueLabel = threadCueLabel(thread);
+              const hasBackgroundNotice =
+                backgroundPriorityNotice?.threadId === thread.thread_id && !isSelected;
+
+              return (
+                <button
+                  className={isSelected ? "thread-summary-card active" : "thread-summary-card"}
+                  key={thread.thread_id}
+                  onClick={() => selectThread(thread.thread_id)}
+                  type="button"
+                >
+                  <div className="workspace-meta-row thread-summary-header">
+                    <div className="thread-summary-title-block">
+                      <strong>{thread.title}</strong>
+                      <span className="workspace-meta">
+                        Updated {formatTimestamp(thread.updated_at)}
+                      </span>
+                    </div>
+                    <div className="thread-summary-statuses">
+                      {isSelected ? <span className="status-badge">Selected</span> : null}
                       <span className={threadBadgeClass(thread)}>
                         {thread.current_activity.label}
                       </span>
                     </div>
-                    <strong>{thread.title}</strong>
-                    {thread.badge ? (
-                      <span className="workspace-meta">
-                        {formatMachineLabel(thread.badge.label)}
-                      </span>
+                  </div>
+                  <p className="thread-summary-activity">{summarizeThreadActivity(thread)}</p>
+                  <div className="thread-summary-cues">
+                    {rowCueLabel ? (
+                      <span className="status-badge">{formatMachineLabel(rowCueLabel)}</span>
                     ) : null}
-                    {thread.blocked_cue ? (
-                      <span className="workspace-meta">
-                        Blocked: {formatMachineLabel(thread.blocked_cue.label)}
-                      </span>
+                    {hasBackgroundNotice ? (
+                      <span className="status-badge warning">Needs attention now</span>
                     ) : null}
-                    <span className="workspace-meta">
-                      Updated {formatTimestamp(thread.updated_at)}
-                    </span>
-                    <span className="workspace-meta">Thread ref: {thread.thread_id}</span>
-                    {thread.resume_cue ? (
-                      <span className="workspace-meta">
-                        {formatMachineLabel(thread.resume_cue.label)}
-                      </span>
+                    {thread.badge && rowCueLabel !== thread.badge.label ? (
+                      <span className="status-badge">{formatMachineLabel(thread.badge.label)}</span>
                     ) : null}
-                  </button>
-                ))}
-              </section>
-            ))}
+                  </div>
+                  {hasBackgroundNotice ? (
+                    <p className="thread-summary-notice">
+                      Background notice: {backgroundPriorityNotice?.reason}
+                    </p>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </section>
 

@@ -38,15 +38,30 @@
 
 ## Artifacts / evidence
 
-- Planned: focused frontend test and validation command output in handoff notes.
-- Planned if visually material: `artifacts/visual-inspection/issue-217-navigation-return-surface/`
+- Sprint validation:
+  - `npm run check`: passed
+  - `node ./node_modules/typescript/bin/tsc --noEmit --pretty false`: passed
+  - `npm test -- tests/chat-view.test.tsx tests/chat-page-client.test.tsx`: passed, 25 tests
+- Dedicated pre-push validation:
+  - `npm run check`: passed
+  - `node ./node_modules/typescript/bin/tsc --noEmit --pretty false`: passed
+  - focused Vitest: 2 files passed, 25 tests passed
+  - full `npm test`: 11 files passed, 84 tests passed
 
 ## Status / handoff notes
 
-- Status: `started`
+- Status: `locally complete`
 - Active branch: `issue-217-navigation-return-surface`
 - Active worktree: `.worktrees/issue-217-navigation-return-surface`
-- Notes: Package created from #217 before implementation.
+- Notes: Implemented client-local Navigation filters/counts, title-first thread rows, selected/background notice cues, compact status/cue display, and removal of dominant raw thread refs. Evaluator approved after `Recent` was corrected to use current API list ordering and existing state cues instead of a synthetic resume-cue value.
+- Completion retrospective:
+  - Completion boundary: package archive after local completion and pre-push validation.
+  - Contract check: Issue #217 acceptance criteria are satisfied locally; Issue close still requires PR merge to `main`, parent checkout sync, worktree cleanup, and GitHub tracking update.
+  - What worked: evaluator caught a production-data mismatch in the initial `Recent` filter before publication.
+  - Workflow problems: early tests used a synthetic `recent` resume cue that current BFF mapping does not emit.
+  - Improvements to adopt: filter/cue tests should include mapped-production-like fixtures for values derived from BFF mappers.
+  - Skill candidates or skill updates: none required.
+  - Follow-up updates: none required before archive; publish-oriented GitHub handoff remains required.
 
 ## Archive conditions
 

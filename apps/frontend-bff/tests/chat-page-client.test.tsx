@@ -396,7 +396,8 @@ describe("ChatPageClient", () => {
     });
     await flushUi();
 
-    expect(container.textContent).toContain("thread_001");
+    expect(container.textContent).toContain("Investigate build");
+    expect(container.textContent).toContain("Selected");
     expect(container.textContent).toContain("Waiting for your input");
     expect(MockEventSource.instances[0]?.url).toBe("/api/v1/threads/thread_001/stream");
 
@@ -1443,10 +1444,13 @@ describe("ChatPageClient", () => {
 
     expect(chatDataMocks.listWorkspaceThreads).toHaveBeenCalledTimes(2);
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain("thread_001");
+    expect(container.textContent).toContain("Investigate build");
+    expect(container.textContent).toContain("Selected");
     expect(container.textContent).toContain("High-priority background thread needs attention.");
     expect(container.textContent).toContain("Background thread needs attention");
     expect(container.textContent).toContain("Reason: Needs response");
+    expect(container.textContent).toContain("Needs attention now");
+    expect(container.textContent).toContain("Background notice: Needs response");
     expect(container.textContent).not.toContain("Request detail");
 
     const openThreadButton = Array.from(container.querySelectorAll("button")).find(
@@ -1465,7 +1469,7 @@ describe("ChatPageClient", () => {
         (button) => button.textContent === "Open thread",
       ),
     ).toBeUndefined();
-    expect(container.textContent).toContain("thread_background");
+    expect(container.textContent).toContain("Background work");
     expect(container.textContent).toContain("Approval required");
     expect(container.textContent).toContain("Approve request");
     expect(container.textContent).toContain("Deny request");
