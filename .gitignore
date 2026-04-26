@@ -15,3 +15,7 @@ coverage/
 .DS_Store
 apps/frontend-bff/playwright-report/
 apps/frontend-bff/test-results/
+
+# Local ad hoc visual-inspection captures from live workspace/thread probes.
+# Issue-owned visual evidence should use a stable issue/run-specific directory.
+artifacts/visual-inspection/workspace*-thread-latest-*/
