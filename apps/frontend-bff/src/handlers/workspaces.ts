@@ -1,11 +1,7 @@
 import { isErrorEnvelope, toErrorResponse } from "../errors";
 import { mapThreadListItem, mapWorkspace, mapWorkspaceList } from "../mappings";
-import type {
-  HomeResponse,
-  ListResponse,
-  RuntimeThreadSummary,
-  RuntimeWorkspaceSummary,
-} from "../runtime-types";
+import type { HomeResponse } from "../public-types";
+import type { ListResponse, RuntimeThreadSummary, RuntimeWorkspaceSummary } from "../runtime-types";
 import type { PublicThreadListItem } from "../thread-types";
 import {
   forwardSearch,

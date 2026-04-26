@@ -1,5 +1,3 @@
-import type { PublicThreadListItem } from "./thread-types";
-
 export interface RuntimeWorkspaceSummary {
   workspace_id: string;
   workspace_name: string;
@@ -232,23 +230,6 @@ export interface RuntimeApprovalStreamEventProjection {
   occurred_at: string;
   payload: Record<string, unknown>;
   native_event_name: string | null;
-}
-
-export interface HomeResponse {
-  workspaces: Array<{
-    workspace_id: string;
-    workspace_name: string;
-    created_at: string;
-    updated_at: string;
-    active_session_summary: {
-      session_id: string;
-      status: string;
-      last_message_at: string | null;
-    } | null;
-    pending_approval_count: number;
-  }>;
-  resume_candidates: PublicThreadListItem[];
-  updated_at: string;
 }
 
 export interface ListResponse<T> {

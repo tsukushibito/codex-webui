@@ -1,6 +1,5 @@
-import type { PublicListResponse } from "./chat-types";
 import { isErrorEnvelope } from "./errors";
-import type { HomeResponse } from "./runtime-types";
+import type { PublicListResponse, PublicWorkspaceSummary } from "./public-types";
 import type {
   PublicRequestDetail,
   PublicRequestResponseResult,
@@ -10,8 +9,9 @@ import type {
   PublicThreadView,
 } from "./thread-types";
 
+export type { PublicWorkspaceSummary } from "./public-types";
+
 type FetchLike = typeof fetch;
-export type PublicWorkspaceSummary = HomeResponse["workspaces"][number];
 
 async function readJson<T>(response: Response) {
   const payload = (await response.json()) as unknown;

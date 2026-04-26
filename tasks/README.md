@@ -73,6 +73,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Archived Task Packages
 
+- [issue-247-bff-type-boundaries](./archive/issue-247-bff-type-boundaries/README.md)
 - [issue-246-bff-resource-handlers](./archive/issue-246-bff-resource-handlers/README.md)
 - [issue-245-request-helper-lifecycle](./archive/issue-245-request-helper-lifecycle/README.md)
 - [issue-244-gateway-event-translation](./archive/issue-244-gateway-event-translation/README.md)

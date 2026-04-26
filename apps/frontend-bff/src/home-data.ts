@@ -1,5 +1,6 @@
 import { isErrorEnvelope } from "./errors";
-import type { HomeResponse, RuntimeWorkspaceSummary } from "./runtime-types";
+import type { HomeResponse } from "./public-types";
+import type { RuntimeWorkspaceSummary } from "./runtime-types";
 
 type FetchLike = typeof fetch;
 

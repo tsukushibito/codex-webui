@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { createWorkspaceFromHome, fetchHomeData } from "./home-data";
 import { HomeView } from "./home-view";
-import type { HomeResponse } from "./runtime-types";
+import type { HomeResponse } from "./public-types";
 import type { PublicNotificationEvent } from "./thread-types";
 
 function chooseDefaultWorkspaceId(home: HomeResponse | null) {

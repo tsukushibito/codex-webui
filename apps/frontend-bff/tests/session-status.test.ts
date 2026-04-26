@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { PublicSessionSummary } from "../src/chat-types";
+import type { PublicSessionSummary } from "../src/legacy-types";
 import { applySessionStatus } from "../src/session-status";
 
 function buildSession(overrides: Partial<PublicSessionSummary> = {}): PublicSessionSummary {
