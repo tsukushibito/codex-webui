@@ -1460,6 +1460,111 @@ describe("ChatView", () => {
     expect(markup).not.toContain('id="message-input"');
   });
 
+  it("folds long timeline rows and expands them in place", async () => {
+    const longOutput = Array.from(
+      { length: 12 },
+      (_, index) => `diagnostic line ${String(index + 1).padStart(2, "0")}`,
+    ).join("\n");
+
+    await act(async () => {
+      root.render(
+        <ChatView
+          backgroundPriorityNotice={null}
+          connectionState="live"
+          draftAssistantMessages={{}}
+          errorMessage={null}
+          isCreatingThread={false}
+          isCreatingWorkspace={false}
+          isInterruptingThread={false}
+          isLoadingThread={false}
+          isLoadingThreads={false}
+          isLoadingWorkspaces={false}
+          isRespondingToRequest={false}
+          isSendingMessage={false}
+          composerDraft=""
+          onApproveRequest={() => {}}
+          onSubmitComposer={() => {}}
+          onCreateWorkspace={() => {}}
+          onDenyRequest={() => {}}
+          onInterruptThread={() => {}}
+          onOpenBackgroundPriorityThread={() => {}}
+          onAskCodex={() => {}}
+          onComposerDraftChange={() => {}}
+          onSelectThread={() => {}}
+          onSelectWorkspace={() => {}}
+          onWorkspaceNameChange={() => {}}
+          selectedRequestDetail={null}
+          selectedThreadId="thread_001"
+          selectedThreadView={{
+            thread: {
+              thread_id: "thread_001",
+              title: "Dense timeline thread",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "waiting_input",
+                active_flags: [],
+                latest_turn_status: null,
+              },
+              updated_at: "2026-03-27T05:22:00Z",
+            },
+            current_activity: {
+              kind: "waiting_on_user_input",
+              label: "Waiting for your input",
+            },
+            pending_request: null,
+            latest_resolved_request: null,
+            composer: {
+              accepting_user_input: true,
+              interrupt_available: false,
+              blocked_by_request: false,
+              input_unavailable_reason: null,
+            },
+            timeline: {
+              items: [
+                {
+                  timeline_item_id: "evt_long_001",
+                  thread_id: "thread_001",
+                  turn_id: "turn_001",
+                  item_id: "item_long_001",
+                  sequence: 1,
+                  occurred_at: "2026-03-27T05:22:00Z",
+                  kind: "tool.output",
+                  payload: {
+                    content: longOutput,
+                  },
+                },
+              ],
+              next_cursor: null,
+              has_more: false,
+            },
+          }}
+          statusMessage={null}
+          streamEvents={[]}
+          threads={[]}
+          workspaceId="ws_alpha"
+          workspaceName=""
+          workspaces={[]}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("diagnostic line 08");
+    expect(container.textContent).not.toContain("diagnostic line 12");
+
+    const showMoreButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Show more",
+    );
+    expect(showMoreButton).toBeDefined();
+    expect(showMoreButton?.getAttribute("aria-expanded")).toBe("false");
+
+    await act(async () => {
+      showMoreButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain("diagnostic line 12");
+    expect(container.textContent).toContain("Show less");
+  });
+
   it("surfaces a latest-activity CTA when auto-scroll is suppressed", async () => {
     const baseProps = {
       backgroundPriorityNotice: null,

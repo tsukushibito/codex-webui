@@ -211,6 +211,34 @@ function timelineRowClass(row: TimelineDisplayRow) {
   return `timeline-row timeline-row-${row.density} timeline-row-${row.role}`;
 }
 
+const TIMELINE_PREVIEW_LINE_LIMIT = 8;
+const TIMELINE_PREVIEW_CHARACTER_LIMIT = 520;
+
+function timelineContentPreview(content: string) {
+  const lines = content.split(/\r?\n/);
+  const lineFolded = lines.length > TIMELINE_PREVIEW_LINE_LIMIT;
+  const linePreview = lineFolded ? lines.slice(0, TIMELINE_PREVIEW_LINE_LIMIT).join("\n") : content;
+
+  if (linePreview.length <= TIMELINE_PREVIEW_CHARACTER_LIMIT) {
+    return {
+      isFoldable: lineFolded,
+      preview: lineFolded ? `${linePreview.trimEnd()}\n...` : content,
+    };
+  }
+
+  const clipped = linePreview.slice(0, TIMELINE_PREVIEW_CHARACTER_LIMIT);
+  const lastWhitespace = clipped.search(/\s+\S*$/);
+  const preview =
+    lastWhitespace > TIMELINE_PREVIEW_CHARACTER_LIMIT * 0.72
+      ? clipped.slice(0, lastWhitespace)
+      : clipped;
+
+  return {
+    isFoldable: true,
+    preview: `${preview.trimEnd()}...`,
+  };
+}
+
 function composerUnavailableReason(threadView: PublicThreadView | null) {
   if (!threadView) {
     return null;
@@ -553,6 +581,7 @@ export function ChatView({
   const [isNavigationOpen, setIsNavigationOpen] = useState(false);
   const [detailSelection, setDetailSelection] = useState<ThreadDetailSelection | null>(null);
   const [selectedFilterId, setSelectedFilterId] = useState<ThreadFilterId>("all");
+  const [expandedTimelineRows, setExpandedTimelineRows] = useState<Set<string>>(() => new Set());
   const [followLatestActivity, setFollowLatestActivity] = useState(true);
   const [hasSuppressedActivity, setHasSuppressedActivity] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -658,6 +687,7 @@ export function ChatView({
   useEffect(() => {
     setIsNavigationOpen(false);
     setDetailSelection(null);
+    setExpandedTimelineRows(new Set());
   }, [selectedThreadId]);
 
   useEffect(() => {
@@ -730,6 +760,18 @@ export function ChatView({
     }
     setFollowLatestActivity(true);
     setHasSuppressedActivity(false);
+  }
+
+  function toggleTimelineRowExpansion(rowId: string) {
+    setExpandedTimelineRows((current) => {
+      const next = new Set(current);
+      if (next.has(rowId)) {
+        next.delete(rowId);
+      } else {
+        next.add(rowId);
+      }
+      return next;
+    });
   }
 
   function renderThreadFeedbackAction(action: ThreadFeedbackAction) {
@@ -1242,31 +1284,63 @@ export function ChatView({
                           <strong>{group.turnId}</strong>
                         </div>
                       ) : null}
-                      {group.rows.map((row) => (
-                        <article className={timelineRowClass(row)} key={row.id}>
-                          <div className="workspace-meta-row">
-                            <strong>{row.label}</strong>
-                            <span className="workspace-meta">
-                              {row.isLive ? "Live" : formatTimestamp(row.occurredAt)}
-                            </span>
-                          </div>
-                          <p>{row.content}</p>
-                          {row.showDetailButton && row.timelineItemId ? (
-                            <button
-                              className="secondary-link action-button inline-detail-button"
-                              onClick={() =>
-                                setDetailSelection({
-                                  kind: "timeline_item_detail",
-                                  timelineItemId: row.timelineItemId ?? "",
-                                })
-                              }
-                              type="button"
+                      {group.rows.map((row) =>
+                        (() => {
+                          const contentPreview = timelineContentPreview(row.content);
+                          const isExpanded = expandedTimelineRows.has(row.id);
+                          const displayedContent =
+                            contentPreview.isFoldable && !isExpanded
+                              ? contentPreview.preview
+                              : row.content;
+
+                          return (
+                            <article
+                              className={`${timelineRowClass(row)}${
+                                contentPreview.isFoldable && !isExpanded
+                                  ? " timeline-row-folded"
+                                  : ""
+                              }`}
+                              key={row.id}
                             >
-                              {row.detailActionLabel ?? "Inspect details"}
-                            </button>
-                          ) : null}
-                        </article>
-                      ))}
+                              <div className="workspace-meta-row timeline-row-meta">
+                                <strong>{row.label}</strong>
+                                <span className="workspace-meta">
+                                  {row.isLive ? "Live" : formatTimestamp(row.occurredAt)}
+                                </span>
+                              </div>
+                              <p className="timeline-row-content">{displayedContent}</p>
+                              {contentPreview.isFoldable || row.showDetailButton ? (
+                                <div className="timeline-row-actions">
+                                  {contentPreview.isFoldable ? (
+                                    <button
+                                      aria-expanded={isExpanded}
+                                      className="secondary-link action-button inline-detail-button"
+                                      onClick={() => toggleTimelineRowExpansion(row.id)}
+                                      type="button"
+                                    >
+                                      {isExpanded ? "Show less" : "Show more"}
+                                    </button>
+                                  ) : null}
+                                  {row.showDetailButton && row.timelineItemId ? (
+                                    <button
+                                      className="secondary-link action-button inline-detail-button"
+                                      onClick={() =>
+                                        setDetailSelection({
+                                          kind: "timeline_item_detail",
+                                          timelineItemId: row.timelineItemId ?? "",
+                                        })
+                                      }
+                                      type="button"
+                                    >
+                                      {row.detailActionLabel ?? "Inspect details"}
+                                    </button>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </article>
+                          );
+                        })(),
+                      )}
                     </section>
                   ))}
                 </div>
