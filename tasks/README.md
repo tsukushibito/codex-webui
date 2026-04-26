@@ -73,6 +73,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Archived Task Packages
 
+- [issue-249-bff-route-boilerplate](./archive/issue-249-bff-route-boilerplate/README.md)
 - [issue-248-bff-mapping-boundaries](./archive/issue-248-bff-mapping-boundaries/README.md)
 - [issue-247-bff-type-boundaries](./archive/issue-247-bff-type-boundaries/README.md)
 - [issue-246-bff-resource-handlers](./archive/issue-246-bff-resource-handlers/README.md)

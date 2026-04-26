@@ -23,3 +23,7 @@ export function retiredLegacyRouteResponse(routeFamily: RetiredLegacyRouteFamily
     },
   });
 }
+
+export const retiredApprovalsRouteHandler = () => retiredLegacyRouteResponse("approvals");
+
+export const retiredSessionsRouteHandler = () => retiredLegacyRouteResponse("sessions");

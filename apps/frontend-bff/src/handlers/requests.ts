@@ -1,11 +1,11 @@
-import { isErrorEnvelope, toErrorResponse } from "../errors";
+import { toErrorResponse } from "../errors";
 import { mapPendingRequestView, mapRequestDetail, mapRequestResponseResult } from "../mappings";
 import type {
   RuntimeRequestDetailView,
   RuntimeRequestResponseResult,
   RuntimeThreadPendingRequestView,
 } from "../runtime-types";
-import { jsonResponse, passthroughRuntimeError, readJsonBody, runtimeClient } from "./shared";
+import { mapRuntimeJsonResult, readJsonBody, runtimeClient } from "./shared";
 
 export async function getPendingRequest(_request: Request, threadId: string) {
   try {
@@ -13,14 +13,10 @@ export async function getPendingRequest(_request: Request, threadId: string) {
       `/api/v1/threads/${threadId}/pending_request`,
     );
 
-    if (isErrorEnvelope(result.body)) {
-      return passthroughRuntimeError(result.status, result.body, {
-        sessionNotFoundCode: "thread_not_found",
-        threadId,
-      });
-    }
-
-    return jsonResponse(result.status, mapPendingRequestView(result.body));
+    return mapRuntimeJsonResult(result, (body) => mapPendingRequestView(body), {
+      sessionNotFoundCode: "thread_not_found",
+      threadId,
+    });
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -32,14 +28,10 @@ export async function getRequestDetail(_request: Request, requestId: string) {
       `/api/v1/requests/${requestId}`,
     );
 
-    if (isErrorEnvelope(result.body)) {
-      return passthroughRuntimeError(result.status, result.body, {
-        requestId,
-        sessionNotFoundCode: "request_not_found",
-      });
-    }
-
-    return jsonResponse(result.status, mapRequestDetail(result.body));
+    return mapRuntimeJsonResult(result, (body) => mapRequestDetail(body), {
+      requestId,
+      sessionNotFoundCode: "request_not_found",
+    });
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -55,15 +47,11 @@ export async function postRequestResponse(request: Request, requestId: string) {
       },
     );
 
-    if (isErrorEnvelope(result.body)) {
-      return passthroughRuntimeError(result.status, result.body, {
-        requestId,
-        sessionInvalidStateCode: "request_not_pending",
-        sessionNotFoundCode: "request_not_found",
-      });
-    }
-
-    return jsonResponse(result.status, mapRequestResponseResult(result.body));
+    return mapRuntimeJsonResult(result, (body) => mapRequestResponseResult(body), {
+      requestId,
+      sessionInvalidStateCode: "request_not_pending",
+      sessionNotFoundCode: "request_not_found",
+    });
   } catch (error) {
     return toErrorResponse(error);
   }
