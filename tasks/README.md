@@ -73,6 +73,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Archived Task Packages
 
+- [issue-245-request-helper-lifecycle](./archive/issue-245-request-helper-lifecycle/README.md)
 - [issue-244-gateway-event-translation](./archive/issue-244-gateway-event-translation/README.md)
 - [issue-243-persistence-boundary](./archive/issue-243-persistence-boundary/README.md)
 - [issue-242-thread-orchestration-boundary](./archive/issue-242-thread-orchestration-boundary/README.md)
