@@ -50,6 +50,14 @@
 - Active branch: `issue-219-contextual-details`
 - Active worktree: `.worktrees/issue-219-contextual-details`
 - Notes: Implemented contextual timeline detail inspection for stored event rows. Detail actions are gated by extracted contextual signals, visible action labels are contextual, structured artifact/operation sections render before raw debug data, and raw payload JSON is available only behind a collapsed debug affordance. Keep #220 mobile density, #221 visual language, and #222 broader validation out of this slice except for tests directly covering #219 behavior.
+- Completion retrospective:
+  - Completion boundary: package archive after local completion, evaluator approval, and pre-push validation.
+  - Contract check: Issue #219 acceptance criteria are satisfied locally; Issue close still requires PR merge to `main`, parent checkout sync, worktree cleanup, and GitHub tracking update.
+  - What worked: planner's bounded slice kept this focused on contextual inspection and avoided pulling in #220/#221 polish concerns.
+  - Workflow problems: initial work-package handoff was interrupted before mutation and had to be rerun from verified clean state; no durable workflow change needed.
+  - Improvements to adopt: artifact inspection tests should assert both contextual labels and collapsed raw debug payload behavior.
+  - Skill candidates or skill updates: none required.
+  - Follow-up updates: none required before archive; publish-oriented GitHub handoff remains required.
 
 ## Archive conditions
 

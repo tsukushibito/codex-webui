@@ -69,10 +69,11 @@ Each active task package `README.md` must include at least the following section
 
 ## Current Active Tasks
 
-- [issue-219-contextual-details](./issue-219-contextual-details/README.md)
+- `None`
 
 ## Archived Task Packages
 
+- [issue-219-contextual-details](./archive/issue-219-contextual-details/README.md)
 - [issue-218-feedback-recovery](./archive/issue-218-feedback-recovery/README.md)
 - [issue-217-navigation-return-surface](./archive/issue-217-navigation-return-surface/README.md)
 - [issue-216-timeline-chronology](./archive/issue-216-timeline-chronology/README.md)
