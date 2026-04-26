@@ -406,10 +406,16 @@ export async function mockChatFlow(page: Page) {
   });
 }
 
-export async function mockApprovalFlow(page: Page) {
+export async function mockApprovalFlow(
+  page: Page,
+  options: {
+    longTimeline?: boolean;
+  } = {},
+) {
   const requestedAt = "2026-04-05T02:40:00Z";
   const resolvedAt = "2026-04-05T02:41:00Z";
   let resolution: "pending" | "approved" | "denied" = "pending";
+  const longTimeline = options.longTimeline ?? false;
 
   const pendingRequest = () => ({
     request_id: "req_001",
@@ -446,6 +452,37 @@ export async function mockApprovalFlow(page: Page) {
     updated_at: resolution === "pending" ? requestedAt : resolvedAt,
   });
 
+  const pendingTimelineItems = longTimeline
+    ? Array.from({ length: 18 }, (_, index) => ({
+        timeline_item_id: `evt_long_${index + 2}`,
+        thread_id: "thread_001",
+        turn_id: null,
+        item_id: null,
+        sequence: index + 2,
+        occurred_at: requestedAt,
+        kind:
+          index % 3 === 0
+            ? "message.user"
+            : index % 3 === 1
+              ? "message.assistant.completed"
+              : "session.status_changed",
+        payload:
+          index % 3 === 0
+            ? {
+                summary: `User follow-up ${index + 1}`,
+                content: `Long timeline filler item ${index + 1} keeps the pending approval thread tall enough to require in-panel scrolling on mobile.`,
+              }
+            : index % 3 === 1
+              ? {
+                  summary: `Assistant output ${index + 1}`,
+                  content: `Expanded assistant context ${index + 1} for the pending approval state. This entry is intentionally verbose to force scroll-region overflow.`,
+                }
+              : {
+                  summary: `Status update ${index + 1}`,
+                },
+      }))
+    : [];
+
   const currentThreadView = () => ({
     thread: currentThread(),
     current_activity:
@@ -479,6 +516,7 @@ export async function mockApprovalFlow(page: Page) {
             summary: "Run deployment",
           },
         },
+        ...pendingTimelineItems,
         ...(resolution === "pending"
           ? []
           : [

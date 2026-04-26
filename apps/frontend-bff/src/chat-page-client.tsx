@@ -716,6 +716,19 @@ export function ChatPageClient() {
     updateSelectedThreadId(threadId, reason);
   }
 
+  function handleAskCodex() {
+    if (!workspaceId) {
+      return;
+    }
+
+    setBackgroundPriorityNotice(null);
+    setStatusMessage(null);
+    setErrorMessage(null);
+    updateSelectedThreadId(null, "navigation_ask_codex", {
+      workspace_id: workspaceId,
+    });
+  }
+
   return (
     <ChatView
       backgroundPriorityNotice={backgroundPriorityNotice}
@@ -739,6 +752,7 @@ export function ChatPageClient() {
         handleSelectThread(threadId, "background_priority_notice")
       }
       onInterruptThread={() => void handleInterruptThread()}
+      onAskCodex={() => handleAskCodex()}
       onSelectWorkspace={(nextWorkspaceId) => void handleSelectWorkspace(nextWorkspaceId)}
       onSelectThread={(threadId) => handleSelectThread(threadId, "user_select_thread")}
       onSubmitComposer={() => void handleSubmitComposer()}

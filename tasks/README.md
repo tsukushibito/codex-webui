@@ -73,6 +73,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Archived Task Packages
 
+- [issue-215-first-input-composer](./archive/issue-215-first-input-composer/README.md)
 - [issue-205-mobile-responsive-polish](./archive/issue-205-mobile-responsive-polish/README.md)
 - [issue-204-desktop-shell-polish](./archive/issue-204-desktop-shell-polish/README.md)
 - [issue-203-ux-regression-coverage](./archive/issue-203-ux-regression-coverage/README.md)

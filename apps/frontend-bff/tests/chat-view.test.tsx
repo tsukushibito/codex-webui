@@ -43,6 +43,7 @@ describe("ChatView", () => {
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
         onOpenBackgroundPriorityThread={() => {}}
+        onAskCodex={() => {}}
         onComposerDraftChange={() => {}}
         onSelectThread={() => {}}
         onSelectWorkspace={() => {}}
@@ -152,6 +153,7 @@ describe("ChatView", () => {
     expect(markup).toContain("Navigation");
     expect(markup).toContain("Switch workspace");
     expect(markup).toContain("Create workspace");
+    expect(markup).toContain(">Ask Codex<");
     expect(markup).toContain("1 approval");
     expect(markup).toContain("Attention needed");
     expect(markup).toContain("Active");
@@ -194,6 +196,7 @@ describe("ChatView", () => {
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
         onOpenBackgroundPriorityThread={() => {}}
+        onAskCodex={() => {}}
         onComposerDraftChange={() => {}}
         onSelectWorkspace={() => {}}
         onSelectThread={() => {}}
@@ -383,6 +386,7 @@ describe("ChatView", () => {
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
         onOpenBackgroundPriorityThread={() => {}}
+        onAskCodex={() => {}}
         onComposerDraftChange={() => {}}
         onSelectWorkspace={() => {}}
         onSelectThread={() => {}}
@@ -429,6 +433,7 @@ describe("ChatView", () => {
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
         onOpenBackgroundPriorityThread={() => {}}
+        onAskCodex={() => {}}
         onComposerDraftChange={() => {}}
         onSelectWorkspace={() => {}}
         onSelectThread={() => {}}
@@ -535,6 +540,7 @@ describe("ChatView", () => {
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
         onOpenBackgroundPriorityThread={() => {}}
+        onAskCodex={() => {}}
         onComposerDraftChange={() => {}}
         onSelectWorkspace={() => {}}
         onSelectThread={() => {}}
@@ -579,6 +585,7 @@ describe("ChatView", () => {
         onDenyRequest={() => {}}
         onInterruptThread={() => {}}
         onOpenBackgroundPriorityThread={() => {}}
+        onAskCodex={() => {}}
         onComposerDraftChange={() => {}}
         onSelectWorkspace={() => {}}
         onSelectThread={() => {}}

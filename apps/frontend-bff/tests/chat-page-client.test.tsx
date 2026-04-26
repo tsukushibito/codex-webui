@@ -250,6 +250,7 @@ describe("ChatPageClient", () => {
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
+    window.history.replaceState(null, "", "/chat?workspaceId=ws_alpha&threadId=thread_001");
     MockEventSource.instances = [];
 
     chatDataMocks.createWorkspaceFromChat.mockReset();
@@ -433,6 +434,171 @@ describe("ChatPageClient", () => {
     expect((textarea as HTMLTextAreaElement).value).toBe("");
     expect(container.textContent).toContain("Running");
     expect(container.textContent).toContain("Continue with the fix.");
+  });
+
+  it("clears the selected thread from Navigation and starts a workspace-scoped thread", async () => {
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [buildThreadListItem()],
+      next_cursor: null,
+      has_more: false,
+    });
+    chatDataMocks.loadChatThreadBundle.mockResolvedValue({
+      view: buildThreadView(),
+      pendingRequestDetail: null,
+    });
+    chatDataMocks.startThreadFromChat.mockResolvedValue(
+      buildAcceptedInputResponse({
+        accepted: {
+          thread_id: "thread_started",
+          turn_id: "turn_started_001",
+          input_item_id: "item_started_001",
+        },
+        thread: {
+          thread_id: "thread_started",
+          workspace_id: "ws_alpha",
+          title: "Workspace scoped thread",
+          native_status: {
+            thread_status: "running",
+            active_flags: ["turn_active"],
+            latest_turn_status: "running",
+          },
+          updated_at: "2026-03-27T05:24:00Z",
+        },
+      }),
+    );
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    const askCodexButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Ask Codex",
+    );
+    expect(askCodexButton).not.toBeUndefined();
+
+    await act(async () => {
+      askCodexButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushUi();
+
+    expect(window.location.pathname).toBe("/chat");
+    expect(window.location.search).toBe("?workspaceId=ws_alpha");
+    expect(container.textContent).toContain("Ask Codex in alpha");
+    expect(container.textContent).toContain("Ready for workspace input");
+    expect(container.textContent).toContain(
+      "First input will create a new thread in this workspace.",
+    );
+    expect(container.querySelectorAll("textarea")).toHaveLength(1);
+    expect(chatDataMocks.sendThreadInput).not.toHaveBeenCalled();
+
+    const textarea = container.querySelector("#thread-composer-input");
+    expect(textarea).not.toBeNull();
+
+    await act(async () => {
+      const setTextareaValue = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set;
+
+      setTextareaValue?.call(textarea as HTMLTextAreaElement, "Start workspace-scoped work.");
+      textarea!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await flushUi();
+
+    const startThreadButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Start thread",
+    );
+    expect(startThreadButton).not.toBeUndefined();
+
+    await act(async () => {
+      startThreadButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushUi();
+
+    expect(chatDataMocks.startThreadFromChat).toHaveBeenCalledWith(
+      "ws_alpha",
+      "Start workspace-scoped work.",
+      expect.stringMatching(/^input_start_/),
+    );
+  });
+
+  it("selects an existing thread from first-input mode and keeps the same composer on follow-up path", async () => {
+    const originalThreadId = searchParams.get("threadId");
+    searchParams.delete("threadId");
+    window.history.replaceState(null, "", "/chat?workspaceId=ws_alpha");
+
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [buildThreadListItem()],
+      next_cursor: null,
+      has_more: false,
+    });
+    chatDataMocks.loadChatThreadBundle.mockResolvedValue({
+      view: buildThreadView(),
+      pendingRequestDetail: null,
+    });
+    chatDataMocks.sendThreadInput.mockResolvedValue(buildAcceptedInputResponse());
+
+    try {
+      await act(async () => {
+        root.render(<ChatPageClient />);
+      });
+      await flushUi();
+
+      expect(container.textContent).toContain("Ask Codex in alpha");
+      expect(container.querySelectorAll("textarea")).toHaveLength(1);
+
+      const threadCard = Array.from(container.querySelectorAll("button")).find((button) =>
+        button.textContent?.includes("Investigate build"),
+      );
+      expect(threadCard).not.toBeUndefined();
+
+      await act(async () => {
+        threadCard!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      await flushUi();
+
+      expect(window.location.search).toBe("?workspaceId=ws_alpha&threadId=thread_001");
+      expect(container.textContent).toContain("Waiting for your input");
+      expect(container.querySelectorAll("textarea")).toHaveLength(1);
+
+      const textarea = container.querySelector("#thread-composer-input");
+      expect(textarea).not.toBeNull();
+
+      await act(async () => {
+        const setTextareaValue = Object.getOwnPropertyDescriptor(
+          HTMLTextAreaElement.prototype,
+          "value",
+        )?.set;
+
+        setTextareaValue?.call(textarea as HTMLTextAreaElement, "Continue after selecting thread.");
+        textarea!.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      await flushUi();
+
+      const sendButton = Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "Send input",
+      );
+      expect(sendButton).not.toBeUndefined();
+
+      await act(async () => {
+        sendButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      await flushUi();
+
+      expect(chatDataMocks.sendThreadInput).toHaveBeenCalledWith(
+        "thread_001",
+        "Continue after selecting thread.",
+        expect.stringMatching(/^input_followup_/),
+      );
+      expect(chatDataMocks.startThreadFromChat).not.toHaveBeenCalled();
+    } finally {
+      if (originalThreadId) {
+        searchParams.set("threadId", originalThreadId);
+      } else {
+        searchParams.delete("threadId");
+      }
+    }
   });
 
   it("converges a newly started thread back to sendable follow-up input without reload", async () => {
