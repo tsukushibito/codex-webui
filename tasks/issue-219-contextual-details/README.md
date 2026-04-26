@@ -38,17 +38,18 @@
 
 ## Artifacts / evidence
 
-- Planned validation:
-  - `npm run check`
-  - `node ./node_modules/typescript/bin/tsc --noEmit --pretty false`
-  - focused Vitest for changed detail/timeline behavior
+- Sprint validation:
+  - `npm run check`: passed
+  - `node ./node_modules/typescript/bin/tsc --noEmit --pretty false`: passed
+  - `node ./node_modules/vitest/vitest.mjs run tests/timeline-display-model.test.ts tests/chat-view.test.tsx tests/chat-page-client.test.tsx`: passed, 3 files / 47 tests
+- Sprint evaluator: approved
 
 ## Status / handoff notes
 
-- Status: `in progress`
+- Status: `locally complete pending pre-push validation`
 - Active branch: `issue-219-contextual-details`
 - Active worktree: `.worktrees/issue-219-contextual-details`
-- Notes: Started from `origin/main` after #218 reached main. Keep #220 mobile density, #221 visual language, and #222 broader validation out of this slice except for tests directly covering #219 behavior.
+- Notes: Implemented contextual timeline detail inspection for stored event rows. Detail actions are gated by extracted contextual signals, visible action labels are contextual, structured artifact/operation sections render before raw debug data, and raw payload JSON is available only behind a collapsed debug affordance. Keep #220 mobile density, #221 visual language, and #222 broader validation out of this slice except for tests directly covering #219 behavior.
 
 ## Archive conditions
 

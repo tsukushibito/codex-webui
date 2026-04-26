@@ -1,4 +1,5 @@
 import type { PublicThreadStreamEvent, PublicTimelineItem } from "./thread-types";
+import { getTimelineItemDetail } from "./timeline-item-detail";
 
 export type TimelineRowDensity = "primary" | "prominent" | "compact";
 
@@ -16,6 +17,7 @@ export interface TimelineDisplayRow {
   timelineItemId: string | null;
   isLive: boolean;
   showDetailButton: boolean;
+  detailActionLabel: string | null;
 }
 
 export interface TimelineDisplayGroup {
@@ -194,24 +196,27 @@ function shouldHideRow(kind: string, content: string, payload: Record<string, un
   return false;
 }
 
-function shouldShowDetailButton(
-  kind: string,
-  role: TimelineRowRole,
-  timelineItemId: string | null,
-) {
-  if (!timelineItemId) {
-    return false;
+function timelineRowDetail(item: PublicTimelineItem, role: TimelineRowRole) {
+  if (!item.timeline_item_id || role !== "event" || item.kind === "session.status_changed") {
+    return {
+      showDetailButton: false,
+      detailActionLabel: null,
+    };
   }
 
-  if (role !== "event") {
-    return false;
-  }
+  const detail = getTimelineItemDetail(item);
 
-  if (kind === "session.status_changed") {
-    return false;
-  }
+  return {
+    showDetailButton: detail.hasContext,
+    detailActionLabel: detail.hasContext ? detail.actionLabel : null,
+  };
+}
 
-  return true;
+function streamRowDetail() {
+  return {
+    showDetailButton: false,
+    detailActionLabel: null,
+  };
 }
 
 export function classifyTimelineDensity(kind: string): TimelineRowDensity {
@@ -411,7 +416,7 @@ export function buildTimelineDisplayModel({
       role,
       timelineItemId: item.timeline_item_id,
       isLive: false,
-      showDetailButton: shouldShowDetailButton(item.kind, role, item.timeline_item_id),
+      ...timelineRowDetail(item, role),
     });
   }
 
@@ -513,6 +518,7 @@ export function buildTimelineDisplayModel({
       timelineItemId: null,
       isLive: !isCompleted,
       showDetailButton: false,
+      detailActionLabel: null,
     });
   }
 
@@ -535,6 +541,7 @@ export function buildTimelineDisplayModel({
       timelineItemId: group.timelineItemId,
       isLive: !isCompleted,
       showDetailButton: false,
+      detailActionLabel: null,
     });
   }
 
@@ -555,6 +562,7 @@ export function buildTimelineDisplayModel({
       timelineItemId: null,
       isLive: true,
       showDetailButton: false,
+      detailActionLabel: null,
     });
   }
 
@@ -587,7 +595,7 @@ export function buildTimelineDisplayModel({
       role,
       timelineItemId: null,
       isLive: false,
-      showDetailButton: false,
+      ...streamRowDetail(),
     });
   }
 
