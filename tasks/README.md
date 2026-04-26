@@ -73,6 +73,7 @@ None.
 
 ## Archived Task Packages
 
+- [issue-252-css-surface-modules](./archive/issue-252-css-surface-modules/README.md)
 - [issue-253-retire-home-approvals](./archive/issue-253-retire-home-approvals/README.md)
 - [issue-251-chat-view-components](./archive/issue-251-chat-view-components/README.md)
 - [issue-250-chat-page-hooks](./archive/issue-250-chat-page-hooks/README.md)
