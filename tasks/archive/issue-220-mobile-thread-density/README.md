@@ -50,6 +50,14 @@
 - Active branch: `issue-220-mobile-thread-density`
 - Active worktree: `.worktrees/issue-220-mobile-thread-density`
 - Notes: Implemented mobile-only selected-thread density changes, sticky pending approval reachability, bottom Threads/Details affordances, and focused 360x780 Playwright coverage. Keep #221 visual language and #222 broad validation out of this package.
+- Completion retrospective:
+  - Completion boundary: package archive after local completion, evaluator approval, and pre-push validation.
+  - Contract check: Issue #220 acceptance criteria are satisfied locally; Issue close still requires PR merge to `main`, parent checkout sync, worktree cleanup, and GitHub tracking update.
+  - What worked: the focused Playwright spec directly exercised the 360x780 mobile state and caught layout/reachability acceptance criteria in one place.
+  - Workflow problems: evaluator first returned a nonstandard output shape; strict retry produced the required gate shape without code changes.
+  - Improvements to adopt: mobile layout slices should include viewport metrics for horizontal scroll, document scroll, visible composer, and reachable critical actions.
+  - Skill candidates or skill updates: none required.
+  - Follow-up updates: none required before archive; publish-oriented GitHub handoff remains required.
 
 ## Archive conditions
 
