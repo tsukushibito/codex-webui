@@ -73,6 +73,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Archived Task Packages
 
+- [issue-243-persistence-boundary](./archive/issue-243-persistence-boundary/README.md)
 - [issue-242-thread-orchestration-boundary](./archive/issue-242-thread-orchestration-boundary/README.md)
 - [issue-260-error-code-normalization](./archive/issue-260-error-code-normalization/README.md)
 - [issue-257-readme-v09-sync](./archive/issue-257-readme-v09-sync/README.md)
