@@ -1,6 +1,16 @@
 import { expect, test } from "@playwright/test";
 
-import { stubEventSource } from "./helpers/browser-mocks";
+import {
+  fulfillJson,
+  mockApprovalRequestDetailFixture,
+  mockApprovalRequestFixture,
+  mockThreadListItemFixture,
+  mockThreadSummaryFixture,
+  mockThreadViewFixture,
+  mockTimelineItemFixture,
+  mockWorkspaceFixture,
+  stubEventSource,
+} from "./helpers/browser-mocks";
 
 async function emitNotificationEvent(
   page: Parameters<typeof test>[0]["page"],
@@ -25,9 +35,7 @@ async function emitNotificationEvent(
 async function mockBackgroundPriorityFlow(page: Parameters<typeof test>[0]["page"]) {
   const baseTimestamp = "2026-04-24T03:10:00Z";
 
-  const workspace = {
-    workspace_id: "ws_alpha",
-    workspace_name: "alpha",
+  const workspace = mockWorkspaceFixture({
     created_at: "2026-04-24T03:00:00Z",
     updated_at: baseTimestamp,
     active_session_summary: {
@@ -36,9 +44,9 @@ async function mockBackgroundPriorityFlow(page: Parameters<typeof test>[0]["page
       last_message_at: baseTimestamp,
     },
     pending_approval_count: 1,
-  };
+  });
 
-  const primaryThread = {
+  const primaryThread = mockThreadListItemFixture({
     thread_id: "thread_001",
     workspace_id: "ws_alpha",
     native_status: {
@@ -55,12 +63,12 @@ async function mockBackgroundPriorityFlow(page: Parameters<typeof test>[0]["page
     blocked_cue: null,
     resume_cue: {
       reason_kind: "active_thread",
-      priority_band: "medium" as const,
+      priority_band: "medium",
       label: "Active now",
     },
-  };
+  });
 
-  const backgroundThread = {
+  const backgroundThread = mockThreadListItemFixture({
     thread_id: "thread_background",
     workspace_id: "ws_alpha",
     native_status: {
@@ -83,19 +91,19 @@ async function mockBackgroundPriorityFlow(page: Parameters<typeof test>[0]["page
     },
     resume_cue: {
       reason_kind: "waiting_on_approval",
-      priority_band: "highest" as const,
+      priority_band: "highest",
       label: "Resume here first",
     },
-  };
+  });
 
   const threadViewById = {
-    thread_001: {
-      thread: {
+    thread_001: mockThreadViewFixture({
+      thread: mockThreadSummaryFixture({
         thread_id: "thread_001",
         workspace_id: "ws_alpha",
         native_status: primaryThread.native_status,
         updated_at: primaryThread.updated_at,
-      },
+      }),
       current_activity: primaryThread.current_activity,
       pending_request: null,
       latest_resolved_request: null,
@@ -106,11 +114,9 @@ async function mockBackgroundPriorityFlow(page: Parameters<typeof test>[0]["page
       },
       timeline: {
         items: [
-          {
+          mockTimelineItemFixture({
             timeline_item_id: "evt_001",
             thread_id: "thread_001",
-            turn_id: null,
-            item_id: null,
             sequence: 1,
             occurred_at: baseTimestamp,
             kind: "message.assistant.completed",
@@ -118,31 +124,31 @@ async function mockBackgroundPriorityFlow(page: Parameters<typeof test>[0]["page
               summary: "assistant completed",
               content: "Primary thread is idle.",
             },
-          },
+          }),
         ],
         next_cursor: null,
         has_more: false,
       },
-    },
-    thread_background: {
-      thread: {
+    }),
+    thread_background: mockThreadViewFixture({
+      thread: mockThreadSummaryFixture({
         thread_id: "thread_background",
         workspace_id: "ws_alpha",
         native_status: backgroundThread.native_status,
         updated_at: backgroundThread.updated_at,
-      },
+      }),
       current_activity: backgroundThread.current_activity,
-      pending_request: {
+      pending_request: mockApprovalRequestFixture({
         request_id: "req_background",
         thread_id: "thread_background",
         turn_id: "turn_background",
         item_id: "item_background",
         request_kind: "approval",
-        status: "pending" as const,
-        risk_category: "external_side_effect" as const,
+        status: "pending",
+        risk_category: "external_side_effect",
         summary: "Deploy background fix",
         requested_at: backgroundThread.updated_at,
-      },
+      }),
       latest_resolved_request: null,
       composer: {
         accepting_user_input: false,
@@ -151,23 +157,21 @@ async function mockBackgroundPriorityFlow(page: Parameters<typeof test>[0]["page
       },
       timeline: {
         items: [
-          {
+          mockTimelineItemFixture({
             timeline_item_id: "evt_100",
             thread_id: "thread_background",
-            turn_id: null,
-            item_id: null,
             sequence: 1,
             occurred_at: backgroundThread.updated_at,
             kind: "approval.requested",
             payload: {
               summary: "Deploy background fix",
             },
-          },
+          }),
         ],
         next_cursor: null,
         has_more: false,
       },
-    },
+    }),
   };
 
   await page.route("**/api/v1/**", async (route) => {
@@ -176,26 +180,18 @@ async function mockBackgroundPriorityFlow(page: Parameters<typeof test>[0]["page
     const { pathname } = url;
 
     if (pathname === "/api/v1/workspaces" && request.method() === "GET") {
-      return route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          items: [workspace],
-          next_cursor: null,
-          has_more: false,
-        }),
+      return fulfillJson(route, {
+        items: [workspace],
+        next_cursor: null,
+        has_more: false,
       });
     }
 
     if (pathname === "/api/v1/workspaces/ws_alpha/threads" && request.method() === "GET") {
-      return route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          items: [primaryThread, backgroundThread],
-          next_cursor: null,
-          has_more: false,
-        }),
+      return fulfillJson(route, {
+        items: [primaryThread, backgroundThread],
+        next_cursor: null,
+        has_more: false,
       });
     }
 
@@ -205,18 +201,13 @@ async function mockBackgroundPriorityFlow(page: Parameters<typeof test>[0]["page
       request.method() === "GET"
     ) {
       const threadId = pathname.includes("thread_background") ? "thread_background" : "thread_001";
-      return route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(threadViewById[threadId]),
-      });
+      return fulfillJson(route, threadViewById[threadId]);
     }
 
     if (pathname === "/api/v1/requests/req_background" && request.method() === "GET") {
-      return route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
+      return fulfillJson(
+        route,
+        mockApprovalRequestDetailFixture({
           request_id: "req_background",
           thread_id: "thread_background",
           turn_id: "turn_background",
@@ -238,7 +229,7 @@ async function mockBackgroundPriorityFlow(page: Parameters<typeof test>[0]["page
             environment: "staging",
           },
         }),
-      });
+      );
     }
 
     return route.abort();
