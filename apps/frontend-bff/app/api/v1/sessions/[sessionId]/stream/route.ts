@@ -1,8 +1,4 @@
-import { retiredLegacyRouteResponse } from "../../../../../../src/retired-routes";
+export { retiredSessionsRouteHandler as GET } from "../../../../../../src/retired-routes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-export function GET() {
-  return retiredLegacyRouteResponse("sessions");
-}

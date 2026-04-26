@@ -1,5 +1,1 @@
-import { retiredLegacyRouteResponse } from "../../../../../../src/retired-routes";
-
-export function POST() {
-  return retiredLegacyRouteResponse("approvals");
-}
+export { retiredApprovalsRouteHandler as POST } from "../../../../../../src/retired-routes";

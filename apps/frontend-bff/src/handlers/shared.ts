@@ -215,3 +215,15 @@ export function passthroughRuntimeError(
 
   throw new Error("expected runtime error envelope");
 }
+
+export function mapRuntimeJsonResult<TBody, TMapped>(
+  result: { status: number; body: TBody | ErrorEnvelope },
+  mapper: (body: TBody) => TMapped,
+  mapping?: ActiveRuntimeErrorMapping,
+) {
+  if (isErrorEnvelope(result.body)) {
+    return passthroughRuntimeError(result.status, result.body, mapping);
+  }
+
+  return jsonResponse(result.status, mapper(result.body));
+}

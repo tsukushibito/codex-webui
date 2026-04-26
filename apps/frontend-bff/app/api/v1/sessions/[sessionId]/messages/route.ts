@@ -1,9 +1,4 @@
-import { retiredLegacyRouteResponse } from "../../../../../../src/retired-routes";
-
-export function GET() {
-  return retiredLegacyRouteResponse("sessions");
-}
-
-export function POST() {
-  return retiredLegacyRouteResponse("sessions");
-}
+export {
+  retiredSessionsRouteHandler as GET,
+  retiredSessionsRouteHandler as POST,
+} from "../../../../../../src/retired-routes";
