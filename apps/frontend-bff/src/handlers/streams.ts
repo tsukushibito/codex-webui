@@ -1,16 +1,7 @@
 import { logLiveChatDebug } from "../debug";
 import { toErrorResponse } from "../errors";
-import {
-  mapApprovalStreamEvent,
-  mapEvent,
-  mapNotificationEvent,
-  mapThreadStreamEvent,
-} from "../mappings";
-import type {
-  RuntimeApprovalStreamEventProjection,
-  RuntimeNotificationEvent,
-  RuntimeSessionEventProjection,
-} from "../runtime-types";
+import { mapNotificationEvent, mapThreadStreamEvent } from "../mappings";
+import type { RuntimeNotificationEvent, RuntimeSessionEventProjection } from "../runtime-types";
 import { type ActiveRuntimeErrorMapping, parseRuntimeErrorResponse, runtimeClient } from "./shared";
 
 function encodeSseData(data: unknown) {
@@ -164,7 +155,7 @@ function createSseRelayStream<TInput, TOutput>(
   });
 }
 
-async function relaySse<TInput, TOutput>(
+export async function relaySse<TInput, TOutput>(
   request: Request,
   path: string,
   mapper: (value: TInput) => TOutput,
@@ -198,29 +189,6 @@ async function relaySse<TInput, TOutput>(
       connection: "keep-alive",
     },
   });
-}
-
-export async function getSessionStream(request: Request, sessionId: string) {
-  try {
-    return await relaySse<RuntimeSessionEventProjection, ReturnType<typeof mapEvent>>(
-      request,
-      `/api/v1/sessions/${sessionId}/stream`,
-      mapEvent,
-    );
-  } catch (error) {
-    return toErrorResponse(error);
-  }
-}
-
-export async function getApprovalStream(request: Request) {
-  try {
-    return await relaySse<
-      RuntimeApprovalStreamEventProjection,
-      ReturnType<typeof mapApprovalStreamEvent>
-    >(request, "/api/v1/approvals/stream", mapApprovalStreamEvent);
-  } catch (error) {
-    return toErrorResponse(error);
-  }
 }
 
 export async function getThreadStream(request: Request, threadId: string) {

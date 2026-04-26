@@ -12,15 +12,14 @@ export {
   startSession,
   stopSession,
 } from "./handlers/legacy";
+export { getApprovalStream, getSessionStream } from "./handlers/legacy-streams";
 export {
   getPendingRequest,
   getRequestDetail,
   postRequestResponse,
 } from "./handlers/requests";
 export {
-  getApprovalStream,
   getNotificationsStream,
-  getSessionStream,
   getThreadStream,
 } from "./handlers/streams";
 export {
