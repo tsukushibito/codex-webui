@@ -184,15 +184,151 @@ describe("ChatView", () => {
     expect(markup).toContain("Approval thread");
     expect(markup).toContain("Active thread");
     expect(markup).toContain("Recent thread");
-    expect(markup).toContain("Selected");
+    expect(markup).toContain('aria-current="page"');
+    expect(markup).not.toContain(">Selected<");
     expect(markup).toContain("Needs response");
-    expect(markup).toContain("Waiting for your input");
+    expect(markup).toContain('aria-label="Idle"');
     expect(markup.match(/<textarea/g) ?? []).toHaveLength(1);
     expect(markup).toContain('id="thread-composer-input"');
     expect(markup).not.toContain('id="thread-input"');
     expect(markup).not.toContain('id="message-input"');
     expect(markup).not.toContain("Home");
     expect(markup).not.toContain("Thread ref:");
+  });
+
+  it("switches desktop Navigation into a recoverable minibar", async () => {
+    const storage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+    };
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: storage,
+    });
+
+    await act(async () => {
+      root.render(
+        <ChatView
+          backgroundPriorityNotice={{
+            threadId: "thread_approval",
+            reason: "Needs response",
+          }}
+          connectionState="idle"
+          draftAssistantMessages={{}}
+          errorMessage={null}
+          isCreatingThread={false}
+          isCreatingWorkspace={false}
+          isInterruptingThread={false}
+          isLoadingThread={false}
+          isLoadingThreads={false}
+          isLoadingWorkspaces={false}
+          isRespondingToRequest={false}
+          isSendingMessage={false}
+          composerDraft=""
+          onApproveRequest={() => {}}
+          onSubmitComposer={() => {}}
+          onCreateWorkspace={() => {}}
+          onDenyRequest={() => {}}
+          onInterruptThread={() => {}}
+          onOpenBackgroundPriorityThread={() => {}}
+          onAskCodex={() => {}}
+          onComposerDraftChange={() => {}}
+          onSelectThread={() => {}}
+          onSelectWorkspace={() => {}}
+          onWorkspaceNameChange={() => {}}
+          selectedRequestDetail={null}
+          selectedThreadId="thread_active"
+          selectedThreadView={null}
+          statusMessage={null}
+          streamEvents={[]}
+          threads={[
+            {
+              thread_id: "thread_active",
+              title: "Active thread",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "running",
+                active_flags: [],
+                latest_turn_status: "running",
+              },
+              updated_at: "2026-03-27T05:20:00Z",
+              current_activity: {
+                kind: "running",
+                label: "Running",
+              },
+              badge: null,
+              blocked_cue: null,
+              resume_cue: null,
+            },
+            {
+              thread_id: "thread_approval",
+              title: "Approval thread",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "running",
+                active_flags: ["waiting_on_request"],
+                latest_turn_status: "running",
+              },
+              updated_at: "2026-03-27T05:22:00Z",
+              current_activity: {
+                kind: "waiting_on_approval",
+                label: "Approval required",
+              },
+              badge: {
+                kind: "approval",
+                label: "Waiting approval",
+              },
+              blocked_cue: {
+                kind: "approval_required",
+                label: "Needs response",
+              },
+              resume_cue: null,
+            },
+          ]}
+          workspaceId="ws_alpha"
+          workspaceName=""
+          workspaces={[
+            {
+              workspace_id: "ws_alpha",
+              workspace_name: "alpha",
+              created_at: "2026-03-27T05:00:00Z",
+              updated_at: "2026-03-27T05:22:00Z",
+              active_session_summary: null,
+              pending_approval_count: 1,
+            },
+          ]}
+        />,
+      );
+    });
+
+    const minimizeButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Minimize",
+    );
+    expect(minimizeButton).toBeDefined();
+
+    await act(async () => {
+      minimizeButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(container.querySelector(".chat-layout.sidebar-minibar")).not.toBeNull();
+    expect(container.textContent).toContain("Nav");
+    expect(container.textContent).toContain("New");
+    expect(container.querySelector('[aria-label="Expand Navigation"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Current thread: Active thread"]')).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="Waiting approval: Approval thread"]'),
+    ).not.toBeNull();
+    expect(storage.setItem).toHaveBeenCalledWith("codex-webui.sidebar-mode", "mini");
+
+    const expandButton = container.querySelector(
+      '[aria-label="Expand Navigation"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      expandButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(container.querySelector(".chat-layout.sidebar-minibar")).toBeNull();
+    expect(storage.setItem).toHaveBeenCalledWith("codex-webui.sidebar-mode", "full");
   });
 
   it("filters visible rows without changing thread selection behavior", async () => {
@@ -436,7 +572,7 @@ describe("ChatView", () => {
     });
 
     expect(container.textContent).toContain("Mapped idle thread");
-    expect(container.textContent).toContain("Waiting for your input");
+    expect(container.querySelector('[aria-label="Idle"]')).not.toBeNull();
     expect(container.textContent).not.toContain("Running thread");
   });
 
