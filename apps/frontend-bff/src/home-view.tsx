@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import type { HomeResponse } from "./runtime-types";
+import type { HomeResponse } from "./public-types";
 import type { PublicThreadListItem } from "./thread-types";
 
 export interface HomeViewProps {

@@ -65,9 +65,3 @@ export interface PublicStopResult {
   session: PublicSessionSummary;
   canceled_approval: PublicApprovalSummary | null;
 }
-
-export interface PublicListResponse<T> {
-  items: T[];
-  next_cursor: string | null;
-  has_more: boolean;
-}

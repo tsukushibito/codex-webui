@@ -1,4 +1,4 @@
-import type { PublicSessionSummary } from "./chat-types";
+import type { PublicSessionSummary } from "./legacy-types";
 
 function canStopForStatus(status: PublicSessionSummary["status"]) {
   return status === "running" || status === "waiting_input" || status === "waiting_approval";

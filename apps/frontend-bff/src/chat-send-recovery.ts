@@ -1,4 +1,4 @@
-import type { PublicMessage, PublicSessionEvent, PublicSessionSummary } from "./chat-types";
+import type { PublicMessage, PublicSessionEvent, PublicSessionSummary } from "./legacy-types";
 
 export interface ChatSessionSnapshot {
   session: PublicSessionSummary | null;
