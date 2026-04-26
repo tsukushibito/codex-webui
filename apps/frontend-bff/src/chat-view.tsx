@@ -187,6 +187,7 @@ function workspaceSummary(workspace: PublicWorkspaceSummary) {
 }
 
 type ThreadDetailSelection =
+  | { kind: "thread_details" }
   | { kind: "request_detail" }
   | { kind: "timeline_item_detail"; timelineItemId: string };
 
@@ -619,6 +620,10 @@ export function ChatView({
     streamEvents,
     draftAssistantMessages,
   });
+  const timelineArtifactCount = timelineModel.groups.reduce(
+    (count, group) => count + group.rows.filter((row) => row.showDetailButton).length,
+    0,
+  );
   const hasRequestDetailAffordance = selectedRequestDetail !== null;
   const latestTimelineGroup = timelineModel.groups[timelineModel.groups.length - 1] ?? null;
   const latestTimelineRow = latestTimelineGroup?.rows[latestTimelineGroup.rows.length - 1] ?? null;
@@ -1083,6 +1088,14 @@ export function ChatView({
                     Refresh
                   </Link>
                 ) : null}
+                <button
+                  className="secondary-link compact-link"
+                  disabled={!workspaceId}
+                  onClick={() => setDetailSelection({ kind: "thread_details" })}
+                  type="button"
+                >
+                  Details
+                </button>
               </div>
             </header>
           </div>
@@ -1270,8 +1283,14 @@ export function ChatView({
               </button>
               <button
                 className="secondary-link action-button compact-button"
-                disabled={!hasRequestDetailAffordance}
-                onClick={() => setDetailSelection({ kind: "request_detail" })}
+                disabled={!workspaceId}
+                onClick={() =>
+                  setDetailSelection(
+                    hasRequestDetailAffordance
+                      ? { kind: "request_detail" }
+                      : { kind: "thread_details" },
+                  )
+                }
                 type="button"
               >
                 Details
@@ -1335,11 +1354,160 @@ export function ChatView({
                 </button>
               </div>
               <h2>
-                {detailSelection.kind === "request_detail"
-                  ? "Request detail"
-                  : (selectedTimelineItemDetail?.title ?? "Timeline detail")}
+                {detailSelection.kind === "thread_details"
+                  ? "Thread details"
+                  : detailSelection.kind === "request_detail"
+                    ? "Request detail"
+                    : (selectedTimelineItemDetail?.title ?? "Timeline detail")}
               </h2>
             </header>
+
+            {detailSelection.kind === "thread_details" ? (
+              <div className="detail-stack">
+                <section className="thread-detail-section detail-text-section">
+                  <strong>Overview</strong>
+                  <dl className="request-detail-list">
+                    <div>
+                      <dt>Title</dt>
+                      <dd>
+                        {selectedThreadView?.thread.title ??
+                          (workspaceId ? "New workspace input" : "No workspace selected")}
+                      </dd>
+                    </div>
+                    <div className={detailFieldClass("Thread")}>
+                      <dt>Thread</dt>
+                      <dd>
+                        {selectedThreadView?.thread.thread_id ? (
+                          <code className="artifact-inline">
+                            {selectedThreadView.thread.thread_id}
+                          </code>
+                        ) : (
+                          "Not started"
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Workspace</dt>
+                      <dd>{selectedWorkspace?.workspace_name ?? workspaceId ?? "Not selected"}</dd>
+                    </div>
+                    <div>
+                      <dt>Updated</dt>
+                      <dd>{formatTimestamp(selectedThreadView?.thread.updated_at ?? null)}</dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section className="thread-detail-section detail-text-section">
+                  <strong>Status</strong>
+                  <dl className="request-detail-list">
+                    <div>
+                      <dt>Current activity</dt>
+                      <dd>
+                        {selectedThreadView?.current_activity.label ??
+                          (isOpeningSelectedThread
+                            ? "Opening"
+                            : workspaceId
+                              ? "Ready for first input"
+                              : "Workspace required")}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Activity summary</dt>
+                      <dd>
+                        {workspaceId
+                          ? currentActivitySummary(selectedThreadView, isOpeningSelectedThread)
+                          : "Choose a workspace to enable the composer."}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Stream</dt>
+                      <dd>{connectionState}</dd>
+                    </div>
+                    <div>
+                      <dt>Composer</dt>
+                      <dd>
+                        {selectedThreadView?.composer.accepting_user_input
+                          ? "Accepting input"
+                          : composerGuidance}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section className="thread-detail-section detail-text-section">
+                  <strong>Next action</strong>
+                  <p>{threadFeedback.summary}</p>
+                  {threadFeedback.actions.length > 0 ? (
+                    <div className="workspace-actions thread-feedback-actions">
+                      {threadFeedback.actions.map((action) => renderThreadFeedbackAction(action))}
+                    </div>
+                  ) : null}
+                </section>
+
+                <section className="thread-detail-section detail-text-section">
+                  <strong>Requests</strong>
+                  <p>
+                    {selectedThreadView?.pending_request
+                      ? selectedThreadView.pending_request.summary
+                      : selectedThreadView?.latest_resolved_request
+                        ? `Latest resolved request: ${selectedThreadView.latest_resolved_request.decision}`
+                        : "No pending or recently resolved request."}
+                  </p>
+                  {selectedRequestDetail ? (
+                    <button
+                      className="secondary-link action-button compact-button"
+                      onClick={() => setDetailSelection({ kind: "request_detail" })}
+                      type="button"
+                    >
+                      Request detail
+                    </button>
+                  ) : null}
+                </section>
+
+                <section className="thread-detail-section detail-text-section">
+                  <strong>Artifacts</strong>
+                  {timelineArtifactCount > 0 ? (
+                    <ul className="detail-list">
+                      {timelineModel.groups.flatMap((group) =>
+                        group.rows
+                          .filter((row) => row.showDetailButton && row.timelineItemId)
+                          .map((row) => (
+                            <li key={row.id}>
+                              <strong>{row.label}</strong>
+                              <span>{row.content}</span>
+                              <button
+                                className="secondary-link action-button inline-detail-button"
+                                onClick={() =>
+                                  setDetailSelection({
+                                    kind: "timeline_item_detail",
+                                    timelineItemId: row.timelineItemId ?? "",
+                                  })
+                                }
+                                type="button"
+                              >
+                                {row.detailActionLabel ?? "Inspect details"}
+                              </button>
+                            </li>
+                          )),
+                      )}
+                    </ul>
+                  ) : (
+                    <p>No extracted artifacts are available for this thread yet.</p>
+                  )}
+                </section>
+
+                <details className="detail-debug">
+                  <summary>Debug: raw thread view JSON</summary>
+                  <pre className="detail-json">
+                    {JSON.stringify(
+                      selectedThreadView ?? { workspaceId, selectedThreadId },
+                      null,
+                      2,
+                    )}
+                  </pre>
+                </details>
+              </div>
+            ) : null}
 
             {detailSelection.kind === "request_detail" && selectedRequestDetail ? (
               <div className="detail-stack">

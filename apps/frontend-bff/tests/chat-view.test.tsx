@@ -1166,6 +1166,225 @@ describe("ChatView", () => {
     expect(markup).not.toContain("thread-feedback-card-inline");
   });
 
+  it("opens Thread Details with status metadata and collapsed debug content", async () => {
+    await act(async () => {
+      root.render(
+        <ChatView
+          backgroundPriorityNotice={null}
+          connectionState="live"
+          draftAssistantMessages={{}}
+          errorMessage={null}
+          isCreatingThread={false}
+          isCreatingWorkspace={false}
+          isInterruptingThread={false}
+          isLoadingThread={false}
+          isLoadingThreads={false}
+          isLoadingWorkspaces={false}
+          isRespondingToRequest={false}
+          isSendingMessage={false}
+          composerDraft=""
+          onApproveRequest={() => {}}
+          onSubmitComposer={() => {}}
+          onCreateWorkspace={() => {}}
+          onDenyRequest={() => {}}
+          onInterruptThread={() => {}}
+          onOpenBackgroundPriorityThread={() => {}}
+          onAskCodex={() => {}}
+          onComposerDraftChange={() => {}}
+          onSelectThread={() => {}}
+          onSelectWorkspace={() => {}}
+          onWorkspaceNameChange={() => {}}
+          selectedRequestDetail={null}
+          selectedThreadId="thread_001"
+          selectedThreadView={{
+            thread: {
+              thread_id: "thread_001",
+              title: "Ready thread",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "waiting_input",
+                active_flags: [],
+                latest_turn_status: null,
+              },
+              updated_at: "2026-03-27T05:22:00Z",
+            },
+            current_activity: {
+              kind: "waiting_on_user_input",
+              label: "Waiting for your input",
+            },
+            pending_request: null,
+            latest_resolved_request: null,
+            composer: {
+              accepting_user_input: true,
+              interrupt_available: false,
+              blocked_by_request: false,
+              input_unavailable_reason: null,
+            },
+            timeline: {
+              items: [],
+              next_cursor: null,
+              has_more: false,
+            },
+          }}
+          statusMessage={null}
+          streamEvents={[]}
+          threads={[]}
+          workspaceId="ws_alpha"
+          workspaceName=""
+          workspaces={[
+            {
+              workspace_id: "ws_alpha",
+              workspace_name: "alpha",
+              created_at: "2026-03-27T05:00:00Z",
+              updated_at: "2026-03-27T05:22:00Z",
+              active_session_summary: null,
+              pending_approval_count: 0,
+            },
+          ]}
+        />,
+      );
+    });
+
+    const detailsButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Details",
+    );
+    expect(detailsButton).toBeDefined();
+
+    await act(async () => {
+      detailsButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain("Thread details");
+    expect(container.textContent).toContain("Overview");
+    expect(container.textContent).toContain("Status");
+    expect(container.textContent).toContain("Next action");
+    expect(container.textContent).toContain("Requests");
+    expect(container.textContent).toContain("Artifacts");
+    expect(container.textContent).toContain("Ready thread");
+    expect(container.textContent).toContain("Waiting for your input");
+    expect(container.textContent).toContain("This thread is ready for your next input.");
+    expect(container.textContent).toContain("No pending or recently resolved request.");
+    expect(container.textContent).toContain("Debug: raw thread view JSON");
+    const debugDetails = container.querySelector("details.detail-debug");
+    expect(debugDetails).not.toBeNull();
+    expect(debugDetails?.hasAttribute("open")).toBe(false);
+  });
+
+  it("lists contextual artifacts from Thread Details and opens their detail", async () => {
+    await act(async () => {
+      root.render(
+        <ChatView
+          backgroundPriorityNotice={null}
+          connectionState="live"
+          draftAssistantMessages={{}}
+          errorMessage={null}
+          isCreatingThread={false}
+          isCreatingWorkspace={false}
+          isInterruptingThread={false}
+          isLoadingThread={false}
+          isLoadingThreads={false}
+          isLoadingWorkspaces={false}
+          isRespondingToRequest={false}
+          isSendingMessage={false}
+          composerDraft=""
+          onApproveRequest={() => {}}
+          onSubmitComposer={() => {}}
+          onCreateWorkspace={() => {}}
+          onDenyRequest={() => {}}
+          onInterruptThread={() => {}}
+          onOpenBackgroundPriorityThread={() => {}}
+          onAskCodex={() => {}}
+          onComposerDraftChange={() => {}}
+          onSelectThread={() => {}}
+          onSelectWorkspace={() => {}}
+          onWorkspaceNameChange={() => {}}
+          selectedRequestDetail={null}
+          selectedThreadId="thread_001"
+          selectedThreadView={{
+            thread: {
+              thread_id: "thread_001",
+              title: "Artifact thread",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "waiting_input",
+                active_flags: [],
+                latest_turn_status: null,
+              },
+              updated_at: "2026-03-27T05:22:00Z",
+            },
+            current_activity: {
+              kind: "waiting_on_user_input",
+              label: "Waiting for your input",
+            },
+            pending_request: null,
+            latest_resolved_request: null,
+            composer: {
+              accepting_user_input: true,
+              interrupt_available: false,
+              blocked_by_request: false,
+              input_unavailable_reason: null,
+            },
+            timeline: {
+              items: [
+                {
+                  timeline_item_id: "timeline_failure",
+                  thread_id: "thread_001",
+                  turn_id: "turn_001",
+                  item_id: "item_failure_001",
+                  sequence: 1,
+                  occurred_at: "2026-03-27T05:15:00Z",
+                  kind: "turn.failed",
+                  payload: {
+                    summary: "Tests failed after the patch",
+                    command: "npm run check",
+                    file_paths: ["apps/frontend-bff/src/chat-view.tsx"],
+                    tests: ["tests/chat-view.test.tsx"],
+                    request_id: "req_failure_001",
+                  },
+                },
+              ],
+              next_cursor: null,
+              has_more: false,
+            },
+          }}
+          statusMessage={null}
+          streamEvents={[]}
+          threads={[]}
+          workspaceId="ws_alpha"
+          workspaceName=""
+          workspaces={[]}
+        />,
+      );
+    });
+
+    const detailsButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Details",
+    );
+    await act(async () => {
+      detailsButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain("Thread details");
+    expect(container.textContent).toContain("Artifacts");
+    expect(container.textContent).toContain("Turn failed");
+    expect(container.textContent).toContain("Tests failed after the patch");
+
+    const artifactButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Inspect failure",
+    );
+    expect(artifactButton).toBeDefined();
+
+    await act(async () => {
+      artifactButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain("Failure detail");
+    expect(container.textContent).toContain("Commands");
+    expect(container.textContent).toContain("npm run check");
+    expect(container.textContent).toContain("apps/frontend-bff/src/chat-view.tsx");
+    expect(container.textContent).toContain("Debug: raw timeline payload JSON");
+  });
+
   it("renders recovery input-unavailable reason as the single disabled composer state", () => {
     const markup = renderToStaticMarkup(
       <ChatView

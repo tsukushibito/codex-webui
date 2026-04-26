@@ -922,6 +922,15 @@ textarea {
   padding: 10px 12px;
 }
 
+.thread-detail-section {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(22, 47, 52, 0.08);
+  border-radius: 12px;
+  background: rgba(245, 249, 249, 0.96);
+  padding: 10px 12px;
+}
+
 .detail-artifact-section {
   border-color: var(--artifact-border);
   background: rgba(237, 244, 245, 0.62);
