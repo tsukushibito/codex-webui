@@ -230,6 +230,12 @@ function createDeferred<T>() {
   };
 }
 
+function expectSelectedThreadTitle(title: string) {
+  const selectedThreadButton = document.querySelector('button[aria-current="page"]');
+  expect(selectedThreadButton).not.toBeNull();
+  expect(selectedThreadButton?.textContent).toContain(title);
+}
+
 async function flushUi() {
   await act(async () => {
     await Promise.resolve();
@@ -397,7 +403,7 @@ describe("ChatPageClient", () => {
     await flushUi();
 
     expect(container.textContent).toContain("Investigate build");
-    expect(container.textContent).toContain("Selected");
+    expectSelectedThreadTitle("Investigate build");
     expect(container.textContent).toContain("Waiting for your input");
     expect(MockEventSource.instances[0]?.url).toBe("/api/v1/threads/thread_001/stream");
 
@@ -526,6 +532,100 @@ describe("ChatPageClient", () => {
       "Start workspace-scoped work.",
       expect.stringMatching(/^input_start_/),
     );
+  });
+
+  it("does not restore stale thread view or request detail after Ask Codex clears a pending selected thread load", async () => {
+    const pendingThread = createDeferred<{
+      view: PublicThreadView;
+      pendingRequestDetail: PublicRequestDetail | null;
+    }>();
+
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [
+        buildThreadListItem({
+          title: "Navigation thread",
+          current_activity: {
+            kind: "running",
+            label: "Running",
+          },
+        }),
+      ],
+      next_cursor: null,
+      has_more: false,
+    });
+    chatDataMocks.loadChatThreadBundle.mockReturnValue(pendingThread.promise);
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    expect(container.textContent).toContain("Opening thread");
+    expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(1);
+
+    const askCodexButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Ask Codex",
+    );
+    expect(askCodexButton).not.toBeUndefined();
+
+    await act(async () => {
+      askCodexButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushUi();
+
+    expect(window.location.search).toBe("?workspaceId=ws_alpha");
+    expect(container.textContent).toContain("Ask Codex in alpha");
+    expect(container.textContent).toContain("Ready for workspace input");
+    expect(container.textContent).not.toContain("Opening thread");
+
+    await act(async () => {
+      pendingThread.resolve({
+        view: buildThreadView({
+          thread: {
+            thread_id: "thread_001",
+            workspace_id: "ws_alpha",
+            title: "Delayed selected thread",
+            native_status: {
+              thread_status: "waiting_input",
+              active_flags: [],
+              latest_turn_status: null,
+            },
+            updated_at: "2026-03-27T05:26:00Z",
+          },
+          current_activity: {
+            kind: "waiting_on_approval",
+            label: "Approval required",
+          },
+          pending_request: {
+            request_id: "req_001",
+            thread_id: "thread_001",
+            turn_id: "turn_001",
+            item_id: "item_001",
+            request_kind: "approval",
+            status: "pending",
+            risk_category: "external_side_effect",
+            summary: "Run git push",
+            requested_at: "2026-03-27T05:25:00Z",
+          },
+          composer: {
+            accepting_user_input: false,
+            interrupt_available: true,
+            blocked_by_request: true,
+            input_unavailable_reason: null,
+          },
+        }),
+        pendingRequestDetail: buildPendingRequestDetail(),
+      });
+    });
+    await flushUi();
+
+    expect(container.textContent).toContain("Ask Codex in alpha");
+    expect(container.textContent).toContain("Ready for workspace input");
+    expect(container.textContent).not.toContain("Delayed selected thread");
+    expect(container.textContent).not.toContain("Approval required");
+    expect(container.textContent).not.toContain("Approve request");
+    expect(container.textContent).not.toContain("Deny request");
+    expect(document.querySelector('button[aria-current="page"]')).toBeNull();
   });
 
   it("selects an existing thread from first-input mode and keeps the same composer on follow-up path", async () => {
@@ -1488,7 +1588,7 @@ describe("ChatPageClient", () => {
     expect(chatDataMocks.listWorkspaceThreads).toHaveBeenCalledTimes(2);
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain("Investigate build");
-    expect(container.textContent).toContain("Selected");
+    expectSelectedThreadTitle("Investigate build");
     expect(container.textContent).toContain("High-priority background thread needs attention.");
     expect(container.textContent).toContain("Background thread needs attention");
     expect(container.textContent).toContain("Reason: Needs response");

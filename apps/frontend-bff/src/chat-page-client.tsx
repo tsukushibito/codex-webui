@@ -8,7 +8,6 @@ import {
   interruptThreadFromChat,
   listChatWorkspaces,
   listWorkspaceThreads,
-  loadChatThreadBundle,
   type PublicWorkspaceSummary,
   respondToPendingRequest,
   sendThreadInput,
@@ -18,11 +17,10 @@ import { ChatView } from "./chat-view";
 import { logLiveChatDebug } from "./debug";
 import type {
   PublicNotificationEvent,
-  PublicRequestDetail,
   PublicThreadListItem,
   PublicThreadStreamEvent,
-  PublicThreadView,
 } from "./thread-types";
+import { useSelectedThreadBundle } from "./use-selected-thread-bundle";
 
 function createClientId(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -48,13 +46,6 @@ function upsertStreamEvent(
 const ACTIVE_THREAD_REFRESH_INTERVAL_MS = 1500;
 const POST_START_READY_REFRESH_INTERVAL_MS = 400;
 const POST_START_READY_REFRESH_ATTEMPTS = 8;
-
-function selectRequestDetail(bundle: {
-  latestResolvedRequestDetail?: PublicRequestDetail | null;
-  pendingRequestDetail: PublicRequestDetail | null;
-}) {
-  return bundle.pendingRequestDetail ?? bundle.latestResolvedRequestDetail ?? null;
-}
 
 function hasStreamSequenceInconsistency(
   events: PublicThreadStreamEvent[],
@@ -119,10 +110,6 @@ export function ChatPageClient() {
   const [workspaceId, setWorkspaceId] = useState<string | null>(initialWorkspaceId);
   const [threads, setThreads] = useState<PublicThreadListItem[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(initialThreadId);
-  const [selectedThreadView, setSelectedThreadView] = useState<PublicThreadView | null>(null);
-  const [selectedRequestDetail, setSelectedRequestDetail] = useState<PublicRequestDetail | null>(
-    null,
-  );
   const [streamEvents, setStreamEvents] = useState<PublicThreadStreamEvent[]>([]);
   const [draftAssistantMessages, setDraftAssistantMessages] = useState<Record<string, string>>({});
   const [composerDraft, setComposerDraft] = useState("");
@@ -136,7 +123,6 @@ export function ChatPageClient() {
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
   const [workspaceName, setWorkspaceName] = useState("");
-  const [isLoadingThread, setIsLoadingThread] = useState(false);
   const [isCreatingThread, setIsCreatingThread] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isInterruptingThread, setIsInterruptingThread] = useState(false);
@@ -146,9 +132,22 @@ export function ChatPageClient() {
   const reconnectTimerRef = useRef<number | null>(null);
   const activeThreadRefreshTimerRef = useRef<number | null>(null);
   const threadListRefreshIdRef = useRef(0);
-  const selectedThreadRefreshIdRef = useRef(0);
   const selectedThreadIdRef = useRef<string | null>(initialThreadId);
   const streamEventsRef = useRef<PublicThreadStreamEvent[]>([]);
+  const {
+    isLoadingThread,
+    selectedRequestDetail,
+    selectedThreadView,
+    refreshSelectedThreadBundle,
+  } = useSelectedThreadBundle({
+    selectedThreadId,
+    onLoadStart: () => {
+      setErrorMessage(null);
+    },
+    onLoadError: (message) => {
+      setErrorMessage(message);
+    },
+  });
 
   function updateSelectedThreadId(
     nextThreadId: string | null,
@@ -196,7 +195,7 @@ export function ChatPageClient() {
         return;
       }
 
-      const bundle = await refreshSelectedThread(threadId);
+      const bundle = await refreshSelectedThreadBundle(threadId);
       if (!bundle) {
         return;
       }
@@ -267,50 +266,8 @@ export function ChatPageClient() {
     }
   }
 
-  async function refreshSelectedThread(threadId: string) {
-    const refreshId = selectedThreadRefreshIdRef.current + 1;
-    selectedThreadRefreshIdRef.current = refreshId;
-    setIsLoadingThread(true);
-    setErrorMessage(null);
-    logLiveChatDebug("chat-refresh", "refreshing selected thread bundle", {
-      thread_id: threadId,
-      refresh_id: refreshId,
-    });
-
-    try {
-      const bundle = await loadChatThreadBundle(threadId);
-      if (selectedThreadRefreshIdRef.current !== refreshId) {
-        logLiveChatDebug("chat-refresh", "discarding stale selected thread bundle", {
-          thread_id: threadId,
-          refresh_id: refreshId,
-        });
-        return null;
-      }
-
-      setSelectedThreadView(bundle.view);
-      setSelectedRequestDetail(selectRequestDetail(bundle));
-      return bundle;
-    } catch (error) {
-      if (selectedThreadRefreshIdRef.current === refreshId) {
-        logLiveChatDebug("chat-refresh", "failed to load selected thread bundle", {
-          thread_id: threadId,
-          refresh_id: refreshId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        setErrorMessage(
-          error instanceof Error ? error.message : "Failed to load the selected thread.",
-        );
-      }
-      return null;
-    } finally {
-      if (selectedThreadRefreshIdRef.current === refreshId) {
-        setIsLoadingThread(false);
-      }
-    }
-  }
-
   async function refreshSelectedThreadAndList(threadId: string) {
-    await Promise.all([refreshSelectedThread(threadId), refreshThreads(threadId)]);
+    await Promise.all([refreshSelectedThreadBundle(threadId), refreshThreads(threadId)]);
   }
 
   useEffect(() => {
@@ -330,11 +287,6 @@ export function ChatPageClient() {
       thread_id: selectedThreadId,
     });
     if (!selectedThreadId) {
-      logLiveChatDebug("chat-stream", "selected thread cleared", {
-        previous_thread_id: selectedThreadView?.thread.thread_id ?? null,
-      });
-      setSelectedThreadView(null);
-      setSelectedRequestDetail(null);
       setStreamEvents([]);
       streamEventsRef.current = [];
       setDraftAssistantMessages({});
@@ -343,14 +295,9 @@ export function ChatPageClient() {
       return;
     }
 
-    logLiveChatDebug("chat-stream", "selected thread changed", {
-      thread_id: selectedThreadId,
-      previous_thread_id: selectedThreadView?.thread.thread_id ?? null,
-    });
     setStreamEvents([]);
     streamEventsRef.current = [];
     setDraftAssistantMessages({});
-    void refreshSelectedThread(selectedThreadId);
   }, [selectedThreadId]);
 
   useEffect(() => {
@@ -617,8 +564,6 @@ export function ChatPageClient() {
     updateSelectedThreadId(null, "user_select_workspace", {
       workspace_id: nextWorkspaceId,
     });
-    setSelectedThreadView(null);
-    setSelectedRequestDetail(null);
     setStreamEvents([]);
     streamEventsRef.current = [];
     setDraftAssistantMessages({});
