@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { logLiveChatDebug } from "./debug";
+import type { ErrorEnvelope } from "./errors";
 import { isErrorEnvelope, toErrorResponse } from "./errors";
 import {
   mapApprovalDetail,
@@ -117,11 +118,173 @@ function jsonResponse(status: number, body: unknown) {
   return NextResponse.json(body, { status });
 }
 
-async function parseRuntimeErrorResponse(response: Response) {
+type ActiveRuntimeErrorMapping = {
+  requestId?: string;
+  sessionInvalidStateCode?: string;
+  sessionNotFoundCode: string;
+  threadId?: string;
+};
+
+function normalizeActiveRuntimeErrorEnvelope(
+  body: ErrorEnvelope,
+  mapping: ActiveRuntimeErrorMapping,
+): ErrorEnvelope {
+  const details = { ...body.error.details };
+
+  const sessionId =
+    typeof details.session_id === "string"
+      ? details.session_id
+      : typeof mapping.threadId === "string"
+        ? mapping.threadId
+        : null;
+  const currentStatus =
+    typeof details.current_status === "string"
+      ? details.current_status
+      : typeof details.status === "string"
+        ? details.status
+        : null;
+
+  if (body.error.code === "session_not_found") {
+    if (mapping.sessionNotFoundCode === "request_not_found") {
+      return {
+        error: {
+          code: "request_not_found",
+          message: "request was not found",
+          details: {
+            ...(mapping.requestId ? { request_id: mapping.requestId } : {}),
+            ...(typeof details.thread_id === "string"
+              ? { thread_id: details.thread_id }
+              : typeof sessionId === "string"
+                ? { thread_id: sessionId }
+                : {}),
+          },
+        },
+      };
+    }
+
+    return {
+      error: {
+        code: "thread_not_found",
+        message: "thread was not found",
+        details: {
+          ...(typeof details.thread_id === "string"
+            ? { thread_id: details.thread_id }
+            : typeof sessionId === "string"
+              ? { thread_id: sessionId }
+              : {}),
+        },
+      },
+    };
+  }
+
+  if (body.error.code === "session_invalid_state" && mapping.sessionInvalidStateCode) {
+    if (mapping.sessionInvalidStateCode === "request_not_pending") {
+      return {
+        error: {
+          code: "request_not_pending",
+          message: "request is not pending",
+          details: {
+            ...(mapping.requestId ? { request_id: mapping.requestId } : {}),
+            ...(typeof details.thread_id === "string"
+              ? { thread_id: details.thread_id }
+              : typeof sessionId === "string"
+                ? { thread_id: sessionId }
+                : {}),
+            ...(typeof currentStatus === "string" ? { status: currentStatus } : {}),
+          },
+        },
+      };
+    }
+
+    return {
+      error: {
+        code: mapping.sessionInvalidStateCode,
+        message:
+          mapping.sessionInvalidStateCode === "thread_not_interruptible"
+            ? "thread is not interruptible"
+            : "thread is not accepting user input",
+        details: {
+          ...(typeof details.thread_id === "string"
+            ? { thread_id: details.thread_id }
+            : typeof sessionId === "string"
+              ? { thread_id: sessionId }
+              : {}),
+          ...(typeof currentStatus === "string" ? { status: currentStatus } : {}),
+          workspace_id: typeof details.workspace_id === "string" ? details.workspace_id : undefined,
+          active_thread_id:
+            typeof details.active_thread_id === "string"
+              ? details.active_thread_id
+              : typeof details.active_session_id === "string"
+                ? details.active_session_id
+                : undefined,
+        },
+      },
+    };
+  }
+
+  if (body.error.code.startsWith("session_")) {
+    const normalizedDetails = { ...details };
+    if (typeof details.session_id === "string" && !("thread_id" in normalizedDetails)) {
+      normalizedDetails.thread_id = details.session_id;
+    }
+    if (
+      typeof details.active_session_id === "string" &&
+      !("active_thread_id" in normalizedDetails)
+    ) {
+      normalizedDetails.active_thread_id = details.active_session_id;
+    }
+    delete normalizedDetails.session_id;
+    delete normalizedDetails.active_session_id;
+
+    return {
+      error: {
+        code: body.error.code.replace(/^session_/, "thread_"),
+        message: body.error.message.replace(/\bsession\b/g, "thread"),
+        details:
+          typeof sessionId === "string" && !("thread_id" in normalizedDetails)
+            ? { ...normalizedDetails, thread_id: sessionId }
+            : normalizedDetails,
+      },
+    };
+  }
+
+  if ("session_id" in details || "active_session_id" in details) {
+    const normalizedDetails = { ...details };
+    if (typeof details.session_id === "string" && !("thread_id" in normalizedDetails)) {
+      normalizedDetails.thread_id = details.session_id;
+    }
+    if (
+      typeof details.active_session_id === "string" &&
+      !("active_thread_id" in normalizedDetails)
+    ) {
+      normalizedDetails.active_thread_id = details.active_session_id;
+    }
+    delete normalizedDetails.session_id;
+    delete normalizedDetails.active_session_id;
+
+    if (mapping.requestId && !("request_id" in normalizedDetails)) {
+      normalizedDetails.request_id = mapping.requestId;
+    }
+
+    return {
+      error: {
+        ...body.error,
+        details: normalizedDetails,
+      },
+    };
+  }
+
+  return body;
+}
+
+async function parseRuntimeErrorResponse(response: Response, mapping?: ActiveRuntimeErrorMapping) {
   try {
     const payload = await response.json();
     if (isErrorEnvelope(payload)) {
-      return jsonResponse(response.status, payload);
+      return jsonResponse(
+        response.status,
+        mapping ? normalizeActiveRuntimeErrorEnvelope(payload, mapping) : payload,
+      );
     }
   } catch {
     // fall through
@@ -285,6 +448,7 @@ async function relaySse<TInput, TOutput>(
   request: Request,
   path: string,
   mapper: (value: TInput) => TOutput,
+  errorMapping?: ActiveRuntimeErrorMapping,
 ) {
   logLiveChatDebug("sse-relay", "opening runtime stream", {
     path,
@@ -295,7 +459,7 @@ async function relaySse<TInput, TOutput>(
       path,
       status: response.status,
     });
-    return parseRuntimeErrorResponse(response);
+    return parseRuntimeErrorResponse(response, errorMapping);
   }
 
   if (!response.body) {
@@ -316,9 +480,16 @@ async function relaySse<TInput, TOutput>(
   });
 }
 
-function passthroughRuntimeError(status: number, body: unknown) {
+function passthroughRuntimeError(
+  status: number,
+  body: unknown,
+  mapping?: ActiveRuntimeErrorMapping,
+) {
   if (isErrorEnvelope(body)) {
-    return jsonResponse(status, body);
+    return jsonResponse(
+      status,
+      mapping ? normalizeActiveRuntimeErrorEnvelope(body, mapping) : body,
+    );
   }
 
   throw new Error("expected runtime error envelope");
@@ -360,7 +531,9 @@ export async function getHome(_request: Request) {
 
     const runtimeThreadError = threadResults.find((result) => isErrorEnvelope(result.body));
     if (runtimeThreadError && isErrorEnvelope(runtimeThreadError.body)) {
-      return passthroughRuntimeError(runtimeThreadError.status, runtimeThreadError.body);
+      return passthroughRuntimeError(runtimeThreadError.status, runtimeThreadError.body, {
+        sessionNotFoundCode: "thread_not_found",
+      });
     }
 
     const resumeCandidates = threadResults
@@ -426,7 +599,9 @@ export async function listThreads(request: Request, workspaceId: string) {
     );
 
     if (isErrorEnvelope(result.body)) {
-      return passthroughRuntimeError(result.status, result.body);
+      return passthroughRuntimeError(result.status, result.body, {
+        sessionNotFoundCode: "thread_not_found",
+      });
     }
 
     return jsonResponse(result.status, mapThreadList(result.body));
@@ -442,7 +617,10 @@ export async function getThread(_request: Request, threadId: string) {
     );
 
     if (isErrorEnvelope(result.body)) {
-      return passthroughRuntimeError(result.status, result.body);
+      return passthroughRuntimeError(result.status, result.body, {
+        sessionNotFoundCode: "thread_not_found",
+        threadId,
+      });
     }
 
     return jsonResponse(result.status, mapThread(result.body));
@@ -458,7 +636,10 @@ export async function getPendingRequest(_request: Request, threadId: string) {
     );
 
     if (isErrorEnvelope(result.body)) {
-      return passthroughRuntimeError(result.status, result.body);
+      return passthroughRuntimeError(result.status, result.body, {
+        sessionNotFoundCode: "thread_not_found",
+        threadId,
+      });
     }
 
     return jsonResponse(result.status, mapPendingRequestView(result.body));
@@ -474,7 +655,10 @@ export async function getRequestDetail(_request: Request, requestId: string) {
     );
 
     if (isErrorEnvelope(result.body)) {
-      return passthroughRuntimeError(result.status, result.body);
+      return passthroughRuntimeError(result.status, result.body, {
+        requestId,
+        sessionNotFoundCode: "request_not_found",
+      });
     }
 
     return jsonResponse(result.status, mapRequestDetail(result.body));
@@ -493,11 +677,17 @@ export async function getThreadView(_request: Request, threadId: string) {
     ]);
 
     if (isErrorEnvelope(viewResult.body)) {
-      return passthroughRuntimeError(viewResult.status, viewResult.body);
+      return passthroughRuntimeError(viewResult.status, viewResult.body, {
+        sessionNotFoundCode: "thread_not_found",
+        threadId,
+      });
     }
 
     if (isErrorEnvelope(timelineResult.body)) {
-      return passthroughRuntimeError(timelineResult.status, timelineResult.body);
+      return passthroughRuntimeError(timelineResult.status, timelineResult.body, {
+        sessionNotFoundCode: "thread_not_found",
+        threadId,
+      });
     }
 
     return jsonResponse(viewResult.status, mapThreadView(viewResult.body, timelineResult.body));
@@ -513,7 +703,10 @@ export async function getTimeline(request: Request, threadId: string) {
     );
 
     if (isErrorEnvelope(result.body)) {
-      return passthroughRuntimeError(result.status, result.body);
+      return passthroughRuntimeError(result.status, result.body, {
+        sessionNotFoundCode: "thread_not_found",
+        threadId,
+      });
     }
 
     return jsonResponse(result.status, mapTimeline(result.body));
@@ -553,7 +746,11 @@ export async function postThreadInput(request: Request, threadId: string) {
     );
 
     if (isErrorEnvelope(result.body)) {
-      return passthroughRuntimeError(result.status, result.body);
+      return passthroughRuntimeError(result.status, result.body, {
+        sessionInvalidStateCode: "thread_not_accepting_input",
+        sessionNotFoundCode: "thread_not_found",
+        threadId,
+      });
     }
 
     return jsonResponse(result.status, mapThreadInputAcceptedResponse(result.body));
@@ -573,7 +770,11 @@ export async function postThreadInterrupt(_request: Request, threadId: string) {
     );
 
     if (isErrorEnvelope(result.body)) {
-      return passthroughRuntimeError(result.status, result.body);
+      return passthroughRuntimeError(result.status, result.body, {
+        sessionInvalidStateCode: "thread_not_interruptible",
+        sessionNotFoundCode: "thread_not_found",
+        threadId,
+      });
     }
 
     return jsonResponse(result.status, mapThread(result.body.thread));
@@ -593,7 +794,11 @@ export async function postRequestResponse(request: Request, requestId: string) {
     );
 
     if (isErrorEnvelope(result.body)) {
-      return passthroughRuntimeError(result.status, result.body);
+      return passthroughRuntimeError(result.status, result.body, {
+        requestId,
+        sessionInvalidStateCode: "request_not_pending",
+        sessionNotFoundCode: "request_not_found",
+      });
     }
 
     return jsonResponse(result.status, mapRequestResponseResult(result.body));
@@ -854,6 +1059,10 @@ export async function getThreadStream(request: Request, threadId: string) {
       request,
       `/api/v1/threads/${threadId}/stream`,
       mapThreadStreamEvent,
+      {
+        sessionNotFoundCode: "thread_not_found",
+        threadId,
+      },
     );
   } catch (error) {
     return toErrorResponse(error);

@@ -73,6 +73,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Archived Task Packages
 
+- [issue-260-error-code-normalization](./archive/issue-260-error-code-normalization/README.md)
 - [issue-257-readme-v09-sync](./archive/issue-257-readme-v09-sync/README.md)
 - [issue-261-tracking-drift](./archive/issue-261-tracking-drift/README.md)
 - [issue-222-ui-gap-validation](./archive/issue-222-ui-gap-validation/README.md)

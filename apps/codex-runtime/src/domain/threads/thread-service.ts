@@ -252,9 +252,24 @@ function mapRequestError(error: unknown, requestId: string): never {
     throw error;
   }
 
+  if (runtimeError.code === "session_not_found" || runtimeError.code === "thread_not_found") {
+    throw new RuntimeError(404, "request_not_found", "request was not found", {
+      request_id: requestId,
+      thread_id: runtimeError.details?.thread_id ?? runtimeError.details?.session_id ?? null,
+    });
+  }
+
   if (runtimeError.code === "approval_not_found") {
     throw new RuntimeError(404, "request_not_found", "request was not found", {
       request_id: requestId,
+    });
+  }
+
+  if (runtimeError.code === "session_invalid_state") {
+    throw new RuntimeError(409, "request_not_pending", "request is not pending", {
+      request_id: requestId,
+      thread_id: runtimeError.details?.thread_id ?? runtimeError.details?.session_id ?? null,
+      status: runtimeError.details?.current_status ?? runtimeError.details?.status ?? null,
     });
   }
 
