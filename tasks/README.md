@@ -69,7 +69,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Current Active Tasks
 
-- `None`
+- [issue-220-mobile-thread-density](./issue-220-mobile-thread-density/README.md)
 
 ## Archived Task Packages
 
