@@ -1,16 +1,24 @@
 :root {
   color-scheme: light;
-  --page-bg: #f4efe4;
-  --panel-bg: rgba(255, 252, 245, 0.94);
-  --panel-border: rgba(40, 31, 19, 0.12);
-  --text-main: #23180f;
-  --text-muted: #66584a;
-  --accent: #b84d24;
-  --accent-strong: #8e3110;
-  --accent-soft: #f3dfd1;
-  --success: #2f6b4f;
-  --warning: #8f5b14;
-  --shadow: 0 20px 50px rgba(42, 25, 9, 0.12);
+  --page-bg: #eef2f1;
+  --panel-bg: rgba(251, 253, 252, 0.94);
+  --panel-border: rgba(22, 47, 52, 0.12);
+  --text-main: #162128;
+  --text-muted: #54636e;
+  --accent: #0f5f5d;
+  --accent-strong: #0a4647;
+  --accent-soft: rgba(15, 95, 93, 0.12);
+  --accent-outline: rgba(15, 95, 93, 0.24);
+  --success: #24704b;
+  --success-soft: rgba(36, 112, 75, 0.12);
+  --warning: #b9621f;
+  --warning-soft: rgba(185, 98, 31, 0.14);
+  --danger: #b2413c;
+  --danger-soft: rgba(178, 65, 60, 0.12);
+  --artifact-bg: #edf4f5;
+  --artifact-border: rgba(30, 63, 73, 0.18);
+  --artifact-text: #17333b;
+  --shadow: 0 20px 50px rgba(17, 31, 39, 0.1);
 }
 
 * {
@@ -25,8 +33,8 @@ body {
 
 body {
   background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.72), transparent 30%),
-    linear-gradient(180deg, #f7f1e7 0%, var(--page-bg) 100%);
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.76), transparent 28%),
+    linear-gradient(180deg, #f8fbfb 0%, var(--page-bg) 100%);
   color: var(--text-main);
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
 }
@@ -102,9 +110,9 @@ textarea {
 .workspace-context {
   align-items: end;
   justify-content: space-between;
-  border: 1px solid rgba(35, 24, 15, 0.08);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(22, 47, 52, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.74);
   padding: 14px;
 }
 
@@ -132,8 +140,9 @@ textarea {
 
 .workspace-switcher summary {
   cursor: pointer;
-  border-radius: 14px;
-  background: rgba(35, 24, 15, 0.06);
+  border: 1px solid rgba(22, 47, 52, 0.08);
+  border-radius: 12px;
+  background: rgba(15, 95, 93, 0.05);
   color: var(--text-main);
   padding: 10px 12px;
 }
@@ -147,16 +156,16 @@ textarea {
 .workspace-switcher select,
 .workspace-switcher input {
   width: 100%;
-  border: 1px solid rgba(35, 24, 15, 0.14);
-  border-radius: 14px;
-  background: #fffdf8;
+  border: 1px solid rgba(22, 47, 52, 0.14);
+  border-radius: 12px;
+  background: #ffffff;
   color: var(--text-main);
   padding: 10px 12px;
 }
 
 .workspace-switcher select:focus,
 .workspace-switcher input:focus {
-  outline: 2px solid rgba(184, 77, 36, 0.22);
+  outline: 2px solid var(--accent-outline);
   outline-offset: 1px;
 }
 
@@ -212,56 +221,77 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border-radius: 999px;
+  border: 1px solid transparent;
   padding: 8px 12px;
   font-size: 0.9rem;
   font-weight: 600;
 }
 
 .metric-chip {
-  background: rgba(35, 24, 15, 0.06);
+  border-radius: 12px;
+  border-color: rgba(22, 47, 52, 0.1);
+  background: rgba(237, 244, 245, 0.7);
+  color: var(--artifact-text);
 }
 
 .status-badge {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
+  border-radius: 999px;
+  background: rgba(22, 47, 52, 0.06);
+  color: var(--text-main);
 }
 
 .status-badge.success {
-  background: rgba(47, 107, 79, 0.12);
+  background: var(--success-soft);
   color: var(--success);
 }
 
 .status-badge.warning {
-  background: rgba(143, 91, 20, 0.12);
+  background: var(--warning-soft);
   color: var(--warning);
 }
 
 .primary-link,
 .secondary-link,
+.approve-button,
+.danger-button,
 .submit-button,
 .disabled-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16px;
+  border: 1px solid transparent;
+  border-radius: 12px;
   padding: 12px 16px;
   font-weight: 700;
   transition:
     transform 160ms ease,
     background-color 160ms ease,
-    color 160ms ease;
+    color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .primary-link,
 .submit-button {
   background: var(--accent);
-  color: #fffaf6;
+  color: #f6fbfb;
+}
+
+.approve-button {
+  background: var(--success);
+  color: #f7fcf9;
+}
+
+.danger-button {
+  border-color: rgba(178, 65, 60, 0.22);
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .secondary-link,
 .disabled-link {
-  background: rgba(35, 24, 15, 0.06);
+  border-color: rgba(22, 47, 52, 0.1);
+  background: rgba(255, 255, 255, 0.7);
   color: var(--text-main);
 }
 
@@ -273,8 +303,11 @@ textarea {
 
 .primary-link:hover,
 .secondary-link:hover,
+.approve-button:hover,
+.danger-button:hover,
 .submit-button:hover {
   transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(17, 31, 39, 0.08);
 }
 
 .workspace-grid {
@@ -334,14 +367,14 @@ textarea {
 
 .text-input {
   width: 100%;
-  border: 1px solid rgba(35, 24, 15, 0.14);
-  border-radius: 14px;
-  background: #fffdf8;
+  border: 1px solid rgba(22, 47, 52, 0.14);
+  border-radius: 12px;
+  background: #ffffff;
   padding: 12px 14px;
 }
 
 .text-input:focus {
-  outline: 2px solid rgba(184, 77, 36, 0.22);
+  outline: 2px solid var(--accent-outline);
   outline-offset: 1px;
 }
 
@@ -402,9 +435,9 @@ textarea {
   display: grid;
   gap: 10px;
   padding: 14px 16px;
-  border: 1px solid rgba(143, 91, 20, 0.2);
-  border-radius: 18px;
-  background: rgba(255, 248, 231, 0.92);
+  border: 1px solid rgba(185, 98, 31, 0.22);
+  border-radius: 16px;
+  background: rgba(255, 249, 242, 0.95);
   box-shadow: var(--shadow);
 }
 
@@ -456,7 +489,7 @@ textarea {
 .compact-button,
 .inline-detail-button {
   padding: 8px 10px;
-  border-radius: 12px;
+  border-radius: 10px;
   font-size: 0.9rem;
 }
 
@@ -483,9 +516,9 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid rgba(35, 24, 15, 0.1);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(22, 47, 52, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.76);
   color: var(--text-main);
   padding: 8px 10px;
   font-size: 0.84rem;
@@ -494,15 +527,15 @@ textarea {
 }
 
 .thread-filter-chip.active {
-  border-color: rgba(184, 77, 36, 0.4);
-  background: rgba(243, 223, 209, 0.72);
+  border-color: rgba(15, 95, 93, 0.32);
+  background: rgba(15, 95, 93, 0.12);
   color: var(--accent-strong);
 }
 
 .thread-filter-count {
   min-width: 1.4rem;
-  border-radius: 999px;
-  background: rgba(35, 24, 15, 0.07);
+  border-radius: 8px;
+  background: rgba(22, 47, 52, 0.08);
   padding: 2px 7px;
   text-align: center;
 }
@@ -535,8 +568,8 @@ textarea {
   gap: 4px;
   width: 100%;
   border: 1px solid var(--panel-border);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.68);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
   padding: 12px;
   color: var(--text-main);
   text-align: left;
@@ -544,15 +577,16 @@ textarea {
 }
 
 .workspace-option-card.active {
-  border-color: rgba(184, 77, 36, 0.4);
-  background: rgba(243, 223, 209, 0.45);
+  border-color: rgba(15, 95, 93, 0.28);
+  background: rgba(15, 95, 93, 0.08);
+  box-shadow: inset 3px 0 0 rgba(15, 95, 93, 0.72);
 }
 
 .first-input-card,
 .current-activity-card {
-  border: 1px solid rgba(35, 24, 15, 0.08);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(22, 47, 52, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.8);
   padding: 14px;
 }
 
@@ -566,8 +600,8 @@ textarea {
   gap: 8px;
   width: 100%;
   border: 1px solid var(--panel-border);
-  border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 252, 245, 0.72));
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(246, 250, 250, 0.88));
   padding: 14px;
   text-align: left;
   cursor: pointer;
@@ -619,16 +653,17 @@ textarea {
 }
 
 .thread-summary-card.active {
-  border-color: rgba(184, 77, 36, 0.4);
-  background: rgba(243, 223, 209, 0.45);
+  border-color: rgba(15, 95, 93, 0.28);
+  background: rgba(15, 95, 93, 0.08);
+  box-shadow: inset 3px 0 0 rgba(15, 95, 93, 0.72);
 }
 
 .request-detail-card {
   display: grid;
   gap: 12px;
-  border: 1px solid rgba(143, 91, 20, 0.18);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(185, 98, 31, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.86);
   padding: 14px;
 }
 
@@ -640,9 +675,9 @@ textarea {
 .thread-feedback-card {
   display: grid;
   gap: 12px;
-  border: 1px solid rgba(35, 24, 15, 0.08);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(22, 47, 52, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
   padding: 14px;
 }
 
@@ -670,10 +705,10 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  border: 1px solid rgba(35, 24, 15, 0.08);
-  border-radius: 18px;
-  background: rgba(255, 252, 245, 0.96);
-  box-shadow: 0 10px 24px rgba(42, 25, 9, 0.1);
+  border: 1px solid rgba(22, 47, 52, 0.1);
+  border-radius: 14px;
+  background: rgba(249, 252, 252, 0.98);
+  box-shadow: 0 10px 24px rgba(17, 31, 39, 0.08);
   padding: 10px 12px;
 }
 
@@ -698,11 +733,11 @@ textarea {
 .chat-composer {
   display: grid;
   gap: 12px;
-  border: 1px solid rgba(35, 24, 15, 0.08);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(22, 47, 52, 0.1);
+  border-radius: 14px;
+  background: rgba(248, 252, 252, 0.94);
   padding: 14px;
-  box-shadow: 0 -10px 24px rgba(244, 239, 228, 0.8);
+  box-shadow: 0 -10px 24px rgba(226, 236, 237, 0.8);
 }
 
 .composer-guidance {
@@ -716,14 +751,14 @@ textarea {
   width: 100%;
   min-height: 120px;
   resize: vertical;
-  border: 1px solid rgba(35, 24, 15, 0.14);
-  border-radius: 16px;
-  background: #fffdf8;
+  border: 1px solid rgba(22, 47, 52, 0.14);
+  border-radius: 12px;
+  background: #ffffff;
   padding: 12px 14px;
 }
 
 .chat-textarea:focus {
-  outline: 2px solid rgba(184, 77, 36, 0.22);
+  outline: 2px solid var(--accent-outline);
   outline-offset: 1px;
 }
 
@@ -732,8 +767,9 @@ textarea {
 .timeline-row {
   display: grid;
   gap: 8px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid rgba(22, 47, 52, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -751,7 +787,7 @@ textarea {
 }
 
 .timeline-turn-group {
-  border-left: 3px solid rgba(35, 24, 15, 0.16);
+  border-left: 2px solid rgba(15, 95, 93, 0.22);
   padding-left: 12px;
 }
 
@@ -789,15 +825,15 @@ textarea {
 }
 
 .timeline-row-prominent {
-  border: 1px solid rgba(143, 91, 20, 0.24);
-  background: rgba(255, 247, 236, 0.82);
+  border-color: rgba(185, 98, 31, 0.22);
+  background: linear-gradient(180deg, rgba(255, 249, 242, 0.98), rgba(255, 255, 255, 0.92));
 }
 
 .timeline-row-compact {
   grid-template-columns: minmax(0, 1fr);
   gap: 5px;
-  border: 1px solid rgba(35, 24, 15, 0.07);
-  background: rgba(255, 255, 255, 0.46);
+  border-color: rgba(22, 47, 52, 0.07);
+  background: rgba(244, 248, 249, 0.92);
   padding: 9px 12px;
 }
 
@@ -808,19 +844,20 @@ textarea {
 }
 
 .timeline-row-user {
-  border: 1px solid rgba(184, 77, 36, 0.22);
+  border-color: rgba(15, 95, 93, 0.26);
+  background: linear-gradient(180deg, rgba(239, 248, 248, 0.96), rgba(255, 255, 255, 0.92));
 }
 
 .timeline-row-assistant {
-  border: 1px solid rgba(35, 24, 15, 0.1);
+  border-color: rgba(22, 47, 52, 0.12);
 }
 
 .chat-message.user {
-  border: 1px solid rgba(184, 77, 36, 0.18);
+  border-color: rgba(15, 95, 93, 0.22);
 }
 
 .chat-message.assistant {
-  border: 1px solid rgba(35, 24, 15, 0.08);
+  border-color: rgba(22, 47, 52, 0.1);
 }
 
 .chat-message p,
@@ -832,8 +869,9 @@ textarea {
 }
 
 .request-signal {
-  border-radius: 16px;
-  background: rgba(143, 91, 20, 0.12);
+  border: 1px solid rgba(185, 98, 31, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 249, 242, 0.92);
   color: var(--warning);
   padding: 12px 14px;
   font-weight: 600;
@@ -865,10 +903,14 @@ textarea {
   display: grid;
   gap: 4px;
   min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(22, 47, 52, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .request-detail-list dt {
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -881,9 +923,52 @@ textarea {
 }
 
 .request-operation-summary {
-  border-radius: 14px;
-  background: rgba(35, 24, 15, 0.06);
+  border: 1px solid rgba(22, 47, 52, 0.08);
+  border-radius: 12px;
+  background: rgba(245, 249, 249, 0.96);
   padding: 10px 12px;
+}
+
+.detail-artifact-section {
+  border-color: var(--artifact-border);
+  background: rgba(237, 244, 245, 0.62);
+}
+
+.detail-artifact-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.detail-artifact-list li {
+  display: block;
+}
+
+.request-detail-field-code {
+  border-color: var(--artifact-border);
+  background: rgba(237, 244, 245, 0.5);
+}
+
+.artifact-inline {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--artifact-border);
+  border-radius: 8px;
+  background: var(--artifact-bg);
+  color: var(--artifact-text);
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.88em;
+  line-height: 1.45;
+  padding: 0.16rem 0.42rem;
+  vertical-align: baseline;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.detail-link {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
 }
 
 .detail-list {
@@ -897,6 +982,8 @@ textarea {
 
 .detail-debug summary {
   cursor: pointer;
+  color: var(--accent-strong);
+  font-weight: 700;
 }
 
 .request-detail-actions {
@@ -906,15 +993,17 @@ textarea {
 .detail-json {
   max-width: 100%;
   overflow: auto;
-  border: 1px solid rgba(35, 24, 15, 0.08);
+  border: 1px solid var(--artifact-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.72);
-  color: var(--text-muted);
-  font-size: 0.82rem;
-  line-height: 1.45;
-  padding: 10px;
+  background: #f2f7f8;
+  color: var(--artifact-text);
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  padding: 12px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .field-hint,
@@ -933,8 +1022,8 @@ textarea {
 .error-banner {
   padding: 12px 14px;
   border-radius: 16px;
-  background: rgba(184, 77, 36, 0.08);
-  color: var(--accent-strong);
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .placeholder-card {
@@ -967,8 +1056,8 @@ textarea {
 
   body {
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.58), transparent 18rem),
-      linear-gradient(180deg, #f8f3ea 0%, #eee6d8 100%);
+      linear-gradient(180deg, rgba(255, 255, 255, 0.7), transparent 18rem),
+      linear-gradient(180deg, #f7fbfb 0%, #e7efef 100%);
   }
 
   .chat-shell {
@@ -1012,10 +1101,10 @@ textarea {
     inset: auto 10px 10px;
     max-height: min(82vh, 650px);
     border-radius: 20px;
-    background: #fffdf8;
+    background: #fdfefe;
     box-shadow:
-      0 0 0 9999px rgba(35, 24, 15, 0.22),
-      0 18px 48px rgba(35, 24, 15, 0.24);
+      0 0 0 9999px rgba(17, 31, 39, 0.2),
+      0 18px 48px rgba(17, 31, 39, 0.22);
     padding: 16px;
   }
 
@@ -1024,8 +1113,8 @@ textarea {
     top: 0;
     z-index: 1;
     margin: -16px -16px 0;
-    border-bottom: 1px solid rgba(35, 24, 15, 0.08);
-    background: #fffdf8;
+    border-bottom: 1px solid rgba(22, 47, 52, 0.08);
+    background: #fdfefe;
     padding: 16px;
   }
 
@@ -1110,7 +1199,7 @@ textarea {
     top: 0;
     z-index: 2;
     gap: 8px;
-    box-shadow: 0 10px 18px rgba(42, 25, 9, 0.08);
+    box-shadow: 0 10px 18px rgba(17, 31, 39, 0.08);
   }
 
   .pending-request-card .workspace-actions,
@@ -1119,6 +1208,10 @@ textarea {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 8px;
     margin-top: 4px;
+  }
+
+  .pending-request-card .workspace-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .thread-detail-surface .request-context-field,
@@ -1132,6 +1225,10 @@ textarea {
 
   .pending-request-card .workspace-actions > :last-child:nth-child(odd) {
     grid-column: 1 / -1;
+  }
+
+  .pending-request-card .workspace-actions > :last-child:nth-child(odd) {
+    grid-column: auto;
   }
 
   .thread-interrupt-actions {
@@ -1203,6 +1300,8 @@ textarea {
 
   .primary-link,
   .secondary-link,
+  .approve-button,
+  .danger-button,
   .submit-button {
     max-width: 100%;
     white-space: normal;
@@ -1227,8 +1326,8 @@ textarea {
 @media (min-width: 720px) {
   body {
     background:
-      linear-gradient(90deg, rgba(15, 94, 93, 0.035), transparent 26%),
-      linear-gradient(180deg, #f8f5ee 0%, #f0eadf 100%);
+      linear-gradient(90deg, rgba(15, 95, 93, 0.05), transparent 24%),
+      linear-gradient(180deg, #f7fbfb 0%, #edf2f2 100%);
   }
 
   .chat-shell {
@@ -1261,10 +1360,10 @@ textarea {
     align-items: stretch;
     gap: 0;
     overflow: hidden;
-    border: 1px solid rgba(35, 24, 15, 0.16);
+    border: 1px solid rgba(22, 47, 52, 0.14);
     border-radius: 10px;
-    background: rgba(255, 253, 248, 0.94);
-    box-shadow: 0 18px 42px rgba(35, 24, 15, 0.11);
+    background: rgba(252, 254, 254, 0.96);
+    box-shadow: 0 18px 42px rgba(17, 31, 39, 0.1);
   }
 
   .chat-layout:has(.thread-detail-surface) {
@@ -1290,14 +1389,14 @@ textarea {
 
   .thread-navigation {
     align-content: start;
-    border-right: 1px solid rgba(35, 24, 15, 0.12);
-    background: rgba(250, 247, 241, 0.92);
+    border-right: 1px solid rgba(22, 47, 52, 0.1);
+    background: linear-gradient(180deg, rgba(246, 250, 250, 0.96), rgba(240, 246, 246, 0.9));
     padding: 16px;
   }
 
   .thread-view-card,
   .thread-detail-surface {
-    background: rgba(255, 253, 248, 0.96);
+    background: rgba(252, 254, 254, 0.98);
     padding: 18px 20px;
   }
 
@@ -1307,7 +1406,7 @@ textarea {
   }
 
   .thread-detail-surface {
-    border-left: 1px solid rgba(35, 24, 15, 0.12);
+    border-left: 1px solid rgba(22, 47, 52, 0.1);
   }
 
   .current-activity-card,
@@ -1320,8 +1419,8 @@ textarea {
 
   .thread-summary-card {
     gap: 6px;
-    border-color: rgba(35, 24, 15, 0.1);
-    background: rgba(255, 255, 255, 0.64);
+    border-color: rgba(22, 47, 52, 0.1);
+    background: rgba(255, 255, 255, 0.88);
     padding: 11px 12px;
   }
 
@@ -1330,26 +1429,26 @@ textarea {
   }
 
   .thread-summary-card.active {
-    border-color: rgba(184, 77, 36, 0.5);
-    background: rgba(255, 246, 235, 0.86);
-    box-shadow: inset 3px 0 0 rgba(184, 77, 36, 0.74);
+    border-color: rgba(15, 95, 93, 0.34);
+    background: rgba(234, 246, 246, 0.96);
+    box-shadow: inset 3px 0 0 rgba(15, 95, 93, 0.74);
   }
 
   .thread-context-metrics .metric-chip {
     padding: 6px 10px;
     font-size: 0.78rem;
-    color: rgba(35, 24, 15, 0.66);
-    background: rgba(35, 24, 15, 0.045);
+    color: rgba(23, 51, 59, 0.82);
+    background: rgba(237, 244, 245, 0.92);
   }
 
   .current-activity-card,
   .chat-composer {
-    background: rgba(255, 255, 255, 0.58);
+    background: rgba(248, 252, 252, 0.96);
   }
 
   .request-detail-card {
-    border-color: rgba(143, 91, 20, 0.32);
-    background: rgba(255, 250, 241, 0.86);
+    border-color: rgba(185, 98, 31, 0.28);
+    background: rgba(255, 250, 245, 0.96);
   }
 
   .timeline-turn-group {
@@ -1357,7 +1456,7 @@ textarea {
   }
 
   .timeline-row {
-    background: transparent;
+    background: rgba(255, 255, 255, 0.86);
   }
 
   .timeline-row-primary {

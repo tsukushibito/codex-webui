@@ -37,17 +37,24 @@
 
 ## Artifacts / evidence
 
-- Planned validation:
-  - `npm run check`
-  - `node ./node_modules/typescript/bin/tsc --noEmit --pretty false`
-  - focused tests or visual inspection evidence if layout-affecting
+- Sprint validation:
+  - `npm run check`: passed
+  - `node ./node_modules/typescript/bin/tsc --noEmit --pretty false`: passed
+  - `npm test -- tests/chat-view.test.tsx tests/timeline-display-model.test.ts`: passed, 30 tests
+  - `npm run test:e2e -- e2e/approval-flow.spec.ts e2e/issue-220-mobile-thread-density.spec.ts`: passed, 6 tests
+- Visual inspection evidence:
+  - `artifacts/visual-inspection/issue-221-visual-language-polish/desktop-selected-thread-detail.png`
+  - `artifacts/visual-inspection/issue-221-visual-language-polish/mobile-selected-pending-approval.png`
+  - `artifacts/visual-inspection/issue-221-visual-language-polish/inspection-summary.json`
+  - `artifacts/visual-inspection/issue-221-visual-language-polish/mobile-selected-pending-approval-summary.json`
+- Sprint evaluator: approved after pending-approval status color was corrected from success to warning
 
 ## Status / handoff notes
 
-- Status: `in progress`
+- Status: `locally complete pending pre-push validation`
 - Active branch: `issue-221-visual-language-polish`
 - Active worktree: `.worktrees/issue-221-visual-language-polish`
-- Notes: Started from `origin/main` after #220 reached main. Keep #222 broad validation out of this package.
+- Notes: Implemented a CSS-dominant visual-language polish pass that shifts the shell toward teal/neutral identity, reserves orange/green/red for operational state, reduces neutral pill styling, and improves coding-artifact treatment. Mobile remains visually dense near the lower viewport, but inspection evidence reports no horizontal scroll or overflowing labels, and approval controls remain visible. Keep #222 broad validation out of this package.
 
 ## Archive conditions
 

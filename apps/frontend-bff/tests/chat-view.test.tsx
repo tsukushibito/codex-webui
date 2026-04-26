@@ -632,7 +632,9 @@ describe("ChatView", () => {
     expect(markup).toContain(">Threads<");
     expect(markup).toContain(">Details<");
     expect(markup).toContain("Input is paused while this thread waits for your approval response.");
-    expect(markup).toContain("Operation: git push origin main");
+    expect(markup).toContain(
+      'Operation: <code class="artifact-inline">git push origin main</code>',
+    );
     expect(markup).toContain("Interrupt thread");
     expect(markup).toContain("Please explain the diff.");
     expect(markup).toContain("Updated apps/frontend-bff/src/chat-view.tsx");
@@ -649,6 +651,122 @@ describe("ChatView", () => {
     expect(markup).toContain('id="thread-composer-input"');
     expect(markup).not.toContain('id="thread-input"');
     expect(markup).not.toContain('id="message-input"');
+  });
+
+  it("tones selected pending approval activity badges as warning state", async () => {
+    await act(async () => {
+      root.render(
+        <ChatView
+          backgroundPriorityNotice={null}
+          connectionState="live"
+          draftAssistantMessages={{}}
+          errorMessage={null}
+          isCreatingThread={false}
+          isCreatingWorkspace={false}
+          isInterruptingThread={false}
+          isLoadingThread={false}
+          isLoadingThreads={false}
+          isLoadingWorkspaces={false}
+          isRespondingToRequest={false}
+          isSendingMessage={false}
+          composerDraft=""
+          onApproveRequest={() => {}}
+          onSubmitComposer={() => {}}
+          onCreateWorkspace={() => {}}
+          onDenyRequest={() => {}}
+          onInterruptThread={() => {}}
+          onOpenBackgroundPriorityThread={() => {}}
+          onAskCodex={() => {}}
+          onComposerDraftChange={() => {}}
+          onSelectThread={() => {}}
+          onSelectWorkspace={() => {}}
+          onWorkspaceNameChange={() => {}}
+          selectedRequestDetail={null}
+          selectedThreadId="thread_001"
+          selectedThreadView={{
+            thread: {
+              thread_id: "thread_001",
+              workspace_id: "ws_alpha",
+              title: "Approval thread",
+              native_status: {
+                thread_status: "running",
+                active_flags: ["waiting_on_request"],
+                latest_turn_status: "running",
+              },
+              updated_at: "2026-03-27T05:22:00Z",
+            },
+            current_activity: {
+              kind: "waiting_on_approval",
+              label: "Approval required",
+            },
+            pending_request: null,
+            latest_resolved_request: null,
+            composer: {
+              accepting_user_input: false,
+              interrupt_available: true,
+              blocked_by_request: false,
+              input_unavailable_reason: null,
+            },
+            timeline: {
+              items: [],
+              next_cursor: null,
+              has_more: false,
+            },
+          }}
+          statusMessage={null}
+          streamEvents={[]}
+          threads={[
+            {
+              thread_id: "thread_001",
+              title: "Approval thread",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "running",
+                active_flags: ["waiting_on_request"],
+                latest_turn_status: "running",
+              },
+              updated_at: "2026-03-27T05:22:00Z",
+              current_activity: {
+                kind: "waiting_on_approval",
+                label: "Approval required",
+              },
+              badge: null,
+              blocked_cue: {
+                kind: "approval_required",
+                label: "Needs your response",
+              },
+              resume_cue: {
+                reason_kind: "waiting_on_approval",
+                priority_band: "highest",
+                label: "Resume here first",
+              },
+            },
+          ]}
+          workspaceId="ws_alpha"
+          workspaceName=""
+          workspaces={[
+            {
+              workspace_id: "ws_alpha",
+              workspace_name: "alpha",
+              created_at: "2026-03-27T05:00:00Z",
+              updated_at: "2026-03-27T05:22:00Z",
+              active_session_summary: null,
+              pending_approval_count: 1,
+            },
+          ]}
+        />,
+      );
+    });
+
+    const headerBadge = container.querySelector(".thread-view-header-stack header .status-badge");
+    const activityCardBadge = container.querySelector(".current-activity-card .status-badge");
+
+    expect(headerBadge?.textContent).toContain("Approval required");
+    expect(headerBadge?.className).toContain("warning");
+    expect(headerBadge?.className).not.toContain("success");
+    expect(activityCardBadge?.textContent).toContain("Approval required");
+    expect(activityCardBadge?.className).toContain("warning");
+    expect(activityCardBadge?.className).not.toContain("success");
   });
 
   it("renders transient feedback above the chat panels", () => {
@@ -806,6 +924,9 @@ describe("ChatView", () => {
     expect(container.textContent).toContain("tests/chat-view.test.tsx");
     expect(container.textContent).toContain("Request ID");
     expect(container.textContent).toContain("Debug: raw timeline payload JSON");
+    expect(container.querySelectorAll(".detail-artifact-section").length).toBeGreaterThan(0);
+    expect(container.querySelectorAll(".artifact-inline").length).toBeGreaterThan(0);
+    expect(container.querySelector(".request-detail-field-code")).not.toBeNull();
 
     const debugDetails = container.querySelector("details.detail-debug");
     expect(debugDetails).not.toBeNull();

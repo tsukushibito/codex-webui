@@ -85,6 +85,18 @@ function threadBadgeClass(thread: PublicThreadListItem) {
   return "status-badge";
 }
 
+function activityBadgeClass(activityKind: PublicThreadListItem["current_activity"]["kind"] | null) {
+  if (activityKind === "waiting_on_approval") {
+    return "status-badge warning";
+  }
+
+  if (activityKind === "running") {
+    return "status-badge success";
+  }
+
+  return "status-badge";
+}
+
 function requestBadgeClass(request: PublicRequestDetail | null) {
   if (!request) {
     return "status-badge";
@@ -259,6 +271,39 @@ function threadFeedbackBadgeClass(descriptor: ThreadFeedbackDescriptor) {
   }
 
   return "status-badge";
+}
+
+function isCodeLikeFieldLabel(label: string) {
+  return (
+    label === "Request ID" ||
+    label === "Operation" ||
+    label === "Thread" ||
+    label === "Turn" ||
+    label === "Item"
+  );
+}
+
+function detailFieldClass(label: string) {
+  return isCodeLikeFieldLabel(label)
+    ? "request-detail-field request-detail-field-code"
+    : "request-detail-field";
+}
+
+function renderDetailFieldValue(
+  field: { label: string; value: string; href?: string } | { label: string; value: string | null },
+) {
+  const isCodeLike = isCodeLikeFieldLabel(field.label);
+  const content = isCodeLike ? <code className="artifact-inline">{field.value}</code> : field.value;
+
+  if ("href" in field && field.href) {
+    return (
+      <a className="detail-link" href={field.href} rel="noreferrer" target="_blank">
+        {content}
+      </a>
+    );
+  }
+
+  return content;
 }
 
 function buildThreadFeedbackDescriptor({
@@ -704,7 +749,7 @@ export function ChatView({
       case "approve":
         return (
           <button
-            className="primary-link action-button compact-button"
+            className="approve-button action-button compact-button"
             disabled={isRespondingToRequest || selectedRequestDetail?.status !== "pending"}
             key={action.label}
             onClick={onApproveRequest}
@@ -716,7 +761,7 @@ export function ChatView({
       case "deny":
         return (
           <button
-            className="secondary-link action-button compact-button"
+            className="danger-button action-button compact-button"
             disabled={isRespondingToRequest || selectedRequestDetail?.status !== "pending"}
             key={action.label}
             onClick={onDenyRequest}
@@ -780,7 +825,9 @@ export function ChatView({
               <span className="status-badge warning">High priority</span>
             </div>
             <p>
-              <strong>{backgroundPriorityNotice.threadId}</strong>
+              <strong>
+                <code className="artifact-inline">{backgroundPriorityNotice.threadId}</code>
+              </strong>
               {" needs attention now."}
             </p>
             <p className="workspace-meta">Reason: {backgroundPriorityNotice.reason}</p>
@@ -973,7 +1020,7 @@ export function ChatView({
               <div className="workspace-meta-row">
                 <p className="eyebrow">{isStartingThread ? "Workspace input" : "Current thread"}</p>
                 {selectedThreadView ? (
-                  <span className="status-badge success">
+                  <span className={activityBadgeClass(selectedThreadView.current_activity.kind)}>
                     {selectedThreadView.current_activity.label}
                   </span>
                 ) : isOpeningSelectedThread ? (
@@ -1028,7 +1075,9 @@ export function ChatView({
             <div className="current-activity-card">
               <div className="workspace-meta-row">
                 <strong>Current activity</strong>
-                <span className="status-badge">
+                <span
+                  className={activityBadgeClass(selectedThreadView?.current_activity.kind ?? null)}
+                >
                   {selectedThreadView?.current_activity.label ??
                     (isOpeningSelectedThread
                       ? "Opening"
@@ -1066,7 +1115,7 @@ export function ChatView({
               onScroll={handleScrollRegionScroll}
               ref={scrollRegionRef}
             >
-              {hasSuppressedActivity ? (
+              {hasSuppressedActivity && latestTimelineRow ? (
                 <div className="latest-activity-cta">
                   <span className="workspace-meta">New activity is available below.</span>
                   <button
@@ -1092,7 +1141,10 @@ export function ChatView({
                   ) : null}
                   {selectedRequestDetail?.operation_summary ? (
                     <p className="workspace-meta">
-                      Operation: {selectedRequestDetail.operation_summary}
+                      Operation:{" "}
+                      <code className="artifact-inline">
+                        {selectedRequestDetail.operation_summary}
+                      </code>
                     </p>
                   ) : null}
                   <p className="workspace-meta">
@@ -1100,7 +1152,7 @@ export function ChatView({
                   </p>
                   <div className="workspace-actions">
                     <button
-                      className="primary-link action-button"
+                      className="approve-button action-button compact-button"
                       disabled={
                         isRespondingToRequest || selectedRequestDetail?.status !== "pending"
                       }
@@ -1110,7 +1162,7 @@ export function ChatView({
                       {isRespondingToRequest ? "Submitting..." : "Approve request"}
                     </button>
                     <button
-                      className="secondary-link action-button"
+                      className="danger-button action-button compact-button"
                       disabled={
                         isRespondingToRequest || selectedRequestDetail?.status !== "pending"
                       }
@@ -1121,7 +1173,7 @@ export function ChatView({
                     </button>
                     {selectedRequestDetail ? (
                       <button
-                        className="secondary-link action-button"
+                        className="secondary-link action-button compact-button"
                         onClick={() => setDetailSelection({ kind: "request_detail" })}
                         type="button"
                       >
@@ -1330,26 +1382,40 @@ export function ChatView({
                     <dd>{selectedRequestDetail.reason}</dd>
                   </div>
                   {selectedRequestDetail.operation_summary ? (
-                    <div>
+                    <div className={detailFieldClass("Operation")}>
                       <dt>Operation</dt>
-                      <dd>{selectedRequestDetail.operation_summary}</dd>
+                      <dd>
+                        <code className="artifact-inline">
+                          {selectedRequestDetail.operation_summary}
+                        </code>
+                      </dd>
                     </div>
                   ) : null}
                   <div>
                     <dt>Requested</dt>
                     <dd>{formatTimestamp(selectedRequestDetail.requested_at)}</dd>
                   </div>
-                  <div className="request-context-field">
+                  <div className={`request-context-field ${detailFieldClass("Thread")}`}>
                     <dt>Thread</dt>
-                    <dd>{selectedRequestDetail.thread_id}</dd>
+                    <dd>
+                      <code className="artifact-inline">{selectedRequestDetail.thread_id}</code>
+                    </dd>
                   </div>
-                  <div className="request-context-field">
+                  <div className={`request-context-field ${detailFieldClass("Turn")}`}>
                     <dt>Turn</dt>
-                    <dd>{selectedRequestDetail.turn_id ?? "Not available"}</dd>
+                    <dd>
+                      {selectedRequestDetail.turn_id ? (
+                        <code className="artifact-inline">{selectedRequestDetail.turn_id}</code>
+                      ) : (
+                        "Not available"
+                      )}
+                    </dd>
                   </div>
-                  <div className="request-context-field">
+                  <div className={`request-context-field ${detailFieldClass("Item")}`}>
                     <dt>Item</dt>
-                    <dd>{selectedRequestDetail.item_id}</dd>
+                    <dd>
+                      <code className="artifact-inline">{selectedRequestDetail.item_id}</code>
+                    </dd>
                   </div>
                   {selectedRequestDetail.decision ? (
                     <div>
@@ -1366,13 +1432,16 @@ export function ChatView({
                 </dl>
                 {selectedRequestDetail.operation_summary ? (
                   <p className="request-operation-summary">
-                    Operation: {selectedRequestDetail.operation_summary}
+                    Operation:{" "}
+                    <code className="artifact-inline">
+                      {selectedRequestDetail.operation_summary}
+                    </code>
                   </p>
                 ) : null}
                 {selectedRequestDetail.status === "pending" ? (
                   <div className="workspace-actions request-detail-actions">
                     <button
-                      className="primary-link action-button"
+                      className="approve-button action-button compact-button"
                       disabled={isRespondingToRequest}
                       onClick={onApproveRequest}
                       type="button"
@@ -1380,7 +1449,7 @@ export function ChatView({
                       {isRespondingToRequest ? "Submitting..." : "Approve request"}
                     </button>
                     <button
-                      className="secondary-link action-button"
+                      className="danger-button action-button compact-button"
                       disabled={isRespondingToRequest}
                       onClick={onDenyRequest}
                       type="button"
@@ -1401,11 +1470,22 @@ export function ChatView({
                 </p>
                 <p>{selectedTimelineItemDetail.summary}</p>
                 {selectedTimelineItemDetail.sections.map((section) => (
-                  <div className="request-operation-summary" key={section.title}>
+                  <div
+                    className={
+                      section.code
+                        ? "request-operation-summary detail-artifact-section"
+                        : "request-operation-summary detail-text-section"
+                    }
+                    key={section.title}
+                  >
                     <strong>{section.title}</strong>
-                    <ul className="detail-list">
+                    <ul
+                      className={section.code ? "detail-list detail-artifact-list" : "detail-list"}
+                    >
                       {section.items.map((entry) => (
-                        <li key={entry}>{section.code ? <code>{entry}</code> : entry}</li>
+                        <li key={entry}>
+                          {section.code ? <code className="artifact-inline">{entry}</code> : entry}
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -1413,17 +1493,12 @@ export function ChatView({
                 {selectedTimelineItemDetail.fields.length > 0 ? (
                   <dl className="request-detail-list">
                     {selectedTimelineItemDetail.fields.map((field) => (
-                      <div key={`${field.label}:${field.value}`}>
+                      <div
+                        className={detailFieldClass(field.label)}
+                        key={`${field.label}:${field.value}`}
+                      >
                         <dt>{field.label}</dt>
-                        <dd>
-                          {field.href ? (
-                            <a href={field.href} rel="noreferrer" target="_blank">
-                              {field.value}
-                            </a>
-                          ) : (
-                            field.value
-                          )}
-                        </dd>
+                        <dd>{renderDetailFieldValue(field)}</dd>
                       </div>
                     ))}
                   </dl>
