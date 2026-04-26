@@ -1,3 +1,4 @@
+/* Foundation / Shared Primitives */
 :root {
   color-scheme: light;
   --page-bg: #eef2f1;
@@ -292,6 +293,7 @@ textarea {
   cursor: pointer;
 }
 
+/* App Shell */
 .chat-shell {
   display: grid;
   gap: 12px;
@@ -354,6 +356,7 @@ textarea {
   min-width: 0;
 }
 
+/* Navigation */
 .thread-navigation {
   display: none;
 }
@@ -362,6 +365,7 @@ textarea {
   display: grid;
 }
 
+/* Thread View */
 .thread-view-card {
   display: flex;
   flex-direction: column;
@@ -613,6 +617,7 @@ textarea {
   box-shadow: inset 3px 0 0 rgba(15, 95, 93, 0.72);
 }
 
+/* Request / Feedback */
 .request-detail-card {
   display: grid;
   gap: 12px;
@@ -676,6 +681,7 @@ textarea {
   padding: 10px 12px;
 }
 
+/* Timeline */
 .timeline-section {
   display: grid;
   gap: 10px;
@@ -684,6 +690,7 @@ textarea {
   align-content: start;
 }
 
+/* Composer */
 .chat-composer {
   display: grid;
   gap: 12px;
@@ -849,6 +856,7 @@ textarea {
   font-weight: 600;
 }
 
+/* Detail Surface */
 .thread-detail-surface {
   align-content: start;
 }
@@ -987,6 +995,7 @@ textarea {
   word-break: break-word;
 }
 
+/* Utilities */
 .field-hint,
 .status-message,
 .error-banner,
@@ -1012,7 +1021,9 @@ textarea {
   font-weight: 700;
 }
 
+/* Mobile Responsive Rules */
 @media (max-width: 719px) {
+  /* Foundation / Shared Primitives */
   html,
   body {
     height: 100%;
@@ -1025,6 +1036,7 @@ textarea {
       linear-gradient(180deg, #f7fbfb 0%, #e7efef 100%);
   }
 
+  /* App Shell */
   .chat-shell {
     height: 100dvh;
     gap: 10px;
@@ -1053,6 +1065,7 @@ textarea {
     overflow: hidden;
   }
 
+  /* Navigation + Detail Surface Overlays */
   .thread-navigation.open,
   .thread-detail-surface {
     position: fixed;
@@ -1062,6 +1075,7 @@ textarea {
     max-width: calc(100vw - 24px);
   }
 
+  /* Detail Surface */
   .thread-detail-surface {
     inset: auto 10px 10px;
     max-height: min(82vh, 650px);
@@ -1083,6 +1097,7 @@ textarea {
     padding: 16px;
   }
 
+  /* Thread View */
   .thread-view-card {
     display: grid;
     gap: 8px;
@@ -1151,6 +1166,7 @@ textarea {
     width: 100%;
   }
 
+  /* Request / Feedback */
   .thread-feedback-card,
   .request-detail-card,
   .chat-composer {
@@ -1195,6 +1211,7 @@ textarea {
     grid-column: auto;
   }
 
+  /* Timeline */
   .latest-activity-cta {
     align-items: stretch;
     border-radius: 16px;
@@ -1241,6 +1258,7 @@ textarea {
     flex-shrink: 0;
   }
 
+  /* Composer */
   .chat-textarea {
     min-height: 56px;
     border-radius: 14px;
@@ -1258,6 +1276,7 @@ textarea {
     line-height: 1.3;
   }
 
+  /* Foundation / Shared Primitives */
   .primary-link,
   .secondary-link,
   .approve-button,
@@ -1271,11 +1290,13 @@ textarea {
     text-align: center;
   }
 
+  /* Navigation */
   .thread-filter-chip {
     justify-content: space-between;
     width: calc(50% - 4px);
   }
 
+  /* Utilities */
   .thread-feedback-actions,
   .pending-request-card .workspace-actions,
   .request-detail-actions {
@@ -1283,13 +1304,16 @@ textarea {
   }
 }
 
+/* Desktop Responsive Rules */
 @media (min-width: 720px) {
+  /* Foundation / Shared Primitives */
   body {
     background:
       linear-gradient(90deg, rgba(15, 95, 93, 0.05), transparent 24%),
       linear-gradient(180deg, #f7fbfb 0%, #edf2f2 100%);
   }
 
+  /* App Shell */
   .chat-shell {
     gap: 10px;
     height: 100vh;
@@ -1306,6 +1330,7 @@ textarea {
     font-size: 1.35rem;
   }
 
+  /* Navigation */
   .navigation-toggle {
     display: none;
   }
@@ -1371,6 +1396,7 @@ textarea {
     padding: 10px;
   }
 
+  /* Thread View + Detail Surface */
   .thread-view-card,
   .thread-detail-surface {
     background: rgba(252, 254, 254, 0.98);
@@ -1386,6 +1412,7 @@ textarea {
     border-left: 1px solid rgba(22, 47, 52, 0.1);
   }
 
+  /* Thread View, Composer, Timeline, Request / Feedback */
   .chat-composer,
   .request-detail-card,
   .thread-summary-card,
@@ -1417,15 +1444,18 @@ textarea {
     background: rgba(237, 244, 245, 0.92);
   }
 
+  /* Composer */
   .chat-composer {
     background: rgba(248, 252, 252, 0.96);
   }
 
+  /* Request / Feedback */
   .request-detail-card {
     border-color: rgba(185, 98, 31, 0.28);
     background: rgba(255, 250, 245, 0.96);
   }
 
+  /* Timeline */
   .timeline-turn-group {
     border-left-color: rgba(15, 94, 93, 0.28);
   }
@@ -1442,6 +1472,7 @@ textarea {
     grid-column: 1 / -1;
   }
 
+  /* Detail Surface */
   .thread-detail-surface {
     position: sticky;
     top: 22px;
