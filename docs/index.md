@@ -20,6 +20,7 @@ Read this file first when you need to locate maintained knowledge across source-
 - [docs/specs/codex_webui_common_spec_v0_9.md](./specs/codex_webui_common_spec_v0_9.md): shared API and behavior rules
 - [docs/specs/codex_webui_internal_api_v0_9.md](./specs/codex_webui_internal_api_v0_9.md): maintained internal API contract
 - [docs/specs/codex_webui_public_api_v0_9.md](./specs/codex_webui_public_api_v0_9.md): maintained public API contract
+- [docs/specs/codex_webui_shared_contract_strategy_v0_1.md](./specs/codex_webui_shared_contract_strategy_v0_1.md): maintained near-term decision for reducing runtime/BFF contract drift without root workspace, shared package, generator, or lockfile churn
 - [docs/specs/codex_webui_ui_layout_spec_v0_9.md](./specs/codex_webui_ui_layout_spec_v0_9.md): maintained thread-first desktop/mobile UI layout and interaction structure
 - [docs/validation/app_server_behavior_validation_plan_checklist.md](./validation/app_server_behavior_validation_plan_checklist.md): app-server behavior validation plan
 - [docs/validation/codex_webui_ux_renewal_validation_gates_v0_1.md](./validation/codex_webui_ux_renewal_validation_gates_v0_1.md): maintained UX renewal browser, regression, desktop-inspection, and mobile-reachability validation gates

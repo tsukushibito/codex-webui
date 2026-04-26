@@ -1,3 +1,29 @@
+import { z } from "zod";
+
+export const runtimeThreadSummarySchema = z.object({
+  thread_id: z.string(),
+  workspace_id: z.string(),
+  title: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+  native_status: z.object({
+    thread_status: z.string(),
+    active_flags: z.array(z.string()),
+    latest_turn_status: z.string().nullable(),
+  }),
+  derived_hints: z.object({
+    accepting_user_input: z.boolean(),
+    has_pending_request: z.boolean(),
+    blocked_reason: z.string().nullable(),
+  }),
+});
+
+export const runtimeThreadListResponseSchema = z.object({
+  items: z.array(runtimeThreadSummarySchema),
+  next_cursor: z.string().nullable(),
+  has_more: z.boolean(),
+});
+
 export interface RuntimeWorkspaceSummary {
   workspace_id: string;
   workspace_name: string;
@@ -13,23 +39,8 @@ export interface RuntimeWorkspaceSummary {
   pending_approval_count: number;
 }
 
-export interface RuntimeThreadSummary {
-  thread_id: string;
-  workspace_id: string;
-  title: string;
-  created_at: string;
-  updated_at: string;
-  native_status: {
-    thread_status: string;
-    active_flags: string[];
-    latest_turn_status: string | null;
-  };
-  derived_hints: {
-    accepting_user_input: boolean;
-    has_pending_request: boolean;
-    blocked_reason: string | null;
-  };
-}
+export type RuntimeThreadSummary = z.infer<typeof runtimeThreadSummarySchema>;
+export type RuntimeThreadListResponse = z.infer<typeof runtimeThreadListResponseSchema>;
 
 export interface RuntimePendingRequestSummary {
   request_id: string;

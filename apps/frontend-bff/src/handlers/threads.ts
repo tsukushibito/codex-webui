@@ -10,10 +10,12 @@ import type {
   ListResponse,
   RuntimeThreadInputAcceptedResponse,
   RuntimeThreadInterruptResponse,
+  RuntimeThreadListResponse,
   RuntimeThreadSummary,
   RuntimeThreadViewHelper,
   RuntimeTimelineItem,
 } from "../runtime-types";
+import { runtimeThreadListResponseSchema } from "../runtime-types";
 import {
   forwardSearch,
   jsonResponse,
@@ -24,7 +26,7 @@ import {
 
 export async function listThreads(request: Request, workspaceId: string) {
   try {
-    const result = await runtimeClient.requestJson<ListResponse<RuntimeThreadSummary>>(
+    const result = await runtimeClient.requestJson<RuntimeThreadListResponse>(
       `/api/v1/workspaces/${workspaceId}/threads${forwardSearch(request)}`,
     );
 
@@ -34,7 +36,10 @@ export async function listThreads(request: Request, workspaceId: string) {
       });
     }
 
-    return jsonResponse(result.status, mapThreadList(result.body));
+    return jsonResponse(
+      result.status,
+      mapThreadList(runtimeThreadListResponseSchema.parse(result.body)),
+    );
   } catch (error) {
     return toErrorResponse(error);
   }
