@@ -69,10 +69,11 @@ Each active task package `README.md` must include at least the following section
 
 ## Current Active Tasks
 
-- [issue-222-ui-gap-validation](./issue-222-ui-gap-validation/README.md)
+- `None`
 
 ## Archived Task Packages
 
+- [issue-222-ui-gap-validation](./archive/issue-222-ui-gap-validation/README.md)
 - [issue-221-visual-language-polish](./archive/issue-221-visual-language-polish/README.md)
 - [issue-220-mobile-thread-density](./archive/issue-220-mobile-thread-density/README.md)
 - [issue-219-contextual-details](./archive/issue-219-contextual-details/README.md)

@@ -49,6 +49,14 @@
 - Active branch: `issue-222-ui-gap-validation`
 - Active worktree: `.worktrees/issue-222-ui-gap-validation`
 - Notes: Added desktop/mobile Playwright validation for the post-approval follow-up state after actual approve/deny interactions. The spec verifies latest resolved request visibility, stale pending controls removal, restored composer sendability, request-detail access without response actions, timeline resolution evidence, and mobile reachability without horizontal overflow. This is the final child issue before #214 can be considered for closure.
+- Completion retrospective:
+  - Completion boundary: package archive after local completion, evaluator approval, and pre-push validation.
+  - Contract check: Issue #222 acceptance criteria are satisfied locally; Issue close still requires PR merge to `main`, parent checkout sync, worktree cleanup, and GitHub tracking update.
+  - What worked: the final validation slice stayed production-code-free and directly covered post-approval continuation on desktop and mobile.
+  - Workflow problems: worktree-local dependency symlinks needed correction before validation could run; no repo-tracked change was required.
+  - Improvements to adopt: gap-follow-up validation should prefer actual UI interaction from pending to resolved states rather than loading already-resolved fixtures.
+  - Skill candidates or skill updates: none required.
+  - Follow-up updates: after #222 reaches `main`, parent #214 can be checked for closure because all child issues should be complete.
 
 ## Archive conditions
 
