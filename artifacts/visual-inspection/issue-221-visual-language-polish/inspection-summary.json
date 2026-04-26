@@ -1,0 +1,16 @@
+{
+  "desktop": {
+    "file": "/workspace/.worktrees/issue-221-visual-language-polish/artifacts/visual-inspection/issue-221-visual-language-polish/desktop-selected-thread-detail.png",
+    "noHorizontalScroll": true,
+    "overflowing": [],
+    "detailVisible": true,
+    "approvalButtonsVisible": true
+  },
+  "mobile": {
+    "file": "/workspace/.worktrees/issue-221-visual-language-polish/artifacts/visual-inspection/issue-221-visual-language-polish/mobile-selected-pending-approval.png",
+    "noHorizontalScroll": true,
+    "overflowing": [],
+    "detailVisible": false,
+    "approvalButtonsVisible": true
+  }
+}
