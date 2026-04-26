@@ -34,17 +34,21 @@
 
 ## Artifacts / evidence
 
-- Planned validation:
-  - `npm run check`
-  - `node ./node_modules/typescript/bin/tsc --noEmit --pretty false`
-  - focused Playwright/Vitest coverage for the new validation slice
+- Sprint validation:
+  - `npm run check`: passed
+  - `node ./node_modules/typescript/bin/tsc --noEmit --pretty false`: passed
+  - `npm run test:e2e -- e2e/issue-222-approval-resolution-followup.spec.ts --project=desktop-chromium --reporter=line`: passed, 2 tests
+  - `npm run test:e2e -- e2e/issue-222-approval-resolution-followup.spec.ts --project=mobile-chromium --reporter=line`: passed, 2 tests
+- New validation coverage:
+  - `apps/frontend-bff/e2e/issue-222-approval-resolution-followup.spec.ts`
+- Sprint evaluator: approved
 
 ## Status / handoff notes
 
-- Status: `in progress`
+- Status: `locally complete pending pre-push validation`
 - Active branch: `issue-222-ui-gap-validation`
 - Active worktree: `.worktrees/issue-222-ui-gap-validation`
-- Notes: Started from `origin/main` after #221 reached main. This is the final child issue before #214 can be considered for closure.
+- Notes: Added desktop/mobile Playwright validation for the post-approval follow-up state after actual approve/deny interactions. The spec verifies latest resolved request visibility, stale pending controls removal, restored composer sendability, request-detail access without response actions, timeline resolution evidence, and mobile reachability without horizontal overflow. This is the final child issue before #214 can be considered for closure.
 
 ## Archive conditions
 
