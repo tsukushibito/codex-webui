@@ -271,6 +271,18 @@ describe("ChatView", () => {
                   content: "Please explain the diff.",
                 },
               },
+              {
+                timeline_item_id: "evt_file_001",
+                thread_id: "thread_001",
+                turn_id: "turn_001",
+                item_id: "item_file_001",
+                sequence: 2,
+                occurred_at: "2026-03-27T05:15:00Z",
+                kind: "file.changed",
+                payload: {
+                  summary: "Updated apps/frontend-bff/src/chat-view.tsx",
+                },
+              },
             ],
             next_cursor: null,
             has_more: false,
@@ -282,7 +294,7 @@ describe("ChatView", () => {
             event_id: "evt_stream_001",
             thread_id: "thread_001",
             event_type: "approval.requested",
-            sequence: 2,
+            sequence: 3,
             occurred_at: "2026-03-27T05:18:00Z",
             payload: {
               summary: "Run git push",
@@ -293,7 +305,7 @@ describe("ChatView", () => {
             event_id: "evt_stream_002",
             thread_id: "thread_001",
             event_type: "session.status_changed",
-            sequence: 3,
+            sequence: 4,
             occurred_at: "2026-03-27T05:19:00Z",
             payload: {
               summary: "Tool output received",
@@ -351,11 +363,13 @@ describe("ChatView", () => {
     expect(markup).toContain("Operation: git push origin main");
     expect(markup).toContain("Interrupt thread");
     expect(markup).toContain("Please explain the diff.");
+    expect(markup).toContain("Updated apps/frontend-bff/src/chat-view.tsx");
     expect(markup).toContain("Streaming update");
     expect(markup).toContain("Request needs attention");
     expect(markup).toContain("timeline-row-prominent");
     expect(markup).toContain("Status update");
     expect(markup).toContain("timeline-row-compact");
+    expect(markup.match(/Timeline item detail/g) ?? []).toHaveLength(1);
     expect(markup).not.toContain("approval.requested");
     expect(markup).not.toContain("session.status_changed");
     expect(markup.match(/<textarea/g) ?? []).toHaveLength(1);

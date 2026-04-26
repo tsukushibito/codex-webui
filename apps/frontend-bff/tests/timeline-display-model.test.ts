@@ -130,9 +130,192 @@ describe("timeline display model", () => {
     const convergedRows = rows(afterRest);
     expect(convergedRows).toHaveLength(1);
     expect(convergedRows[0]).toMatchObject({
-      id: "timeline:timeline_completed",
+      id: "timeline-assistant:message_001",
       content: "Final answer.",
     });
+  });
+
+  it("prefers stream completion while REST has only stored assistant deltas", () => {
+    const model = buildTimelineDisplayModel({
+      timelineItems: [
+        timelineItem({
+          timeline_item_id: "assistant_delta_001",
+          item_id: "item_assistant_001",
+          sequence: 1,
+          kind: "message.assistant.delta",
+          payload: {
+            message_id: "message_001",
+            delta: "Partial",
+          },
+        }),
+      ],
+      streamEvents: [
+        streamEvent({
+          event_id: "completed_001",
+          event_type: "message.assistant.completed",
+          sequence: 2,
+          payload: {
+            message_id: "message_001",
+            item_id: "item_assistant_001",
+            content: "Final answer.",
+          },
+        }),
+      ],
+      draftAssistantMessages: {},
+    });
+
+    expect(rows(model)).toEqual([
+      expect.objectContaining({
+        id: "timeline-assistant:message_001",
+        content: "Final answer.",
+        isLive: false,
+      }),
+    ]);
+  });
+
+  it("suppresses matching live stream deltas when REST assistant deltas already exist", () => {
+    const model = buildTimelineDisplayModel({
+      timelineItems: [
+        timelineItem({
+          timeline_item_id: "assistant_delta_001",
+          item_id: "item_assistant_001",
+          sequence: 1,
+          kind: "message.assistant.delta",
+          payload: {
+            message_id: "message_001",
+            delta: "Partial",
+          },
+        }),
+      ],
+      streamEvents: [
+        streamEvent({
+          event_id: "delta_002",
+          event_type: "message.assistant.delta",
+          sequence: 2,
+          payload: {
+            message_id: "message_001",
+            item_id: "item_assistant_001",
+            delta: "Partial",
+          },
+        }),
+      ],
+      draftAssistantMessages: {},
+    });
+
+    expect(rows(model)).toEqual([
+      expect.objectContaining({
+        id: "timeline-assistant:message_001",
+        content: "Partial...",
+        isLive: true,
+        showDetailButton: false,
+      }),
+    ]);
+  });
+
+  it("collapses stored assistant deltas and completion into one logical assistant row", () => {
+    const model = buildTimelineDisplayModel({
+      timelineItems: [
+        timelineItem({
+          timeline_item_id: "assistant_delta_001",
+          item_id: "item_assistant_001",
+          turn_id: "turn_001",
+          sequence: 2,
+          kind: "message.assistant.delta",
+          payload: {
+            message_id: "message_001",
+            delta: "Hi ",
+          },
+        }),
+        timelineItem({
+          timeline_item_id: "assistant_delta_002",
+          item_id: "item_assistant_001",
+          turn_id: "turn_001",
+          sequence: 3,
+          kind: "message.assistant.delta",
+          payload: {
+            message_id: "message_001",
+            delta: "there",
+          },
+        }),
+        timelineItem({
+          timeline_item_id: "assistant_completed_001",
+          item_id: "item_assistant_001",
+          turn_id: "turn_001",
+          sequence: 4,
+          kind: "message.assistant.completed",
+          payload: {
+            message_id: "message_001",
+            content: "Hi there",
+          },
+        }),
+      ],
+      streamEvents: [],
+      draftAssistantMessages: {},
+    });
+
+    expect(rows(model)).toEqual([
+      expect.objectContaining({
+        id: "timeline-assistant:message_001",
+        label: "Codex",
+        content: "Hi there",
+        role: "assistant",
+        isLive: false,
+        showDetailButton: false,
+      }),
+    ]);
+  });
+
+  it("collapses mapped public REST assistant rows without message_id or item_id into one final row", () => {
+    const model = buildTimelineDisplayModel({
+      timelineItems: [
+        timelineItem({
+          timeline_item_id: "assistant_delta_001",
+          item_id: null,
+          turn_id: null,
+          sequence: 2,
+          kind: "message.assistant.delta",
+          payload: {
+            summary: "assistant streaming",
+            content: "Hi ",
+          },
+        }),
+        timelineItem({
+          timeline_item_id: "assistant_delta_002",
+          item_id: null,
+          turn_id: null,
+          sequence: 3,
+          kind: "message.assistant.delta",
+          payload: {
+            summary: "assistant streaming",
+            content: "there",
+          },
+        }),
+        timelineItem({
+          timeline_item_id: "assistant_completed_001",
+          item_id: null,
+          turn_id: null,
+          sequence: 4,
+          kind: "message.assistant.completed",
+          payload: {
+            summary: "assistant completed",
+            content: "Hi there",
+          },
+        }),
+      ],
+      streamEvents: [],
+      draftAssistantMessages: {},
+    });
+
+    expect(rows(model)).toEqual([
+      expect.objectContaining({
+        id: "timeline-assistant:assistant_delta_001",
+        label: "Codex",
+        content: "Hi there",
+        role: "assistant",
+        isLive: false,
+        showDetailButton: false,
+      }),
+    ]);
   });
 
   it("groups adjacent timeline rows by turn_id without grouping rows that lack turn_id", () => {
@@ -170,14 +353,12 @@ describe("timeline display model", () => {
       draftAssistantMessages: {},
     });
 
-    expect(model.groups).toHaveLength(2);
+    expect(model.groups).toHaveLength(1);
     expect(model.groups[0]?.turnId).toBe("turn_001");
     expect(model.groups[0]?.rows.map((row) => row.id)).toEqual([
       "timeline:user_001",
-      "timeline:assistant_001",
+      "timeline-assistant:assistant_001",
     ]);
-    expect(model.groups[1]?.turnId).toBeNull();
-    expect(model.groups[1]?.rows).toHaveLength(1);
   });
 
   it("classifies primary messages, prominent approval/error/file rows, and compact operational rows", () => {
@@ -191,7 +372,7 @@ describe("timeline display model", () => {
     expect(classifyTimelineDensity("command.output")).toBe("compact");
   });
 
-  it("renders low-priority stream events as compact rows instead of separate raw event cards", () => {
+  it("hides generic status transitions from the rendered timeline", () => {
     const model = buildTimelineDisplayModel({
       timelineItems: [],
       streamEvents: [
@@ -199,6 +380,178 @@ describe("timeline display model", () => {
           event_id: "status_001",
           event_type: "session.status_changed",
           sequence: 4,
+          payload: {
+            summary: "thread status changed",
+          },
+        }),
+      ],
+      draftAssistantMessages: {},
+    });
+
+    expect(rows(model)).toEqual([]);
+  });
+
+  it("keeps failed status evidence visible as a compact row without detail action", () => {
+    const model = buildTimelineDisplayModel({
+      timelineItems: [],
+      streamEvents: [
+        streamEvent({
+          event_id: "status_failed_001",
+          event_type: "session.status_changed",
+          sequence: 4,
+          payload: {
+            summary: "failed",
+            status: "failed",
+          },
+        }),
+      ],
+      draftAssistantMessages: {},
+    });
+
+    expect(rows(model)).toEqual([
+      expect.objectContaining({
+        id: "stream:status_failed_001",
+        label: "Status update",
+        content: "failed",
+        density: "compact",
+        role: "event",
+        showDetailButton: false,
+      }),
+    ]);
+  });
+
+  it("keeps recovery pending status evidence visible as a compact row without detail action", () => {
+    const model = buildTimelineDisplayModel({
+      timelineItems: [],
+      streamEvents: [
+        streamEvent({
+          event_id: "status_recovery_001",
+          event_type: "session.status_changed",
+          sequence: 5,
+          payload: {
+            summary: "recovery pending",
+            status: "recovery_pending",
+          },
+        }),
+      ],
+      draftAssistantMessages: {},
+    });
+
+    expect(rows(model)).toEqual([
+      expect.objectContaining({
+        id: "stream:status_recovery_001",
+        label: "Status update",
+        content: "recovery pending",
+        density: "compact",
+        role: "event",
+        showDetailButton: false,
+      }),
+    ]);
+  });
+
+  it("keeps canonical to_status failed evidence visible without summary or status", () => {
+    const model = buildTimelineDisplayModel({
+      timelineItems: [],
+      streamEvents: [
+        streamEvent({
+          event_id: "status_to_failed_001",
+          event_type: "session.status_changed",
+          sequence: 6,
+          payload: {
+            from_status: "running",
+            to_status: "failed",
+          },
+        }),
+      ],
+      draftAssistantMessages: {},
+    });
+
+    expect(rows(model)).toEqual([
+      expect.objectContaining({
+        id: "stream:status_to_failed_001",
+        label: "Status update",
+        content: "failed",
+        density: "compact",
+        role: "event",
+        showDetailButton: false,
+      }),
+    ]);
+  });
+
+  it("keeps canonical to_status recovery pending evidence visible without summary or status", () => {
+    const model = buildTimelineDisplayModel({
+      timelineItems: [],
+      streamEvents: [
+        streamEvent({
+          event_id: "status_to_recovery_001",
+          event_type: "session.status_changed",
+          sequence: 7,
+          payload: {
+            from_status: "failed",
+            to_status: "recovery_pending",
+          },
+        }),
+      ],
+      draftAssistantMessages: {},
+    });
+
+    expect(rows(model)).toEqual([
+      expect.objectContaining({
+        id: "stream:status_to_recovery_001",
+        label: "Status update",
+        content: "recovery pending",
+        density: "compact",
+        role: "event",
+        showDetailButton: false,
+      }),
+    ]);
+  });
+
+  it("hides routine canonical to_status transitions without summary or status", () => {
+    const model = buildTimelineDisplayModel({
+      timelineItems: [],
+      streamEvents: [
+        streamEvent({
+          event_id: "status_to_waiting_001",
+          event_type: "session.status_changed",
+          sequence: 8,
+          payload: {
+            from_status: "running",
+            to_status: "waiting_input",
+          },
+        }),
+      ],
+      draftAssistantMessages: {},
+    });
+
+    expect(rows(model)).toEqual([]);
+  });
+
+  it("keeps meaningful operational rows visible while hiding low-value detail actions", () => {
+    const model = buildTimelineDisplayModel({
+      timelineItems: [
+        timelineItem({
+          timeline_item_id: "user_001",
+          sequence: 1,
+          kind: "message.user",
+          payload: {
+            content: "Run the checks.",
+          },
+        }),
+        timelineItem({
+          timeline_item_id: "file_001",
+          sequence: 2,
+          kind: "file.changed",
+          payload: {
+            summary: "Updated src/app.ts",
+          },
+        }),
+      ],
+      streamEvents: [
+        streamEvent({
+          event_id: "status_001",
+          event_type: "session.status_changed",
+          sequence: 3,
           payload: {
             summary: "Running tool",
           },
@@ -209,10 +562,21 @@ describe("timeline display model", () => {
 
     expect(rows(model)).toEqual([
       expect.objectContaining({
+        id: "timeline:user_001",
+        label: "You",
+        showDetailButton: false,
+      }),
+      expect.objectContaining({
+        id: "timeline:file_001",
+        label: "File update",
+        showDetailButton: true,
+      }),
+      expect.objectContaining({
         id: "stream:status_001",
         label: "Status update",
         content: "Running tool",
         density: "compact",
+        showDetailButton: false,
       }),
     ]);
   });

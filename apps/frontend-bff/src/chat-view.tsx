@@ -712,7 +712,7 @@ export function ChatView({
                             </span>
                           </div>
                           <p>{row.content}</p>
-                          {row.timelineItemId ? (
+                          {row.showDetailButton && row.timelineItemId ? (
                             <button
                               className="secondary-link action-button inline-detail-button"
                               onClick={() =>
