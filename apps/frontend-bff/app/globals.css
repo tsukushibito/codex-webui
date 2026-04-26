@@ -694,7 +694,7 @@ textarea {
 
 .thread-view-scroll-region {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   min-height: 0;
   overflow: auto;
   padding-bottom: 12px;
@@ -717,7 +717,7 @@ textarea {
 
 .timeline-section {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
   min-height: 0;
   align-content: start;
@@ -775,13 +775,13 @@ textarea {
 .timeline-turn-group,
 .timeline-ungrouped-item {
   display: grid;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
 }
 
 .timeline-turn-group {
   border-left: 2px solid rgba(15, 95, 93, 0.22);
-  padding-left: 12px;
+  padding-left: 10px;
 }
 
 .timeline-turn-label {
@@ -805,12 +805,12 @@ textarea {
 }
 
 .timeline-row {
-  padding: 12px 14px;
+  padding: 10px 12px;
 }
 
 .timeline-row-primary {
   gap: 10px;
-  padding: 16px;
+  padding: 12px 14px;
 }
 
 .timeline-row-primary p {
@@ -827,7 +827,7 @@ textarea {
   gap: 5px;
   border-color: rgba(22, 47, 52, 0.07);
   background: rgba(244, 248, 249, 0.92);
-  padding: 9px 12px;
+  padding: 7px 10px;
 }
 
 .timeline-row-compact p,
@@ -843,6 +843,24 @@ textarea {
 
 .timeline-row-assistant {
   border-color: rgba(22, 47, 52, 0.12);
+}
+
+.timeline-row-meta {
+  gap: 8px;
+}
+
+.timeline-row-content {
+  white-space: pre-wrap;
+}
+
+.timeline-row-folded .timeline-row-content {
+  color: var(--text-muted);
+}
+
+.timeline-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .chat-message.user {
