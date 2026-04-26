@@ -29,6 +29,26 @@ After the heading, keep the body concise:
 
 ## Entries
 
+## [2026-04-26] ingest | shared contract strategy decision
+
+Source:
+
+- Issue `#259`
+- repo-wide refactor review on runtime/BFF contract drift
+- current two-package app layout without a root workspace or `packages/` directory
+
+Updated:
+
+- `docs/specs/codex_webui_shared_contract_strategy_v0_1.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- recorded the near-term decision to defer a physical shared package or generator
+- chose maintained v0.9 API specs plus narrow BFF-local runtime-boundary schemas/tests as the current drift guard
+- documented `GET /api/v1/workspaces/{workspace_id}/threads` as the initial executable contract pilot
+
 ## [2026-04-27] ingest | Issue #253 legacy browser entry redirects
 
 Source:
