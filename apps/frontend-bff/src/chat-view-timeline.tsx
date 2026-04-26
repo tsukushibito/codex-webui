@@ -1,0 +1,136 @@
+import type { TimelineDisplayGroup, TimelineDisplayRow } from "./timeline-display-model";
+
+export interface ChatViewTimelineProps {
+  isLoadingThread: boolean;
+  selectedThreadId: string | null;
+  hasLoadedThreadView: boolean;
+  groups: TimelineDisplayGroup[];
+  expandedRowIds: ReadonlySet<string>;
+  formatTimestamp: (value: string | null) => string;
+  onToggleRowExpansion: (rowId: string) => void;
+  onOpenDetail: (timelineItemId: string) => void;
+}
+
+function timelineRowClass(row: TimelineDisplayRow) {
+  return `timeline-row timeline-row-${row.density} timeline-row-${row.role}`;
+}
+
+const TIMELINE_PREVIEW_LINE_LIMIT = 8;
+const TIMELINE_PREVIEW_CHARACTER_LIMIT = 520;
+
+function timelineContentPreview(content: string) {
+  const lines = content.split(/\r?\n/);
+  const lineFolded = lines.length > TIMELINE_PREVIEW_LINE_LIMIT;
+  const linePreview = lineFolded ? lines.slice(0, TIMELINE_PREVIEW_LINE_LIMIT).join("\n") : content;
+
+  if (linePreview.length <= TIMELINE_PREVIEW_CHARACTER_LIMIT) {
+    return {
+      isFoldable: lineFolded,
+      preview: lineFolded ? `${linePreview.trimEnd()}\n...` : content,
+    };
+  }
+
+  const clipped = linePreview.slice(0, TIMELINE_PREVIEW_CHARACTER_LIMIT);
+  const lastWhitespace = clipped.search(/\s+\S*$/);
+  const preview =
+    lastWhitespace > TIMELINE_PREVIEW_CHARACTER_LIMIT * 0.72
+      ? clipped.slice(0, lastWhitespace)
+      : clipped;
+
+  return {
+    isFoldable: true,
+    preview: `${preview.trimEnd()}...`,
+  };
+}
+
+export function ChatViewTimeline({
+  isLoadingThread,
+  selectedThreadId,
+  hasLoadedThreadView,
+  groups,
+  expandedRowIds,
+  formatTimestamp,
+  onToggleRowExpansion,
+  onOpenDetail,
+}: ChatViewTimelineProps) {
+  return (
+    <section aria-label="Timeline" className="timeline-section">
+      {isLoadingThread ? (
+        <p className="workspace-status">
+          {selectedThreadId
+            ? "Opening this thread and restoring its latest timeline..."
+            : "Preparing thread view..."}
+        </p>
+      ) : null}
+
+      <div className="chat-message-list">
+        {!isLoadingThread && hasLoadedThreadView && groups.length === 0 ? (
+          <p className="empty-state">
+            No timeline items yet. Start the thread or send follow-up input to continue.
+          </p>
+        ) : null}
+
+        {groups.map((group) => (
+          <section
+            className={group.turnId ? "timeline-turn-group" : "timeline-ungrouped-item"}
+            data-turn-id={group.turnId ?? undefined}
+            key={group.id}
+          >
+            {group.turnId ? (
+              <div className="timeline-turn-label">
+                <span>Turn</span>
+                <strong>{group.turnId}</strong>
+              </div>
+            ) : null}
+            {group.rows.map((row) => {
+              const contentPreview = timelineContentPreview(row.content);
+              const isExpanded = expandedRowIds.has(row.id);
+              const displayedContent =
+                contentPreview.isFoldable && !isExpanded ? contentPreview.preview : row.content;
+
+              return (
+                <article
+                  className={`${timelineRowClass(row)}${
+                    contentPreview.isFoldable && !isExpanded ? " timeline-row-folded" : ""
+                  }`}
+                  key={row.id}
+                >
+                  <div className="workspace-meta-row timeline-row-meta">
+                    <strong>{row.label}</strong>
+                    <span className="workspace-meta">
+                      {row.isLive ? "Live" : formatTimestamp(row.occurredAt)}
+                    </span>
+                  </div>
+                  <p className="timeline-row-content">{displayedContent}</p>
+                  {contentPreview.isFoldable || row.showDetailButton ? (
+                    <div className="timeline-row-actions">
+                      {contentPreview.isFoldable ? (
+                        <button
+                          aria-expanded={isExpanded}
+                          className="secondary-link action-button inline-detail-button"
+                          onClick={() => onToggleRowExpansion(row.id)}
+                          type="button"
+                        >
+                          {isExpanded ? "Show less" : "Show more"}
+                        </button>
+                      ) : null}
+                      {row.showDetailButton && row.timelineItemId ? (
+                        <button
+                          className="secondary-link action-button inline-detail-button"
+                          onClick={() => onOpenDetail(row.timelineItemId ?? "")}
+                          type="button"
+                        >
+                          {row.detailActionLabel ?? "Inspect details"}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </section>
+        ))}
+      </div>
+    </section>
+  );
+}

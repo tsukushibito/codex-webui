@@ -73,6 +73,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Archived Task Packages
 
+- [issue-251-chat-view-components](./archive/issue-251-chat-view-components/README.md)
 - [issue-250-chat-page-hooks](./archive/issue-250-chat-page-hooks/README.md)
 - [issue-249-bff-route-boilerplate](./archive/issue-249-bff-route-boilerplate/README.md)
 - [issue-248-bff-mapping-boundaries](./archive/issue-248-bff-mapping-boundaries/README.md)

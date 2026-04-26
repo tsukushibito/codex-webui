@@ -2,13 +2,27 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import type { PublicWorkspaceSummary } from "./chat-data";
+import { ChatViewComposer } from "./chat-view-composer";
+import {
+  ChatViewDetails,
+  type ThreadDetailSelection,
+  type ThreadFeedbackAction,
+  type ThreadFeedbackDescriptor,
+} from "./chat-view-details";
+import {
+  ChatViewNavigation,
+  readStoredSidebarMode,
+  type SidebarMode,
+  writeStoredSidebarMode,
+} from "./chat-view-navigation";
+import { ChatViewTimeline } from "./chat-view-timeline";
 import type {
   PublicRequestDetail,
   PublicThreadListItem,
   PublicThreadStreamEvent,
   PublicThreadView,
 } from "./thread-types";
-import { buildTimelineDisplayModel, type TimelineDisplayRow } from "./timeline-display-model";
+import { buildTimelineDisplayModel } from "./timeline-display-model";
 import { getTimelineItemDetail } from "./timeline-item-detail";
 
 export interface ChatViewProps {
@@ -73,18 +87,6 @@ function threadChatHref(workspaceId: string, threadId?: string) {
   return `/chat?${params.toString()}`;
 }
 
-function threadBadgeClass(thread: PublicThreadListItem) {
-  if (thread.resume_cue?.priority_band === "highest" || thread.blocked_cue) {
-    return "status-badge warning";
-  }
-
-  if (thread.current_activity.kind === "running") {
-    return "status-badge success";
-  }
-
-  return "status-badge";
-}
-
 function activityBadgeClass(activityKind: PublicThreadListItem["current_activity"]["kind"] | null) {
   if (activityKind === "waiting_on_approval") {
     return "status-badge warning";
@@ -107,196 +109,6 @@ function requestBadgeClass(request: PublicRequestDetail | null) {
 
 function formatMachineLabel(value: string | null | undefined) {
   return value ? value.replaceAll("_", " ") : "Not available";
-}
-
-function isActiveThread(thread: PublicThreadListItem) {
-  return thread.current_activity.kind === "running";
-}
-
-function isWaitingApprovalThread(thread: PublicThreadListItem) {
-  return (
-    thread.current_activity.kind === "waiting_on_approval" ||
-    thread.blocked_cue?.kind === "approval_required" ||
-    thread.badge?.kind === "approval"
-  );
-}
-
-function isErrorOrFailedThread(thread: PublicThreadListItem) {
-  return (
-    thread.current_activity.kind === "system_error" ||
-    thread.current_activity.kind === "latest_turn_failed" ||
-    thread.native_status.latest_turn_status === "failed"
-  );
-}
-
-function isRecentThread(thread: PublicThreadListItem) {
-  return (
-    !isActiveThread(thread) && !isWaitingApprovalThread(thread) && !isErrorOrFailedThread(thread)
-  );
-}
-
-type ThreadFilterId = "all" | "active" | "waiting_approval" | "errors_failed" | "recent";
-type SidebarMode = "full" | "mini";
-
-const SIDEBAR_MODE_STORAGE_KEY = "codex-webui.sidebar-mode";
-
-function filterThreads(threads: PublicThreadListItem[], filterId: ThreadFilterId) {
-  switch (filterId) {
-    case "active":
-      return threads.filter(isActiveThread);
-    case "waiting_approval":
-      return threads.filter(isWaitingApprovalThread);
-    case "errors_failed":
-      return threads.filter(isErrorOrFailedThread);
-    case "recent":
-      return threads.filter(isRecentThread);
-    default:
-      return threads;
-  }
-}
-
-function threadCueLabel(thread: PublicThreadListItem) {
-  return thread.blocked_cue?.label ?? thread.resume_cue?.label ?? thread.badge?.label ?? null;
-}
-
-function threadStatusSymbol(thread: PublicThreadListItem) {
-  if (isWaitingApprovalThread(thread)) {
-    return "!";
-  }
-
-  if (isErrorOrFailedThread(thread)) {
-    return "x";
-  }
-
-  if (isActiveThread(thread)) {
-    return ">";
-  }
-
-  return ".";
-}
-
-function threadStatusLabel(thread: PublicThreadListItem) {
-  if (isWaitingApprovalThread(thread)) {
-    return "Waiting approval";
-  }
-
-  if (isErrorOrFailedThread(thread)) {
-    return "Needs review";
-  }
-
-  if (isActiveThread(thread)) {
-    return "Running";
-  }
-
-  return "Idle";
-}
-
-function compactName(value: string | null | undefined) {
-  const normalized = value?.trim();
-  if (!normalized) {
-    return "--";
-  }
-
-  const initials = normalized
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("");
-
-  return (initials || normalized.slice(0, 2)).toUpperCase();
-}
-
-function readStoredSidebarMode() {
-  try {
-    const storage = window.localStorage;
-    if (typeof storage.getItem !== "function") {
-      return null;
-    }
-
-    const storedMode = storage.getItem(SIDEBAR_MODE_STORAGE_KEY);
-    return storedMode === "full" || storedMode === "mini" ? storedMode : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredSidebarMode(nextMode: SidebarMode) {
-  try {
-    const storage = window.localStorage;
-    if (typeof storage.setItem === "function") {
-      storage.setItem(SIDEBAR_MODE_STORAGE_KEY, nextMode);
-    }
-  } catch {
-    // Sidebar preference should never block Navigation controls.
-  }
-}
-
-function workspaceSummary(workspace: PublicWorkspaceSummary) {
-  if (workspace.pending_approval_count > 0) {
-    return `${workspace.pending_approval_count} approval${
-      workspace.pending_approval_count === 1 ? "" : "s"
-    }`;
-  }
-
-  if (workspace.active_session_summary) {
-    return `${formatMachineLabel(workspace.active_session_summary.status)} activity`;
-  }
-
-  return `Updated ${formatTimestamp(workspace.updated_at)}`;
-}
-
-type ThreadDetailSelection =
-  | { kind: "thread_details" }
-  | { kind: "request_detail" }
-  | { kind: "timeline_item_detail"; timelineItemId: string };
-
-type ThreadFeedbackAction =
-  | { kind: "refresh"; label: string }
-  | { kind: "focus_composer"; label: string }
-  | { kind: "interrupt"; label: string }
-  | { kind: "approve"; label: string }
-  | { kind: "deny"; label: string }
-  | { kind: "request_detail"; label: string };
-
-type ThreadFeedbackDescriptor = {
-  badgeTone: "default" | "success" | "warning";
-  isVisible: boolean;
-  title: string;
-  summary: string;
-  actions: ThreadFeedbackAction[];
-};
-
-function timelineRowClass(row: TimelineDisplayRow) {
-  return `timeline-row timeline-row-${row.density} timeline-row-${row.role}`;
-}
-
-const TIMELINE_PREVIEW_LINE_LIMIT = 8;
-const TIMELINE_PREVIEW_CHARACTER_LIMIT = 520;
-
-function timelineContentPreview(content: string) {
-  const lines = content.split(/\r?\n/);
-  const lineFolded = lines.length > TIMELINE_PREVIEW_LINE_LIMIT;
-  const linePreview = lineFolded ? lines.slice(0, TIMELINE_PREVIEW_LINE_LIMIT).join("\n") : content;
-
-  if (linePreview.length <= TIMELINE_PREVIEW_CHARACTER_LIMIT) {
-    return {
-      isFoldable: lineFolded,
-      preview: lineFolded ? `${linePreview.trimEnd()}\n...` : content,
-    };
-  }
-
-  const clipped = linePreview.slice(0, TIMELINE_PREVIEW_CHARACTER_LIMIT);
-  const lastWhitespace = clipped.search(/\s+\S*$/);
-  const preview =
-    lastWhitespace > TIMELINE_PREVIEW_CHARACTER_LIMIT * 0.72
-      ? clipped.slice(0, lastWhitespace)
-      : clipped;
-
-  return {
-    isFoldable: true,
-    preview: `${preview.trimEnd()}...`,
-  };
 }
 
 function composerUnavailableReason(threadView: PublicThreadView | null) {
@@ -361,39 +173,6 @@ function threadFeedbackBadgeClass(descriptor: ThreadFeedbackDescriptor) {
   }
 
   return "status-badge";
-}
-
-function isCodeLikeFieldLabel(label: string) {
-  return (
-    label === "Request ID" ||
-    label === "Operation" ||
-    label === "Thread" ||
-    label === "Turn" ||
-    label === "Item"
-  );
-}
-
-function detailFieldClass(label: string) {
-  return isCodeLikeFieldLabel(label)
-    ? "request-detail-field request-detail-field-code"
-    : "request-detail-field";
-}
-
-function renderDetailFieldValue(
-  field: { label: string; value: string; href?: string } | { label: string; value: string | null },
-) {
-  const isCodeLike = isCodeLikeFieldLabel(field.label);
-  const content = isCodeLike ? <code className="artifact-inline">{field.value}</code> : field.value;
-
-  if ("href" in field && field.href) {
-    return (
-      <a className="detail-link" href={field.href} rel="noreferrer" target="_blank">
-        {content}
-      </a>
-    );
-  }
-
-  return content;
 }
 
 function buildThreadFeedbackDescriptor({
@@ -640,7 +419,6 @@ export function ChatView({
 }: ChatViewProps) {
   const [isNavigationOpen, setIsNavigationOpen] = useState(false);
   const [detailSelection, setDetailSelection] = useState<ThreadDetailSelection | null>(null);
-  const [selectedFilterId, setSelectedFilterId] = useState<ThreadFilterId>("all");
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>("full");
   const [expandedTimelineRows, setExpandedTimelineRows] = useState<Set<string>>(() => new Set());
   const [followLatestActivity, setFollowLatestActivity] = useState(true);
@@ -650,30 +428,6 @@ export function ChatView({
   const latestActivitySignatureRef = useRef<string | null>(null);
   const selectedWorkspace =
     workspaces.find((workspace) => workspace.workspace_id === workspaceId) ?? null;
-  const selectedThreadSummary =
-    threads.find((thread) => thread.thread_id === selectedThreadId) ?? null;
-  const visibleThreads = filterThreads(threads, selectedFilterId);
-  const attentionThreads = threads.filter(
-    (thread) =>
-      isWaitingApprovalThread(thread) ||
-      isErrorOrFailedThread(thread) ||
-      backgroundPriorityNotice?.threadId === thread.thread_id,
-  );
-  const threadFilters: Array<{ id: ThreadFilterId; label: string; count: number }> = [
-    { id: "all", label: "All", count: threads.length },
-    { id: "active", label: "Active", count: threads.filter(isActiveThread).length },
-    {
-      id: "waiting_approval",
-      label: "Waiting approval",
-      count: threads.filter(isWaitingApprovalThread).length,
-    },
-    {
-      id: "errors_failed",
-      label: "Errors / Failed",
-      count: threads.filter(isErrorOrFailedThread).length,
-    },
-    { id: "recent", label: "Recent", count: threads.filter(isRecentThread).length },
-  ];
   const hasSelectedThread = selectedThreadId !== null;
   const isOpeningSelectedThread = hasSelectedThread && !selectedThreadView;
   const isStartingThread = !hasSelectedThread;
@@ -704,6 +458,11 @@ export function ChatView({
     : isOpeningSelectedThread
       ? "Opening this thread and restoring its latest context."
       : unavailableReason;
+  const composerDefaultGuidance = isStartingThread
+    ? "First input starts a new thread in this workspace."
+    : "Input will continue the selected thread.";
+  const isComposerTextareaDisabled =
+    !workspaceId || isOpeningSelectedThread || isSubmittingComposer || Boolean(unavailableReason);
   const selectedTimelineItem =
     detailSelection?.kind === "timeline_item_detail"
       ? (selectedThreadView?.timeline.items.find(
@@ -718,10 +477,6 @@ export function ChatView({
     streamEvents,
     draftAssistantMessages,
   });
-  const timelineArtifactCount = timelineModel.groups.reduce(
-    (count, group) => count + group.rows.filter((row) => row.showDetailButton).length,
-    0,
-  );
   const hasRequestDetailAffordance = selectedRequestDetail !== null;
   const latestTimelineGroup = timelineModel.groups[timelineModel.groups.length - 1] ?? null;
   const latestTimelineRow = latestTimelineGroup?.rows[latestTimelineGroup.rows.length - 1] ?? null;
@@ -752,6 +507,9 @@ export function ChatView({
     selectedThreadView,
     workspaceId,
   });
+  const threadActivitySummary = workspaceId
+    ? currentActivitySummary(selectedThreadView, isOpeningSelectedThread)
+    : "Choose a workspace to enable the composer.";
   const isSidebarMinibar = sidebarMode === "mini" && !isNavigationOpen;
 
   useEffect(() => {
@@ -766,10 +524,6 @@ export function ChatView({
     setDetailSelection(null);
     setExpandedTimelineRows(new Set());
   }, [selectedThreadId]);
-
-  useEffect(() => {
-    setSelectedFilterId("all");
-  }, [workspaceId]);
 
   useEffect(() => {
     latestActivitySignatureRef.current = null;
@@ -965,288 +719,28 @@ export function ChatView({
             ) : null}
           </div>
         ) : null}
-        {backgroundPriorityNotice ? (
-          <section aria-live="polite" className="background-priority-notice" role="status">
-            <div className="workspace-meta-row">
-              <strong>Background thread needs attention</strong>
-              <span className="status-badge warning">High priority</span>
-            </div>
-            <p>
-              <strong>
-                <code className="artifact-inline">{backgroundPriorityNotice.threadId}</code>
-              </strong>
-              {" needs attention now."}
-            </p>
-            <p className="workspace-meta">Reason: {backgroundPriorityNotice.reason}</p>
-            <div className="workspace-actions">
-              <button
-                className="primary-link action-button compact-button"
-                onClick={() => onOpenBackgroundPriorityThread(backgroundPriorityNotice.threadId)}
-                type="button"
-              >
-                Open thread
-              </button>
-            </div>
-          </section>
-        ) : null}
-
-        <section
-          aria-label="Navigation"
-          className={[
-            "chat-panel create-card thread-navigation",
-            isNavigationOpen ? "open" : "",
-            isSidebarMinibar ? "minibar" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          {isSidebarMinibar ? (
-            <div className="navigation-minibar-stack">
-              <button
-                aria-label="Expand Navigation"
-                className="secondary-link action-button minibar-button"
-                onClick={() => updateSidebarMode("full")}
-                title="Expand Navigation"
-                type="button"
-              >
-                Nav
-              </button>
-              {workspaceId ? (
-                <button
-                  aria-label={`Start new thread in ${selectedWorkspace?.workspace_name ?? workspaceId}`}
-                  className="primary-link action-button minibar-button"
-                  onClick={askCodex}
-                  title="Ask Codex"
-                  type="button"
-                >
-                  New
-                </button>
-              ) : null}
-              <button
-                aria-label={`Current workspace: ${
-                  selectedWorkspace?.workspace_name ?? workspaceId ?? "none"
-                }`}
-                className="secondary-link action-button minibar-button"
-                onClick={() => updateSidebarMode("full")}
-                title={selectedWorkspace?.workspace_name ?? workspaceId ?? "Select workspace"}
-                type="button"
-              >
-                {compactName(selectedWorkspace?.workspace_name ?? workspaceId)}
-              </button>
-              {selectedThreadSummary ? (
-                <button
-                  aria-label={`Current thread: ${selectedThreadSummary.title}`}
-                  aria-current="page"
-                  className="secondary-link action-button minibar-button active"
-                  onClick={() => selectThread(selectedThreadSummary.thread_id)}
-                  title={selectedThreadSummary.title}
-                  type="button"
-                >
-                  {threadStatusSymbol(selectedThreadSummary)}
-                </button>
-              ) : null}
-              {attentionThreads
-                .filter((thread) => thread.thread_id !== selectedThreadId)
-                .slice(0, 4)
-                .map((thread) => (
-                  <button
-                    aria-label={`${threadStatusLabel(thread)}: ${thread.title}`}
-                    className="secondary-link action-button minibar-button attention"
-                    key={thread.thread_id}
-                    onClick={() => selectThread(thread.thread_id)}
-                    title={thread.title}
-                    type="button"
-                  >
-                    {threadStatusSymbol(thread)}
-                  </button>
-                ))}
-            </div>
-          ) : (
-            <>
-              <header>
-                <div className="workspace-meta-row navigation-header-row">
-                  <h2>{selectedWorkspace?.workspace_name ?? "Select workspace"}</h2>
-                  <button
-                    aria-label="Collapse Navigation to minibar"
-                    className="secondary-link action-button compact-button sidebar-mode-toggle"
-                    onClick={() => updateSidebarMode("mini")}
-                    type="button"
-                  >
-                    Minimize
-                  </button>
-                </div>
-                <p className="workspace-meta">
-                  {workspaceId ? "Workspace scope active" : "Choose or create a workspace."}
-                </p>
-              </header>
-
-              {workspaceId ? (
-                <button
-                  className={
-                    hasSelectedThread
-                      ? "primary-link action-button navigation-ask-codex"
-                      : "secondary-link action-button navigation-ask-codex"
-                  }
-                  onClick={askCodex}
-                  type="button"
-                >
-                  Ask Codex
-                </button>
-              ) : null}
-
-              <details className="workspace-switcher">
-                <summary>Switch workspace</summary>
-                <div className="workspace-switcher-control">
-                  {isLoadingWorkspaces ? (
-                    <p className="workspace-status">Loading workspaces...</p>
-                  ) : null}
-                  {workspaces.length > 0 ? (
-                    <div className="workspace-option-list">
-                      {workspaces.map((workspace) => (
-                        <button
-                          className={
-                            workspace.workspace_id === workspaceId
-                              ? "workspace-option-card active"
-                              : "workspace-option-card"
-                          }
-                          key={workspace.workspace_id}
-                          onClick={() => onSelectWorkspace(workspace.workspace_id)}
-                          type="button"
-                        >
-                          <strong>{workspace.workspace_name}</strong>
-                          <span className="workspace-meta">{workspace.workspace_id}</span>
-                          <span className="workspace-meta">{workspaceSummary(workspace)}</span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : !isLoadingWorkspaces ? (
-                    <p className="empty-state">Create a workspace to start scoped work.</p>
-                  ) : null}
-
-                  <div className="create-form workspace-create-form">
-                    <label className="form-label" htmlFor="workspace-name">
-                      New workspace
-                      <input
-                        id="workspace-name"
-                        name="workspace-name"
-                        onChange={(event) => onWorkspaceNameChange(event.target.value)}
-                        placeholder="Workspace name"
-                        value={workspaceName}
-                      />
-                    </label>
-                    <button
-                      className="submit-button"
-                      disabled={isCreatingWorkspace || workspaceName.trim().length === 0}
-                      onClick={onCreateWorkspace}
-                      type="button"
-                    >
-                      {isCreatingWorkspace ? "Creating..." : "Create workspace"}
-                    </button>
-                  </div>
-                </div>
-              </details>
-
-              <div className="thread-list">
-                {isLoadingThreads ? <p className="workspace-status">Loading threads...</p> : null}
-
-                {!workspaceId && !isLoadingWorkspaces ? (
-                  <p className="empty-state">Select a workspace to show its threads.</p>
-                ) : null}
-
-                {workspaceId && !isLoadingThreads && threads.length === 0 ? (
-                  <p className="empty-state">No threads yet. Use Ask Codex in Thread View.</p>
-                ) : null}
-
-                {workspaceId && threads.length > 0 ? (
-                  <div className="thread-filter-bar" role="tablist" aria-label="Thread filters">
-                    {threadFilters.map((filter) => (
-                      <button
-                        className={
-                          selectedFilterId === filter.id
-                            ? "thread-filter-chip active"
-                            : "thread-filter-chip"
-                        }
-                        key={filter.id}
-                        onClick={() => setSelectedFilterId(filter.id)}
-                        role="tab"
-                        aria-selected={selectedFilterId === filter.id}
-                        type="button"
-                      >
-                        <span>{filter.label}</span>
-                        <span className="thread-filter-count">{filter.count}</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-
-                {workspaceId &&
-                !isLoadingThreads &&
-                threads.length > 0 &&
-                visibleThreads.length === 0 ? (
-                  <p className="empty-state">No threads match this filter.</p>
-                ) : null}
-
-                {visibleThreads.map((thread) => {
-                  const isSelected = selectedThreadId === thread.thread_id;
-                  const rowCueLabel = threadCueLabel(thread);
-                  const hasBackgroundNotice =
-                    backgroundPriorityNotice?.threadId === thread.thread_id && !isSelected;
-                  const isAttention = rowCueLabel !== null || hasBackgroundNotice;
-
-                  return (
-                    <button
-                      aria-current={isSelected ? "page" : undefined}
-                      className={isSelected ? "thread-summary-card active" : "thread-summary-card"}
-                      key={thread.thread_id}
-                      onClick={() => selectThread(thread.thread_id)}
-                      type="button"
-                    >
-                      <div className="workspace-meta-row thread-summary-header">
-                        <span
-                          aria-label={threadStatusLabel(thread)}
-                          className={threadBadgeClass(thread).replace(
-                            "status-badge",
-                            "thread-status-mark",
-                          )}
-                          role="img"
-                          title={threadStatusLabel(thread)}
-                        >
-                          {threadStatusSymbol(thread)}
-                        </span>
-                        <div className="thread-summary-title-block">
-                          <strong>{thread.title}</strong>
-                          <span className="workspace-meta">
-                            Updated {formatTimestamp(thread.updated_at)}
-                          </span>
-                        </div>
-                      </div>
-                      {isAttention ? (
-                        <div className="thread-summary-cues">
-                          {rowCueLabel ? (
-                            <span className="status-badge">{formatMachineLabel(rowCueLabel)}</span>
-                          ) : null}
-                          {hasBackgroundNotice ? (
-                            <span className="status-badge warning">Needs attention now</span>
-                          ) : null}
-                          {thread.badge && rowCueLabel !== thread.badge.label ? (
-                            <span className="status-badge">
-                              {formatMachineLabel(thread.badge.label)}
-                            </span>
-                          ) : null}
-                        </div>
-                      ) : null}
-                      {hasBackgroundNotice ? (
-                        <p className="thread-summary-notice">
-                          Background notice: {backgroundPriorityNotice?.reason}
-                        </p>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </section>
+        <ChatViewNavigation
+          backgroundPriorityNotice={backgroundPriorityNotice}
+          formatMachineLabel={formatMachineLabel}
+          formatTimestamp={formatTimestamp}
+          isCreatingWorkspace={isCreatingWorkspace}
+          isLoadingThreads={isLoadingThreads}
+          isLoadingWorkspaces={isLoadingWorkspaces}
+          isNavigationOpen={isNavigationOpen}
+          onAskCodex={askCodex}
+          onCreateWorkspace={onCreateWorkspace}
+          onOpenBackgroundPriorityThread={onOpenBackgroundPriorityThread}
+          onSelectThread={selectThread}
+          onSelectWorkspace={onSelectWorkspace}
+          onSidebarModeChange={updateSidebarMode}
+          onWorkspaceNameChange={onWorkspaceNameChange}
+          selectedThreadId={selectedThreadId}
+          sidebarMode={sidebarMode}
+          threads={threads}
+          workspaceId={workspaceId}
+          workspaceName={workspaceName}
+          workspaces={workspaces}
+        />
 
         <section aria-label="Thread View" className="chat-panel workspace-card thread-view-card">
           <div className="thread-view-header-stack">
@@ -1428,95 +922,21 @@ export function ChatView({
                 </div>
               ) : null}
 
-              <section className="timeline-section" aria-label="Timeline">
-                {isLoadingThread ? (
-                  <p className="workspace-status">
-                    {selectedThreadId
-                      ? "Opening this thread and restoring its latest timeline..."
-                      : "Preparing thread view..."}
-                  </p>
-                ) : null}
-
-                <div className="chat-message-list">
-                  {!isLoadingThread && selectedThreadView && timelineModel.groups.length === 0 ? (
-                    <p className="empty-state">
-                      No timeline items yet. Start the thread or send follow-up input to continue.
-                    </p>
-                  ) : null}
-
-                  {timelineModel.groups.map((group) => (
-                    <section
-                      className={group.turnId ? "timeline-turn-group" : "timeline-ungrouped-item"}
-                      data-turn-id={group.turnId ?? undefined}
-                      key={group.id}
-                    >
-                      {group.turnId ? (
-                        <div className="timeline-turn-label">
-                          <span>Turn</span>
-                          <strong>{group.turnId}</strong>
-                        </div>
-                      ) : null}
-                      {group.rows.map((row) =>
-                        (() => {
-                          const contentPreview = timelineContentPreview(row.content);
-                          const isExpanded = expandedTimelineRows.has(row.id);
-                          const displayedContent =
-                            contentPreview.isFoldable && !isExpanded
-                              ? contentPreview.preview
-                              : row.content;
-
-                          return (
-                            <article
-                              className={`${timelineRowClass(row)}${
-                                contentPreview.isFoldable && !isExpanded
-                                  ? " timeline-row-folded"
-                                  : ""
-                              }`}
-                              key={row.id}
-                            >
-                              <div className="workspace-meta-row timeline-row-meta">
-                                <strong>{row.label}</strong>
-                                <span className="workspace-meta">
-                                  {row.isLive ? "Live" : formatTimestamp(row.occurredAt)}
-                                </span>
-                              </div>
-                              <p className="timeline-row-content">{displayedContent}</p>
-                              {contentPreview.isFoldable || row.showDetailButton ? (
-                                <div className="timeline-row-actions">
-                                  {contentPreview.isFoldable ? (
-                                    <button
-                                      aria-expanded={isExpanded}
-                                      className="secondary-link action-button inline-detail-button"
-                                      onClick={() => toggleTimelineRowExpansion(row.id)}
-                                      type="button"
-                                    >
-                                      {isExpanded ? "Show less" : "Show more"}
-                                    </button>
-                                  ) : null}
-                                  {row.showDetailButton && row.timelineItemId ? (
-                                    <button
-                                      className="secondary-link action-button inline-detail-button"
-                                      onClick={() =>
-                                        setDetailSelection({
-                                          kind: "timeline_item_detail",
-                                          timelineItemId: row.timelineItemId ?? "",
-                                        })
-                                      }
-                                      type="button"
-                                    >
-                                      {row.detailActionLabel ?? "Inspect details"}
-                                    </button>
-                                  ) : null}
-                                </div>
-                              ) : null}
-                            </article>
-                          );
-                        })(),
-                      )}
-                    </section>
-                  ))}
-                </div>
-              </section>
+              <ChatViewTimeline
+                expandedRowIds={expandedTimelineRows}
+                formatTimestamp={formatTimestamp}
+                groups={timelineModel.groups}
+                hasLoadedThreadView={selectedThreadView !== null}
+                isLoadingThread={isLoadingThread}
+                onOpenDetail={(timelineItemId) =>
+                  setDetailSelection({
+                    kind: "timeline_item_detail",
+                    timelineItemId,
+                  })
+                }
+                onToggleRowExpansion={toggleTimelineRowExpansion}
+                selectedThreadId={selectedThreadId}
+              />
             </div>
 
             <div className="thread-mobile-footer-actions">
@@ -1543,365 +963,55 @@ export function ChatView({
               </button>
             </div>
 
-            <div className="chat-composer" data-composer-mode={isStartingThread ? "start" : "send"}>
-              <label className="form-label" htmlFor="thread-composer-input">
-                {composerLabel}
-                <textarea
-                  className="chat-textarea"
-                  disabled={
-                    !workspaceId ||
-                    isOpeningSelectedThread ||
-                    isSubmittingComposer ||
-                    Boolean(unavailableReason)
-                  }
-                  id="thread-composer-input"
-                  name="thread-composer-input"
-                  onChange={(event) => onComposerDraftChange(event.target.value)}
-                  placeholder={composerPlaceholder}
-                  ref={composerRef}
-                  rows={4}
-                  value={composerDraft}
-                />
-              </label>
-              {composerGuidance ? (
-                <p className="composer-guidance" role="status">
-                  {composerGuidance}
-                </p>
-              ) : (
-                <p className="composer-guidance" role="status">
-                  {isStartingThread
-                    ? "First input starts a new thread in this workspace."
-                    : "Input will continue the selected thread."}
-                </p>
-              )}
-              <button
-                className="submit-button"
-                disabled={isComposerDisabled}
-                onClick={onSubmitComposer}
-                type="button"
-              >
-                {composerSubmitLabel}
-              </button>
-            </div>
+            <ChatViewComposer
+              composerDraft={composerDraft}
+              composerGuidance={composerGuidance}
+              composerLabel={composerLabel}
+              composerPlaceholder={composerPlaceholder}
+              composerSubmitLabel={composerSubmitLabel}
+              defaultGuidance={composerDefaultGuidance}
+              isComposerDisabled={isComposerDisabled}
+              isStartingThread={isStartingThread}
+              isTextareaDisabled={isComposerTextareaDisabled}
+              onComposerDraftChange={onComposerDraftChange}
+              onSubmitComposer={onSubmitComposer}
+              textareaRef={composerRef}
+            />
           </div>
         </section>
 
         {detailSelection ? (
-          <aside className="chat-panel workspace-card thread-detail-surface">
-            <header>
-              <div className="workspace-meta-row">
-                <p className="eyebrow">Detail</p>
-                <button
-                  className="secondary-link action-button compact-button"
-                  onClick={() => setDetailSelection(null)}
-                  type="button"
-                >
-                  Close
-                </button>
-              </div>
-              <h2>
-                {detailSelection.kind === "thread_details"
-                  ? "Thread details"
-                  : detailSelection.kind === "request_detail"
-                    ? "Request detail"
-                    : (selectedTimelineItemDetail?.title ?? "Timeline detail")}
-              </h2>
-            </header>
-
-            {detailSelection.kind === "thread_details" ? (
-              <div className="detail-stack">
-                <section className="thread-detail-section detail-text-section">
-                  <strong>Overview</strong>
-                  <dl className="request-detail-list">
-                    <div>
-                      <dt>Title</dt>
-                      <dd>
-                        {selectedThreadView?.thread.title ??
-                          (workspaceId ? "New workspace input" : "No workspace selected")}
-                      </dd>
-                    </div>
-                    <div className={detailFieldClass("Thread")}>
-                      <dt>Thread</dt>
-                      <dd>
-                        {selectedThreadView?.thread.thread_id ? (
-                          <code className="artifact-inline">
-                            {selectedThreadView.thread.thread_id}
-                          </code>
-                        ) : (
-                          "Not started"
-                        )}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Workspace</dt>
-                      <dd>{selectedWorkspace?.workspace_name ?? workspaceId ?? "Not selected"}</dd>
-                    </div>
-                    <div>
-                      <dt>Updated</dt>
-                      <dd>{formatTimestamp(selectedThreadView?.thread.updated_at ?? null)}</dd>
-                    </div>
-                  </dl>
-                </section>
-
-                <section className="thread-detail-section detail-text-section">
-                  <strong>Status</strong>
-                  <dl className="request-detail-list">
-                    <div>
-                      <dt>Current activity</dt>
-                      <dd>
-                        {selectedThreadView?.current_activity.label ??
-                          (isOpeningSelectedThread
-                            ? "Opening"
-                            : workspaceId
-                              ? "Ready for first input"
-                              : "Workspace required")}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Activity summary</dt>
-                      <dd>
-                        {workspaceId
-                          ? currentActivitySummary(selectedThreadView, isOpeningSelectedThread)
-                          : "Choose a workspace to enable the composer."}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Stream</dt>
-                      <dd>{connectionState}</dd>
-                    </div>
-                    <div>
-                      <dt>Composer</dt>
-                      <dd>
-                        {selectedThreadView?.composer.accepting_user_input
-                          ? "Accepting input"
-                          : composerGuidance}
-                      </dd>
-                    </div>
-                  </dl>
-                </section>
-
-                <section className="thread-detail-section detail-text-section">
-                  <strong>Next action</strong>
-                  <p>{threadFeedback.summary}</p>
-                  {threadFeedback.actions.length > 0 ? (
-                    <div className="workspace-actions thread-feedback-actions">
-                      {threadFeedback.actions.map((action) => renderThreadFeedbackAction(action))}
-                    </div>
-                  ) : null}
-                </section>
-
-                <section className="thread-detail-section detail-text-section">
-                  <strong>Requests</strong>
-                  <p>
-                    {selectedThreadView?.pending_request
-                      ? selectedThreadView.pending_request.summary
-                      : selectedThreadView?.latest_resolved_request
-                        ? `Latest resolved request: ${selectedThreadView.latest_resolved_request.decision}`
-                        : "No pending or recently resolved request."}
-                  </p>
-                  {selectedRequestDetail ? (
-                    <button
-                      className="secondary-link action-button compact-button"
-                      onClick={() => setDetailSelection({ kind: "request_detail" })}
-                      type="button"
-                    >
-                      Request detail
-                    </button>
-                  ) : null}
-                </section>
-
-                <section className="thread-detail-section detail-text-section">
-                  <strong>Artifacts</strong>
-                  {timelineArtifactCount > 0 ? (
-                    <ul className="detail-list">
-                      {timelineModel.groups.flatMap((group) =>
-                        group.rows
-                          .filter((row) => row.showDetailButton && row.timelineItemId)
-                          .map((row) => (
-                            <li key={row.id}>
-                              <strong>{row.label}</strong>
-                              <span>{row.content}</span>
-                              <button
-                                className="secondary-link action-button inline-detail-button"
-                                onClick={() =>
-                                  setDetailSelection({
-                                    kind: "timeline_item_detail",
-                                    timelineItemId: row.timelineItemId ?? "",
-                                  })
-                                }
-                                type="button"
-                              >
-                                {row.detailActionLabel ?? "Inspect details"}
-                              </button>
-                            </li>
-                          )),
-                      )}
-                    </ul>
-                  ) : (
-                    <p>No extracted artifacts are available for this thread yet.</p>
-                  )}
-                </section>
-
-                <details className="detail-debug">
-                  <summary>Debug: raw thread view JSON</summary>
-                  <pre className="detail-json">
-                    {JSON.stringify(
-                      selectedThreadView ?? { workspaceId, selectedThreadId },
-                      null,
-                      2,
-                    )}
-                  </pre>
-                </details>
-              </div>
-            ) : null}
-
-            {detailSelection.kind === "request_detail" && selectedRequestDetail ? (
-              <div className="detail-stack">
-                <div className="workspace-meta-row">
-                  <span className={requestBadgeClass(selectedRequestDetail)}>
-                    {selectedRequestDetail.status}
-                  </span>
-                  <span className="status-badge">
-                    {formatMachineLabel(selectedRequestDetail.risk_category)}
-                  </span>
-                </div>
-                <p>{selectedRequestDetail.summary}</p>
-                <dl className="request-detail-list">
-                  <div>
-                    <dt>Reason</dt>
-                    <dd>{selectedRequestDetail.reason}</dd>
-                  </div>
-                  {selectedRequestDetail.operation_summary ? (
-                    <div className={detailFieldClass("Operation")}>
-                      <dt>Operation</dt>
-                      <dd>
-                        <code className="artifact-inline">
-                          {selectedRequestDetail.operation_summary}
-                        </code>
-                      </dd>
-                    </div>
-                  ) : null}
-                  <div>
-                    <dt>Requested</dt>
-                    <dd>{formatTimestamp(selectedRequestDetail.requested_at)}</dd>
-                  </div>
-                  <div className={`request-context-field ${detailFieldClass("Thread")}`}>
-                    <dt>Thread</dt>
-                    <dd>
-                      <code className="artifact-inline">{selectedRequestDetail.thread_id}</code>
-                    </dd>
-                  </div>
-                  <div className={`request-context-field ${detailFieldClass("Turn")}`}>
-                    <dt>Turn</dt>
-                    <dd>
-                      {selectedRequestDetail.turn_id ? (
-                        <code className="artifact-inline">{selectedRequestDetail.turn_id}</code>
-                      ) : (
-                        "Not available"
-                      )}
-                    </dd>
-                  </div>
-                  <div className={`request-context-field ${detailFieldClass("Item")}`}>
-                    <dt>Item</dt>
-                    <dd>
-                      <code className="artifact-inline">{selectedRequestDetail.item_id}</code>
-                    </dd>
-                  </div>
-                  {selectedRequestDetail.decision ? (
-                    <div>
-                      <dt>Decision</dt>
-                      <dd>{selectedRequestDetail.decision}</dd>
-                    </div>
-                  ) : null}
-                  {selectedRequestDetail.responded_at ? (
-                    <div>
-                      <dt>Responded</dt>
-                      <dd>{formatTimestamp(selectedRequestDetail.responded_at)}</dd>
-                    </div>
-                  ) : null}
-                </dl>
-                {selectedRequestDetail.operation_summary ? (
-                  <p className="request-operation-summary">
-                    Operation:{" "}
-                    <code className="artifact-inline">
-                      {selectedRequestDetail.operation_summary}
-                    </code>
-                  </p>
-                ) : null}
-                {selectedRequestDetail.status === "pending" ? (
-                  <div className="workspace-actions request-detail-actions">
-                    <button
-                      className="approve-button action-button compact-button"
-                      disabled={isRespondingToRequest}
-                      onClick={onApproveRequest}
-                      type="button"
-                    >
-                      {isRespondingToRequest ? "Submitting..." : "Approve request"}
-                    </button>
-                    <button
-                      className="danger-button action-button compact-button"
-                      disabled={isRespondingToRequest}
-                      onClick={onDenyRequest}
-                      type="button"
-                    >
-                      Deny request
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            {detailSelection.kind === "timeline_item_detail" &&
-            selectedTimelineItem &&
-            selectedTimelineItemDetail ? (
-              <div className="detail-stack">
-                <p className="workspace-meta">
-                  {selectedTimelineItem.kind} at {formatTimestamp(selectedTimelineItem.occurred_at)}
-                </p>
-                <p>{selectedTimelineItemDetail.summary}</p>
-                {selectedTimelineItemDetail.sections.map((section) => (
-                  <div
-                    className={
-                      section.code
-                        ? "request-operation-summary detail-artifact-section"
-                        : "request-operation-summary detail-text-section"
-                    }
-                    key={section.title}
-                  >
-                    <strong>{section.title}</strong>
-                    <ul
-                      className={section.code ? "detail-list detail-artifact-list" : "detail-list"}
-                    >
-                      {section.items.map((entry) => (
-                        <li key={entry}>
-                          {section.code ? <code className="artifact-inline">{entry}</code> : entry}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-                {selectedTimelineItemDetail.fields.length > 0 ? (
-                  <dl className="request-detail-list">
-                    {selectedTimelineItemDetail.fields.map((field) => (
-                      <div
-                        className={detailFieldClass(field.label)}
-                        key={`${field.label}:${field.value}`}
-                      >
-                        <dt>{field.label}</dt>
-                        <dd>{renderDetailFieldValue(field)}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                ) : null}
-                <details className="detail-debug">
-                  <summary>Debug: raw timeline payload JSON</summary>
-                  <pre className="detail-json">
-                    {JSON.stringify(selectedTimelineItem.payload, null, 2)}
-                  </pre>
-                </details>
-              </div>
-            ) : null}
-          </aside>
+          <ChatViewDetails
+            composerGuidance={composerGuidance}
+            connectionState={connectionState}
+            formatMachineLabel={formatMachineLabel}
+            formatTimestamp={formatTimestamp}
+            isOpeningSelectedThread={isOpeningSelectedThread}
+            isRespondingToRequest={isRespondingToRequest}
+            onApproveRequest={onApproveRequest}
+            onClose={() => setDetailSelection(null)}
+            onDenyRequest={onDenyRequest}
+            onSelectRequestDetail={() => setDetailSelection({ kind: "request_detail" })}
+            onSelectTimelineItemDetail={(timelineItemId) =>
+              setDetailSelection({
+                kind: "timeline_item_detail",
+                timelineItemId,
+              })
+            }
+            renderThreadFeedbackAction={renderThreadFeedbackAction}
+            requestBadgeClass={requestBadgeClass}
+            selectedRequestDetail={selectedRequestDetail}
+            selectedThreadId={selectedThreadId}
+            selectedThreadView={selectedThreadView}
+            selectedTimelineItem={selectedTimelineItem}
+            selectedTimelineItemDetail={selectedTimelineItemDetail}
+            selectedWorkspaceName={selectedWorkspace?.workspace_name ?? null}
+            selection={detailSelection}
+            threadActivitySummary={threadActivitySummary}
+            threadFeedback={threadFeedback}
+            timelineGroups={timelineModel.groups}
+            workspaceId={workspaceId}
+          />
         ) : null}
       </div>
     </main>
