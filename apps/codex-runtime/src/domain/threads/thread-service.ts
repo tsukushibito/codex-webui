@@ -2,8 +2,6 @@ import { and, desc, eq } from "drizzle-orm";
 
 import type { RuntimeDatabase } from "../../db/database.js";
 import {
-  type ApprovalRow,
-  approvals,
   type SessionRow,
   sessionEvents,
   sessions,
@@ -11,7 +9,6 @@ import {
   workspaces,
 } from "../../db/schema.js";
 import { RuntimeError } from "../../errors.js";
-import type { ApprovalProjection } from "../approvals/types.js";
 import {
   type NativeSessionGateway,
   resolveWorkspaceSessionCwd,
@@ -25,6 +22,10 @@ import type {
 import type { WorkspaceFilesystem } from "../workspaces/workspace-filesystem.js";
 import type { WorkspaceRegistry } from "../workspaces/workspace-registry.js";
 import { ThreadInputOrchestrator } from "./thread-input-orchestrator.js";
+import {
+  ThreadRequestPersistence,
+  type ThreadRequestRecord,
+} from "./thread-request-persistence.js";
 import type {
   LatestResolvedRequestSummary,
   NotificationEvent,
@@ -123,59 +124,59 @@ function toTimelineItem(event: SessionEventProjection): TimelineItem {
   };
 }
 
-function toPendingRequestSummary(approval: ApprovalProjection): PendingRequestSummary {
+function toPendingRequestSummary(request: ThreadRequestRecord): PendingRequestSummary {
   return {
-    request_id: approval.approval_id,
-    thread_id: approval.session_id,
+    request_id: request.request_id,
+    thread_id: request.thread_id,
     turn_id: null,
-    item_id: approval.approval_id,
-    request_kind: approval.native_request_kind,
-    status: approval.status,
-    risk_classification: approval.approval_category,
-    summary: approval.summary,
-    requested_at: approval.created_at,
+    item_id: request.request_id,
+    request_kind: request.request_kind,
+    status: request.status,
+    risk_classification: request.risk_classification,
+    summary: request.summary,
+    requested_at: request.requested_at,
   };
 }
 
 function toLatestResolvedRequestSummary(
-  approval: ApprovalProjection,
+  request: ThreadRequestRecord,
 ): LatestResolvedRequestSummary | null {
   if (
-    approval.status === "pending" ||
-    approval.resolution === null ||
-    approval.resolved_at === null
+    request.status === "pending" ||
+    request.resolution === null ||
+    request.responded_at === null
   ) {
     return null;
   }
 
   return {
-    request_id: approval.approval_id,
-    thread_id: approval.session_id,
+    request_id: request.request_id,
+    thread_id: request.thread_id,
     turn_id: null,
-    item_id: approval.approval_id,
-    request_kind: approval.native_request_kind,
+    item_id: request.request_id,
+    request_kind: request.request_kind,
     status: "resolved",
-    decision: approval.resolution,
-    requested_at: approval.created_at,
-    responded_at: approval.resolved_at,
+    decision: request.resolution,
+    requested_at: request.requested_at,
+    responded_at: request.responded_at,
   };
 }
 
-function toRequestDetailView(approval: ApprovalProjection): RequestDetailView {
+function toRequestDetailView(request: ThreadRequestRecord): RequestDetailView {
   return {
-    request_id: approval.approval_id,
-    thread_id: approval.session_id,
+    request_id: request.request_id,
+    thread_id: request.thread_id,
     turn_id: null,
-    item_id: approval.approval_id,
-    request_kind: approval.native_request_kind,
-    status: approval.status === "pending" ? approval.status : "resolved",
-    decision: approval.resolution,
-    risk_classification: approval.approval_category,
-    operation_summary: approval.operation_summary,
-    reason: approval.reason,
-    summary: approval.summary,
-    requested_at: approval.created_at,
-    responded_at: approval.resolved_at,
+    item_id: request.request_id,
+    request_kind: request.request_kind,
+    status: request.status === "pending" ? request.status : "resolved",
+    decision: request.resolution,
+    risk_classification: request.risk_classification,
+    operation_summary: request.operation_summary,
+    reason: request.reason,
+    summary: request.summary,
+    requested_at: request.requested_at,
+    responded_at: request.responded_at,
   };
 }
 
@@ -297,6 +298,7 @@ function mapThreadInterruptError(error: unknown, threadId: string): never {
 
 export class ThreadService {
   private readonly threadInputOrchestrator: ThreadInputOrchestrator;
+  private readonly threadRequestPersistence: ThreadRequestPersistence;
 
   constructor(
     private readonly database: RuntimeDatabase,
@@ -312,6 +314,7 @@ export class ThreadService {
       this.nativeSessionGateway,
       this.now,
     );
+    this.threadRequestPersistence = new ThreadRequestPersistence(this.database);
   }
 
   async listThreads(workspaceId: string) {
@@ -508,19 +511,13 @@ export class ThreadService {
   async getThreadPendingRequest(threadId: string) {
     await this.getThread(threadId);
 
-    const threadApprovals = this.database.db
-      .select()
-      .from(approvals)
-      .where(eq(approvals.sessionId, threadId))
-      .orderBy(desc(approvals.createdAt), desc(approvals.approvalId))
-      .all()
-      .map((approval) => this.mapApprovalRow(approval));
-    const pending = threadApprovals.find((approval) => approval.status === "pending") ?? null;
+    const threadRequests = this.threadRequestPersistence.listThreadRequests(threadId);
+    const pending = threadRequests.find((request) => request.status === "pending") ?? null;
     const latestResolved =
-      threadApprovals
-        .filter((approval) => approval.status !== "pending" && approval.resolved_at !== null)
+      threadRequests
+        .filter((request) => request.status !== "pending" && request.responded_at !== null)
         .sort((left, right) =>
-          (right.resolved_at ?? "").localeCompare(left.resolved_at ?? ""),
+          (right.responded_at ?? "").localeCompare(left.responded_at ?? ""),
         )[0] ?? null;
 
     return {
@@ -533,27 +530,19 @@ export class ThreadService {
   }
 
   async getRequestDetail(requestId: string) {
-    const approval = firstRow(
-      this.database.db
-        .select()
-        .from(approvals)
-        .where(eq(approvals.approvalId, requestId))
-        .limit(1)
-        .all(),
-    );
-
-    if (!approval) {
+    const request = this.threadRequestPersistence.getRequestById(requestId);
+    if (!request) {
       throw new RuntimeError(404, "request_not_found", "request was not found", {
         request_id: requestId,
       });
     }
 
-    return toRequestDetailView(this.mapApprovalRow(approval));
+    return toRequestDetailView(request);
   }
 
   async respondToRequest(requestId: string, input: { decision: "approved" | "denied" }) {
     let result: {
-      approval: ApprovalProjection;
+      request: ThreadRequestRecord;
       session: ThreadSummary;
     };
     try {
@@ -563,7 +552,7 @@ export class ThreadService {
     }
 
     return {
-      request: toRequestDetailView(result.approval),
+      request: toRequestDetailView(result.request),
       thread: result.session,
     };
   }
@@ -664,33 +653,26 @@ export class ThreadService {
   private async resolveThreadRequest(
     requestId: string,
     resolution: "approved" | "denied",
-  ): Promise<{ approval: ApprovalProjection; session: ThreadSummary }> {
-    const approval = firstRow(
-      this.database.db
-        .select()
-        .from(approvals)
-        .where(eq(approvals.approvalId, requestId))
-        .limit(1)
-        .all(),
-    );
+  ): Promise<{ request: ThreadRequestRecord; session: ThreadSummary }> {
+    const request = this.threadRequestPersistence.getRequestById(requestId);
 
-    if (!approval) {
+    if (!request) {
       throw new RuntimeError(404, "approval_not_found", "approval was not found", {
         approval_id: requestId,
       });
     }
 
-    if (approval.status !== "pending") {
-      if (approval.resolution === resolution) {
+    if (request.status !== "pending") {
+      if (request.resolution === resolution) {
         return {
-          approval: this.mapApprovalRow(approval),
-          session: await this.getThread(approval.sessionId),
+          request,
+          session: await this.getThread(request.thread_id),
         };
       }
 
       throw new RuntimeError(409, "approval_not_pending", "approval is not pending", {
         approval_id: requestId,
-        status: approval.status,
+        status: request.status,
       });
     }
 
@@ -698,14 +680,14 @@ export class ThreadService {
       this.database.db
         .select()
         .from(sessions)
-        .where(eq(sessions.sessionId, approval.sessionId))
+        .where(eq(sessions.sessionId, request.thread_id))
         .limit(1)
         .all(),
     );
 
     if (!session) {
       throw new RuntimeError(404, "session_not_found", "session was not found", {
-        session_id: approval.sessionId,
+        session_id: request.thread_id,
       });
     }
 
@@ -714,21 +696,13 @@ export class ThreadService {
     const nextTurnId = resolution === "approved" ? session.currentTurnId : null;
 
     await this.nativeSessionGateway.resolveApproval({
-      sessionId: approval.sessionId,
+      sessionId: request.thread_id,
       approvalId: requestId,
       resolution,
     });
 
     this.database.sqlite.transaction(() => {
-      this.database.db
-        .update(approvals)
-        .set({
-          status: resolution,
-          resolution,
-          resolvedAt,
-        })
-        .where(eq(approvals.approvalId, requestId))
-        .run();
+      this.threadRequestPersistence.markRequestResolved(requestId, resolution, resolvedAt);
 
       this.database.db
         .update(sessions)
@@ -740,7 +714,7 @@ export class ThreadService {
           pendingAssistantMessageId:
             resolution === "approved" ? session.pendingAssistantMessageId : null,
         })
-        .where(eq(sessions.sessionId, approval.sessionId))
+        .where(eq(sessions.sessionId, request.thread_id))
         .run();
 
       this.database.db
@@ -748,24 +722,24 @@ export class ThreadService {
         .set({
           updatedAt: resolvedAt,
         })
-        .where(eq(workspaces.workspaceId, approval.workspaceId))
+        .where(eq(workspaces.workspaceId, request.workspace_id))
         .run();
 
       this.sessionEventPublisher.appendSessionEvent({
-        sessionId: approval.sessionId,
+        sessionId: request.thread_id,
         eventType: "approval.resolved",
         occurredAt: resolvedAt,
         payload: {
           approval_id: requestId,
-          workspace_id: approval.workspaceId,
-          approval_category: approval.approvalCategory,
-          summary: approval.summary,
+          workspace_id: request.workspace_id,
+          approval_category: request.risk_classification,
+          summary: request.summary,
           resolution,
         },
       });
 
       this.sessionEventPublisher.appendSessionStatusChangedEvent({
-        sessionId: approval.sessionId,
+        sessionId: request.thread_id,
         occurredAt: resolvedAt,
         fromStatus: session.status as SessionStatus,
         toStatus: nextStatus,
@@ -773,34 +747,13 @@ export class ThreadService {
     })();
 
     return {
-      approval: this.mapApprovalRow({
-        ...approval,
+      request: {
+        ...request,
         status: resolution,
         resolution,
-        resolvedAt,
-      }),
-      session: await this.getThread(approval.sessionId),
-    };
-  }
-
-  private mapApprovalRow(approval: ApprovalRow): ApprovalProjection {
-    return {
-      approval_id: approval.approvalId,
-      session_id: approval.sessionId,
-      workspace_id: approval.workspaceId,
-      status: approval.status as ApprovalProjection["status"],
-      resolution: approval.resolution as ApprovalProjection["resolution"],
-      approval_category: approval.approvalCategory as ApprovalProjection["approval_category"],
-      summary: approval.summary,
-      reason: approval.reason,
-      operation_summary: approval.operationSummary,
-      context:
-        approval.context === null
-          ? null
-          : (JSON.parse(approval.context) as Record<string, unknown>),
-      created_at: approval.createdAt,
-      resolved_at: approval.resolvedAt,
-      native_request_kind: approval.nativeRequestKind,
+        responded_at: resolvedAt,
+      },
+      session: await this.getThread(request.thread_id),
     };
   }
 
