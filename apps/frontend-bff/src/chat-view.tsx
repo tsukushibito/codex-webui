@@ -43,6 +43,7 @@ export interface ChatViewProps {
   onCreateWorkspace: () => void;
   onSelectWorkspace: (workspaceId: string) => void;
   onSelectThread: (threadId: string) => void;
+  onAskCodex: () => void;
   onOpenBackgroundPriorityThread: (threadId: string) => void;
   onInterruptThread: () => void;
   onApproveRequest: () => void;
@@ -237,6 +238,7 @@ export function ChatView({
   onCreateWorkspace,
   onSelectWorkspace,
   onSelectThread,
+  onAskCodex,
   onOpenBackgroundPriorityThread,
   onInterruptThread,
   onApproveRequest,
@@ -296,6 +298,11 @@ export function ChatView({
 
   function selectThread(threadId: string) {
     onSelectThread(threadId);
+    setIsNavigationOpen(false);
+  }
+
+  function askCodex() {
+    onAskCodex();
     setIsNavigationOpen(false);
   }
 
@@ -368,6 +375,20 @@ export function ChatView({
               {workspaceId ? "Workspace scope active" : "Choose or create a workspace."}
             </p>
           </header>
+
+          {workspaceId ? (
+            <button
+              className={
+                hasSelectedThread
+                  ? "primary-link action-button navigation-ask-codex"
+                  : "secondary-link action-button navigation-ask-codex"
+              }
+              onClick={askCodex}
+              type="button"
+            >
+              Ask Codex
+            </button>
+          ) : null}
 
           <details className="workspace-switcher">
             <summary>Switch workspace</summary>
@@ -480,267 +501,278 @@ export function ChatView({
         </section>
 
         <section className="chat-panel workspace-card thread-view-card">
-          <header>
-            <div className="workspace-meta-row">
-              <p className="eyebrow">Current thread</p>
-              {selectedThreadView ? (
-                <span className="status-badge success">
-                  {selectedThreadView.current_activity.label}
-                </span>
-              ) : isOpeningSelectedThread ? (
-                <span className="status-badge">Opening</span>
-              ) : workspaceId ? (
-                <span className="status-badge">Ready to start</span>
-              ) : null}
-            </div>
-            <h2>
-              {selectedThreadView?.thread.title ??
-                (isOpeningSelectedThread
-                  ? "Opening thread"
-                  : workspaceId
-                    ? "New thread"
-                    : "Select workspace")}
-            </h2>
-            <p className="workspace-meta">
-              {selectedThreadView
-                ? `Workspace ${selectedWorkspace?.workspace_name ?? selectedThreadView.thread.workspace_id} - Updated ${formatTimestamp(
-                    selectedThreadView.thread.updated_at,
-                  )}`
-                : isOpeningSelectedThread
-                  ? `Loading ${selectedThreadId}.`
-                  : workspaceId
-                    ? "Ask Codex to start a new thread, or pick a thread from Navigation."
-                    : "Select or create a workspace from Navigation before starting work."}
-            </p>
-            <div className="hero-metrics thread-context-metrics">
-              <span className="metric-chip">
-                Workspace: {selectedWorkspace?.workspace_name ?? workspaceId}
-              </span>
-              <span className="metric-chip">
-                Stream:{" "}
-                {connectionState === "live"
-                  ? "live"
-                  : connectionState === "reconnecting"
-                    ? "reacquiring"
-                    : "idle"}
-              </span>
-              <span className="metric-chip">Threads: {threads.length}</span>
-              {workspaceId ? (
-                <Link
-                  className="secondary-link compact-link"
-                  href={threadChatHref(workspaceId, selectedThreadId ?? undefined)}
-                >
-                  Refresh
-                </Link>
-              ) : null}
-            </div>
-          </header>
-
-          <div className="current-activity-card">
-            <div className="workspace-meta-row">
-              <strong>Current activity</strong>
-              <span className="status-badge">
-                {selectedThreadView?.current_activity.label ??
-                  (isOpeningSelectedThread
-                    ? "Opening"
-                    : workspaceId
-                      ? "Ready for first input"
-                      : "Workspace required")}
-              </span>
-            </div>
-            <p className="workspace-meta">
-              {workspaceId
-                ? currentActivitySummary(selectedThreadView, isOpeningSelectedThread)
-                : "Choose a workspace to enable the composer."}
-            </p>
-          </div>
-
-          {selectedThreadView?.pending_request ? (
-            <div className="request-detail-card pending-request-card">
+          <div className="thread-view-header-stack">
+            <header>
               <div className="workspace-meta-row">
-                <strong>Pending request</strong>
-                <span className={requestBadgeClass(selectedRequestDetail)}>
-                  {formatMachineLabel(selectedThreadView.pending_request.risk_category)}
-                </span>
-              </div>
-              <p>{selectedThreadView.pending_request.summary}</p>
-              {selectedRequestDetail ? (
-                <p className="workspace-meta">{selectedRequestDetail.reason}</p>
-              ) : null}
-              {selectedRequestDetail?.operation_summary ? (
-                <p className="workspace-meta">
-                  Operation: {selectedRequestDetail.operation_summary}
-                </p>
-              ) : null}
-              <p className="workspace-meta">
-                Requested {formatTimestamp(selectedThreadView.pending_request.requested_at)}
-              </p>
-              <div className="workspace-actions">
-                <button
-                  className="primary-link action-button"
-                  disabled={isRespondingToRequest || selectedRequestDetail?.status !== "pending"}
-                  onClick={onApproveRequest}
-                  type="button"
-                >
-                  {isRespondingToRequest ? "Submitting..." : "Approve request"}
-                </button>
-                <button
-                  className="secondary-link action-button"
-                  disabled={isRespondingToRequest || selectedRequestDetail?.status !== "pending"}
-                  onClick={onDenyRequest}
-                  type="button"
-                >
-                  Deny request
-                </button>
-                {selectedRequestDetail ? (
-                  <button
-                    className="secondary-link action-button"
-                    onClick={() => setDetailSelection({ kind: "request_detail" })}
-                    type="button"
-                  >
-                    Request detail
-                  </button>
+                <p className="eyebrow">{isStartingThread ? "Workspace input" : "Current thread"}</p>
+                {selectedThreadView ? (
+                  <span className="status-badge success">
+                    {selectedThreadView.current_activity.label}
+                  </span>
+                ) : isOpeningSelectedThread ? (
+                  <span className="status-badge">Opening</span>
+                ) : workspaceId ? (
+                  <span className="status-badge">Ready for workspace input</span>
                 ) : null}
               </div>
-            </div>
-          ) : selectedThreadView?.latest_resolved_request ? (
-            <div className="request-detail-card resolved-request-card">
-              <div className="workspace-meta-row">
-                <strong>Latest resolved request</strong>
-                <span className={requestBadgeClass(selectedRequestDetail)}>
-                  {selectedThreadView.latest_resolved_request.decision}
-                </span>
-              </div>
-              <p>Decision: {selectedThreadView.latest_resolved_request.decision}</p>
+              <h2>
+                {selectedThreadView?.thread.title ??
+                  (isOpeningSelectedThread
+                    ? "Opening thread"
+                    : workspaceId
+                      ? `Ask Codex in ${selectedWorkspace?.workspace_name ?? workspaceId}`
+                      : "Select workspace")}
+              </h2>
               <p className="workspace-meta">
-                Responded {formatTimestamp(selectedThreadView.latest_resolved_request.responded_at)}
+                {selectedThreadView
+                  ? `Workspace ${selectedWorkspace?.workspace_name ?? selectedThreadView.thread.workspace_id} - Updated ${formatTimestamp(
+                      selectedThreadView.thread.updated_at,
+                    )}`
+                  : isOpeningSelectedThread
+                    ? `Loading ${selectedThreadId}.`
+                    : workspaceId
+                      ? "Ask Codex to start a new thread, or pick a thread from Navigation."
+                      : "Select or create a workspace from Navigation before starting work."}
               </p>
-              {selectedRequestDetail ? (
-                <button
-                  className="secondary-link action-button inline-detail-button"
-                  onClick={() => setDetailSelection({ kind: "request_detail" })}
-                  type="button"
-                >
-                  Reopen request detail
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-
-          {selectedThreadView?.composer.interrupt_available ? (
-            <div className="workspace-actions thread-interrupt-actions">
-              <button
-                className="secondary-link action-button"
-                disabled={isInterruptingThread}
-                onClick={onInterruptThread}
-                type="button"
-              >
-                {isInterruptingThread ? "Interrupting..." : "Interrupt thread"}
-              </button>
-            </div>
-          ) : null}
-
-          <section className="timeline-section" aria-label="Timeline">
-            <header>
-              <p className="eyebrow">Timeline</p>
-              <h2>Thread context</h2>
+              <div className="hero-metrics thread-context-metrics">
+                <span className="metric-chip">
+                  Workspace: {selectedWorkspace?.workspace_name ?? workspaceId}
+                </span>
+                <span className="metric-chip">
+                  Stream:{" "}
+                  {connectionState === "live"
+                    ? "live"
+                    : connectionState === "reconnecting"
+                      ? "reacquiring"
+                      : "idle"}
+                </span>
+                <span className="metric-chip">Threads: {threads.length}</span>
+                {workspaceId ? (
+                  <Link
+                    className="secondary-link compact-link"
+                    href={threadChatHref(workspaceId, selectedThreadId ?? undefined)}
+                  >
+                    Refresh
+                  </Link>
+                ) : null}
+              </div>
             </header>
 
-            {isLoadingThread ? (
-              <p className="workspace-status">
-                {selectedThreadId
-                  ? "Opening this thread and restoring its latest timeline..."
-                  : "Preparing thread view..."}
+            <div className="current-activity-card">
+              <div className="workspace-meta-row">
+                <strong>Current activity</strong>
+                <span className="status-badge">
+                  {selectedThreadView?.current_activity.label ??
+                    (isOpeningSelectedThread
+                      ? "Opening"
+                      : workspaceId
+                        ? "Ready for first input"
+                        : "Workspace required")}
+                </span>
+              </div>
+              <p className="workspace-meta">
+                {workspaceId
+                  ? currentActivitySummary(selectedThreadView, isOpeningSelectedThread)
+                  : "Choose a workspace to enable the composer."}
               </p>
-            ) : null}
+            </div>
+          </div>
 
-            <div className="chat-message-list">
-              {!isLoadingThread && selectedThreadView && timelineModel.groups.length === 0 ? (
-                <p className="empty-state">
-                  No timeline items yet. Start the thread or send follow-up input to continue.
-                </p>
+          <div className="thread-view-body">
+            <div className="thread-view-scroll-region">
+              {selectedThreadView?.pending_request ? (
+                <div className="request-detail-card pending-request-card">
+                  <div className="workspace-meta-row">
+                    <strong>Pending request</strong>
+                    <span className={requestBadgeClass(selectedRequestDetail)}>
+                      {formatMachineLabel(selectedThreadView.pending_request.risk_category)}
+                    </span>
+                  </div>
+                  <p>{selectedThreadView.pending_request.summary}</p>
+                  {selectedRequestDetail ? (
+                    <p className="workspace-meta">{selectedRequestDetail.reason}</p>
+                  ) : null}
+                  {selectedRequestDetail?.operation_summary ? (
+                    <p className="workspace-meta">
+                      Operation: {selectedRequestDetail.operation_summary}
+                    </p>
+                  ) : null}
+                  <p className="workspace-meta">
+                    Requested {formatTimestamp(selectedThreadView.pending_request.requested_at)}
+                  </p>
+                  <div className="workspace-actions">
+                    <button
+                      className="primary-link action-button"
+                      disabled={
+                        isRespondingToRequest || selectedRequestDetail?.status !== "pending"
+                      }
+                      onClick={onApproveRequest}
+                      type="button"
+                    >
+                      {isRespondingToRequest ? "Submitting..." : "Approve request"}
+                    </button>
+                    <button
+                      className="secondary-link action-button"
+                      disabled={
+                        isRespondingToRequest || selectedRequestDetail?.status !== "pending"
+                      }
+                      onClick={onDenyRequest}
+                      type="button"
+                    >
+                      Deny request
+                    </button>
+                    {selectedRequestDetail ? (
+                      <button
+                        className="secondary-link action-button"
+                        onClick={() => setDetailSelection({ kind: "request_detail" })}
+                        type="button"
+                      >
+                        Request detail
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : selectedThreadView?.latest_resolved_request ? (
+                <div className="request-detail-card resolved-request-card">
+                  <div className="workspace-meta-row">
+                    <strong>Latest resolved request</strong>
+                    <span className={requestBadgeClass(selectedRequestDetail)}>
+                      {selectedThreadView.latest_resolved_request.decision}
+                    </span>
+                  </div>
+                  <p>Decision: {selectedThreadView.latest_resolved_request.decision}</p>
+                  <p className="workspace-meta">
+                    Responded{" "}
+                    {formatTimestamp(selectedThreadView.latest_resolved_request.responded_at)}
+                  </p>
+                  {selectedRequestDetail ? (
+                    <button
+                      className="secondary-link action-button inline-detail-button"
+                      onClick={() => setDetailSelection({ kind: "request_detail" })}
+                      type="button"
+                    >
+                      Reopen request detail
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
 
-              {timelineModel.groups.map((group) => (
-                <section
-                  className={group.turnId ? "timeline-turn-group" : "timeline-ungrouped-item"}
-                  data-turn-id={group.turnId ?? undefined}
-                  key={group.id}
-                >
-                  {group.turnId ? (
-                    <div className="timeline-turn-label">
-                      <span>Turn</span>
-                      <strong>{group.turnId}</strong>
-                    </div>
-                  ) : null}
-                  {group.rows.map((row) => (
-                    <article className={timelineRowClass(row)} key={row.id}>
-                      <div className="workspace-meta-row">
-                        <strong>{row.label}</strong>
-                        <span className="workspace-meta">
-                          {row.isLive ? "Live" : formatTimestamp(row.occurredAt)}
-                        </span>
-                      </div>
-                      <p>{row.content}</p>
-                      {row.timelineItemId ? (
-                        <button
-                          className="secondary-link action-button inline-detail-button"
-                          onClick={() =>
-                            setDetailSelection({
-                              kind: "timeline_item_detail",
-                              timelineItemId: row.timelineItemId ?? "",
-                            })
-                          }
-                          type="button"
-                        >
-                          Timeline item detail
-                        </button>
-                      ) : null}
-                    </article>
-                  ))}
-                </section>
-              ))}
-            </div>
-          </section>
+              {selectedThreadView?.composer.interrupt_available ? (
+                <div className="workspace-actions thread-interrupt-actions">
+                  <button
+                    className="secondary-link action-button"
+                    disabled={isInterruptingThread}
+                    onClick={onInterruptThread}
+                    type="button"
+                  >
+                    {isInterruptingThread ? "Interrupting..." : "Interrupt thread"}
+                  </button>
+                </div>
+              ) : null}
 
-          <div className="chat-composer" data-composer-mode={isStartingThread ? "start" : "send"}>
-            <label className="form-label" htmlFor="thread-composer-input">
-              {composerLabel}
-              <textarea
-                className="chat-textarea"
-                disabled={
-                  !workspaceId ||
-                  isOpeningSelectedThread ||
-                  isSubmittingComposer ||
-                  Boolean(unavailableReason)
-                }
-                id="thread-composer-input"
-                name="thread-composer-input"
-                onChange={(event) => onComposerDraftChange(event.target.value)}
-                placeholder={composerPlaceholder}
-                rows={4}
-                value={composerDraft}
-              />
-            </label>
-            {composerGuidance ? (
-              <p className="composer-guidance" role="status">
-                {composerGuidance}
-              </p>
-            ) : (
-              <p className="composer-guidance" role="status">
-                {isStartingThread
-                  ? "First input starts a new thread in this workspace."
-                  : "Input will continue the selected thread."}
-              </p>
-            )}
-            <button
-              className="submit-button"
-              disabled={isComposerDisabled}
-              onClick={onSubmitComposer}
-              type="button"
-            >
-              {composerSubmitLabel}
-            </button>
+              <section className="timeline-section" aria-label="Timeline">
+                <header>
+                  <p className="eyebrow">Timeline</p>
+                  <h2>Thread context</h2>
+                </header>
+
+                {isLoadingThread ? (
+                  <p className="workspace-status">
+                    {selectedThreadId
+                      ? "Opening this thread and restoring its latest timeline..."
+                      : "Preparing thread view..."}
+                  </p>
+                ) : null}
+
+                <div className="chat-message-list">
+                  {!isLoadingThread && selectedThreadView && timelineModel.groups.length === 0 ? (
+                    <p className="empty-state">
+                      No timeline items yet. Start the thread or send follow-up input to continue.
+                    </p>
+                  ) : null}
+
+                  {timelineModel.groups.map((group) => (
+                    <section
+                      className={group.turnId ? "timeline-turn-group" : "timeline-ungrouped-item"}
+                      data-turn-id={group.turnId ?? undefined}
+                      key={group.id}
+                    >
+                      {group.turnId ? (
+                        <div className="timeline-turn-label">
+                          <span>Turn</span>
+                          <strong>{group.turnId}</strong>
+                        </div>
+                      ) : null}
+                      {group.rows.map((row) => (
+                        <article className={timelineRowClass(row)} key={row.id}>
+                          <div className="workspace-meta-row">
+                            <strong>{row.label}</strong>
+                            <span className="workspace-meta">
+                              {row.isLive ? "Live" : formatTimestamp(row.occurredAt)}
+                            </span>
+                          </div>
+                          <p>{row.content}</p>
+                          {row.timelineItemId ? (
+                            <button
+                              className="secondary-link action-button inline-detail-button"
+                              onClick={() =>
+                                setDetailSelection({
+                                  kind: "timeline_item_detail",
+                                  timelineItemId: row.timelineItemId ?? "",
+                                })
+                              }
+                              type="button"
+                            >
+                              Timeline item detail
+                            </button>
+                          ) : null}
+                        </article>
+                      ))}
+                    </section>
+                  ))}
+                </div>
+              </section>
+            </div>
+
+            <div className="chat-composer" data-composer-mode={isStartingThread ? "start" : "send"}>
+              <label className="form-label" htmlFor="thread-composer-input">
+                {composerLabel}
+                <textarea
+                  className="chat-textarea"
+                  disabled={
+                    !workspaceId ||
+                    isOpeningSelectedThread ||
+                    isSubmittingComposer ||
+                    Boolean(unavailableReason)
+                  }
+                  id="thread-composer-input"
+                  name="thread-composer-input"
+                  onChange={(event) => onComposerDraftChange(event.target.value)}
+                  placeholder={composerPlaceholder}
+                  rows={4}
+                  value={composerDraft}
+                />
+              </label>
+              {composerGuidance ? (
+                <p className="composer-guidance" role="status">
+                  {composerGuidance}
+                </p>
+              ) : (
+                <p className="composer-guidance" role="status">
+                  {isStartingThread
+                    ? "First input starts a new thread in this workspace."
+                    : "Input will continue the selected thread."}
+                </p>
+              )}
+              <button
+                className="submit-button"
+                disabled={isComposerDisabled}
+                onClick={onSubmitComposer}
+                type="button"
+              >
+                {composerSubmitLabel}
+              </button>
+            </div>
           </div>
         </section>
 

@@ -42,15 +42,32 @@
 
 ## Artifacts / evidence
 
-- Planned: `artifacts/visual-inspection/issue-215-first-input-composer/`
-- Planned: focused frontend test and validation command output in handoff notes.
+- Visual evidence: `artifacts/visual-inspection/issue-215-first-input-composer/`
+- Sprint validation:
+  - `npm run check`
+  - `node ./node_modules/vitest/vitest.mjs run tests/chat-view.test.tsx tests/chat-page-client.test.tsx`
+  - `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 npm run test:e2e -- e2e/issue-215-first-input-composer.spec.ts --project=mobile-chromium --reporter=line`
+  - `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 npm run test:e2e -- e2e/issue-215-first-input-composer.spec.ts --project=desktop-chromium --reporter=line`
+- Dedicated pre-push validation:
+  - `npm run check`: passed
+  - focused Vitest: 2 files passed, 23 tests passed
+  - mobile Playwright issue spec: 2 passed
+  - desktop Playwright issue spec: 2 passed
 
 ## Status / handoff notes
 
-- Status: `started`
+- Status: `locally complete`
 - Active branch: `issue-215-first-input-composer`
 - Active worktree: `.worktrees/issue-215-first-input-composer`
-- Notes: Package created from #215 before implementation. Project status update to `In Progress` is handled through the GitHub Projects workflow.
+- Notes: Implemented Navigation `Ask Codex` reset to workspace-scoped first-input mode, single composer start/continuation behavior, bounded Thread View body/composer layout, focused tests, and desktop/mobile Playwright coverage. Evaluator approved the sprint after the mobile pending-request composer reachability blocker was fixed and proven with viewport-based assertions.
+- Completion retrospective:
+  - Completion boundary: package archive after local completion and pre-push validation.
+  - Contract check: Issue #215 acceptance criteria are satisfied locally; Issue close still requires PR merge to `main`, parent checkout sync, worktree cleanup, and GitHub tracking update.
+  - What worked: evaluator caught a real mobile layout proof gap before publication; the narrowed replan kept the fix scoped to #215.
+  - Workflow problems: the first pre-push validation prompt used the wrong Vitest cwd and did not allow a temporary e2e server, causing a recoverable validation framing failure.
+  - Improvements to adopt: pre-push validation prompts for frontend e2e slices should explicitly run from the app directory and state whether a temporary dev server may be started for read-only browser validation.
+  - Skill candidates or skill updates: consider updating `codex-webui-pre-push-validation` examples with app-local cwd and temporary server wording for Playwright-backed slices.
+  - Follow-up updates: none required before archive; publish-oriented GitHub handoff remains required.
 
 ## Archive conditions
 

@@ -359,6 +359,8 @@ textarea {
 .chat-shell {
   display: grid;
   gap: 12px;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 100vh;
   min-width: 0;
   padding: 12px;
 }
@@ -387,6 +389,7 @@ textarea {
 .chat-layout {
   display: grid;
   gap: 12px;
+  min-height: 0;
   min-width: 0;
 }
 
@@ -424,8 +427,25 @@ textarea {
 }
 
 .thread-view-card {
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   min-height: calc(100vh - 104px);
+  overflow: hidden;
+}
+
+.thread-view-header-stack,
+.thread-view-body {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.thread-view-body {
+  display: grid;
+  flex: 1;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
 }
 
 .thread-context-metrics {
@@ -451,6 +471,10 @@ textarea {
   max-height: 28rem;
   overflow-y: auto;
   padding-right: 4px;
+}
+
+.navigation-ask-codex {
+  width: 100%;
 }
 
 .thread-list-group {
@@ -535,10 +559,20 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.thread-view-scroll-region {
+  display: grid;
+  gap: 14px;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 12px;
+}
+
 .timeline-section {
   display: grid;
   gap: 12px;
   min-width: 0;
+  min-height: 0;
+  align-content: start;
 }
 
 .timeline-section header {
@@ -558,6 +592,7 @@ textarea {
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.58);
   padding: 14px;
+  box-shadow: 0 -10px 24px rgba(244, 239, 228, 0.8);
 }
 
 .composer-guidance {
@@ -801,6 +836,12 @@ textarea {
 }
 
 @media (max-width: 719px) {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+
   body {
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.58), transparent 18rem),
@@ -808,7 +849,10 @@ textarea {
   }
 
   .chat-shell {
+    height: 100dvh;
     gap: 10px;
+    min-height: 100dvh;
+    overflow: hidden;
     padding: 10px;
   }
 
@@ -824,6 +868,12 @@ textarea {
 
   .chat-topbar-actions {
     max-width: 44%;
+  }
+
+  .chat-layout {
+    height: 100%;
+    min-height: calc(100dvh - 84px);
+    overflow: hidden;
   }
 
   .thread-navigation.open,
@@ -857,7 +907,32 @@ textarea {
   }
 
   .thread-view-card {
-    min-height: auto;
+    display: grid;
+    gap: 12px;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .thread-view-header-stack {
+    gap: 12px;
+    min-height: 0;
+  }
+
+  .thread-view-body {
+    gap: 12px;
+    grid-template-rows: minmax(0, 1fr) auto;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .thread-view-scroll-region {
+    gap: 12px;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
   }
 
   .workspace-card,
@@ -959,6 +1034,12 @@ textarea {
     border-radius: 14px;
   }
 
+  .chat-composer {
+    margin: 0 -2px calc(env(safe-area-inset-bottom) + 2px);
+    flex-shrink: 0;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
   .primary-link,
   .secondary-link,
   .submit-button {
@@ -980,6 +1061,7 @@ textarea {
 
   .chat-shell {
     gap: 10px;
+    height: 100vh;
     padding: 22px;
   }
 
@@ -998,6 +1080,7 @@ textarea {
   }
 
   .chat-layout {
+    height: calc(100vh - 104px);
     grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
     align-items: stretch;
     gap: 0;
@@ -1017,7 +1100,7 @@ textarea {
     display: grid;
     position: sticky;
     top: 22px;
-    max-height: calc(100vh - 44px);
+    max-height: 100%;
     overflow: auto;
   }
 
@@ -1040,6 +1123,11 @@ textarea {
   .thread-detail-surface {
     background: rgba(255, 253, 248, 0.96);
     padding: 18px 20px;
+  }
+
+  .thread-view-card {
+    height: 100%;
+    min-height: 0;
   }
 
   .thread-detail-surface {
