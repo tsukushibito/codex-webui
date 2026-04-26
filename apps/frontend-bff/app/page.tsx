@@ -1,7 +1,7 @@
-import { ChatPageClient } from "@/src/chat-page-client";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default function HomePage() {
-  return <ChatPageClient />;
+  redirect("/chat");
 }

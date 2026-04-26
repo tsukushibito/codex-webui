@@ -9,6 +9,7 @@ This directory contains the public BFF and browser UI for the MVP implementation
 - Public shaping for workspace, thread, thread view, timeline, request helper, and notification stream data
 - Browser-facing SSE relay responsibilities for thread and notification streams
 - Thread-first browser UI surfaces for navigation, timeline, details, request response, and composer workflows
+- Compatibility entry redirects from `/` and `/approvals` into the canonical `/chat` thread-first shell
 - Public error passthrough and runtime-unavailable handling
 
 Use the maintained v0.9 public API and UI layout specs for current behavior boundaries:

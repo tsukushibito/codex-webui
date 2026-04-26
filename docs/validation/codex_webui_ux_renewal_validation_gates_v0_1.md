@@ -78,9 +78,9 @@ The current required automated gate set for `apps/frontend-bff` is:
 ```bash
 npm run check
 node ./node_modules/typescript/bin/tsc --noEmit --pretty false
-npm test -- tests/chat-page-client.test.tsx tests/home-page-client.test.tsx
-npm run test:e2e -- e2e/chat-flow.spec.ts e2e/approval-flow.spec.ts e2e/background-priority.spec.ts --project=desktop-chromium --reporter=line
-npm run test:e2e -- e2e/chat-flow.spec.ts e2e/approval-flow.spec.ts e2e/background-priority.spec.ts --project=mobile-chromium --reporter=line
+npm test -- tests/chat-page-client.test.tsx tests/browser-entry-routes.test.ts
+npm run test:e2e -- e2e/legacy-entry-routes.spec.ts e2e/chat-flow.spec.ts e2e/approval-flow.spec.ts e2e/background-priority.spec.ts --project=desktop-chromium --reporter=line
+npm run test:e2e -- e2e/legacy-entry-routes.spec.ts e2e/chat-flow.spec.ts e2e/approval-flow.spec.ts e2e/background-priority.spec.ts --project=mobile-chromium --reporter=line
 ```
 
 These commands are the bounded validation slice for the UX renewal gates in this work package. Broader build or redesign validation is out of scope for this document version.
@@ -92,8 +92,8 @@ These commands are the bounded validation slice for the UX renewal gates in this
 | First-input thread start in workspace context | roadmap `5.4` item 4; UI layout spec section `13.4`; requirements thread-first/mobile start rules | `apps/frontend-bff/e2e/chat-flow.spec.ts`; `apps/frontend-bff/tests/chat-page-client.test.tsx` | desktop and mobile visual pass during targeted browser inspection |
 | Existing-thread continuation and normal composer flow | roadmap `5.4` item 4; UI layout spec section `13.3` and `13.4` | `apps/frontend-bff/e2e/chat-flow.spec.ts`; `apps/frontend-bff/tests/chat-page-client.test.tsx` | desktop and mobile visual pass during targeted browser inspection |
 | Pending request response inside thread context | roadmap `5.4` item 4; UI layout spec section `13.5`; requirements request-response rules | `apps/frontend-bff/e2e/approval-flow.spec.ts`; `apps/frontend-bff/tests/chat-page-client.test.tsx` | desktop and mobile request card/readability inspection |
-| Background high-priority return via lightweight notification | roadmap `5.3` items 7 and acceptance bullets; roadmap `5.4` item 6; UI layout spec sections `12` and `13.7` | `apps/frontend-bff/e2e/background-priority.spec.ts`; `apps/frontend-bff/tests/chat-page-client.test.tsx`; `apps/frontend-bff/tests/home-page-client.test.tsx` | desktop and mobile notice visibility plus return-path inspection |
-| No standalone approval screen required for background return | UI layout spec sections `3.3`, `5.5`, `12.3`, `13.5`, `13.11` | `apps/frontend-bff/e2e/background-priority.spec.ts`; `apps/frontend-bff/tests/routes.test.ts` retired approvals-route quarantine; `apps/frontend-bff/tests/chat-page-client.test.tsx` | browser review confirms the return path stays on `/chat` thread context |
+| Background high-priority return via lightweight notification | roadmap `5.3` items 7 and acceptance bullets; roadmap `5.4` item 6; UI layout spec sections `12` and `13.7` | `apps/frontend-bff/e2e/background-priority.spec.ts`; `apps/frontend-bff/tests/chat-page-client.test.tsx` | desktop and mobile notice visibility plus return-path inspection |
+| Legacy browser entry compatibility stays thread-first | UI layout spec sections `3.3`, `5.5`, `12.3`, `13.5`, `13.11` | `apps/frontend-bff/e2e/legacy-entry-routes.spec.ts`; `apps/frontend-bff/tests/browser-entry-routes.test.ts` | browser review confirms `/` and `/approvals` land on `/chat` without standalone Home or Approvals UI |
 | Reconnect and state reacquisition convergence | roadmap `5.4` item 3 and item 4; UI layout spec section `13.9` | `apps/frontend-bff/tests/chat-page-client.test.tsx`; `apps/frontend-bff/tests/chat-send-recovery.test.ts` | deferred manual reconnect drill in a full-stack session when pre-push validation runs |
 | Desktop detail remains selection-driven | UI layout spec sections `11.3`, `11.4`, `13.6`, `13.7` | `apps/frontend-bff/tests/chat-page-client.test.tsx`; `apps/frontend-bff/tests/chat-view.test.tsx` | desktop visual inspection of request/background flows |
 | Mobile reachability for notification return and request response | roadmap `5.4` item 5; requirements mobile acceptance rules; UI layout spec sections `4.6`, `6`, `13.10` | `apps/frontend-bff/e2e/approval-flow.spec.ts`; `apps/frontend-bff/e2e/background-priority.spec.ts` | mobile visual inspection at Playwright mobile project width |
@@ -132,6 +132,7 @@ Current automated evidence for this document version is expected from:
 - `apps/frontend-bff/e2e/approval-flow.spec.ts`
 - `apps/frontend-bff/e2e/background-priority.spec.ts`
 - `apps/frontend-bff/tests/chat-page-client.test.tsx`
-- `apps/frontend-bff/tests/home-page-client.test.tsx`
+- `apps/frontend-bff/tests/browser-entry-routes.test.ts`
+- `apps/frontend-bff/e2e/legacy-entry-routes.spec.ts`
 
 Current manual evidence remains targeted visual/browser inspection for desktop and mobile layouts. Record execution-specific command results and inspection notes in the active task package and artifacts, not by rewriting this maintained document.

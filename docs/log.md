@@ -29,6 +29,28 @@ After the heading, keep the body concise:
 
 ## Entries
 
+## [2026-04-27] ingest | Issue #253 legacy browser entry redirects
+
+Source:
+
+- approved sprint slice for Issue `#253`
+- `apps/frontend-bff/app/page.tsx`
+- `apps/frontend-bff/app/approvals/page.tsx`
+- `apps/frontend-bff/e2e/chat-flow.spec.ts`
+- maintained UX renewal validation gates
+
+Updated:
+
+- `apps/frontend-bff/README.md`
+- `docs/validation/codex_webui_ux_renewal_validation_gates_v0_1.md`
+- `docs/log.md`
+
+Notes:
+
+- recorded `/` and `/approvals` as compatibility entry routes that immediately redirect into the canonical `/chat` thread-first shell
+- refreshed the maintained validation gate examples and evidence list to use redirect-focused browser coverage instead of retired Home-page component coverage
+- kept legacy REST Home aggregation and related route-handler validation intact because the compatibility cleanup only retires browser entry surfaces
+
 ## [2026-04-26] query | additional current UI UX gaps
 
 Source:

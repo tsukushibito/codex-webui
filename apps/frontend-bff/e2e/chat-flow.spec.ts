@@ -85,7 +85,7 @@ async function expectThreadRunning(page: Page, isDesktop: boolean) {
   ).toBeVisible();
 }
 
-test("runs the main thread flow from Home through interrupt on desktop and mobile", async ({
+test("runs the main thread flow through interrupt on desktop and mobile", async ({
   page,
 }, testInfo) => {
   const isDesktop = testInfo.project.name === "desktop-chromium";
