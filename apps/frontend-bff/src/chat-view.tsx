@@ -7,9 +7,9 @@ import type {
   PublicThreadListItem,
   PublicThreadStreamEvent,
   PublicThreadView,
-  PublicTimelineItem,
 } from "./thread-types";
 import { buildTimelineDisplayModel, type TimelineDisplayRow } from "./timeline-display-model";
+import { getTimelineItemDetail } from "./timeline-item-detail";
 
 export interface ChatViewProps {
   workspaceId: string | null;
@@ -192,10 +192,6 @@ type ThreadFeedbackDescriptor = {
   summary: string;
   actions: ThreadFeedbackAction[];
 };
-
-function timelineItemLabel(item: PublicTimelineItem) {
-  return String(item.payload.content ?? item.payload.summary ?? item.kind);
-}
 
 function timelineRowClass(row: TimelineDisplayRow) {
   return `timeline-row timeline-row-${row.density} timeline-row-${row.role}`;
@@ -554,6 +550,9 @@ export function ChatView({
           (item) => item.timeline_item_id === detailSelection.timelineItemId,
         ) ?? null)
       : null;
+  const selectedTimelineItemDetail = selectedTimelineItem
+    ? getTimelineItemDetail(selectedTimelineItem)
+    : null;
   const timelineModel = buildTimelineDisplayModel({
     timelineItems: selectedThreadView?.timeline.items ?? [],
     streamEvents,
@@ -1221,7 +1220,7 @@ export function ChatView({
                               }
                               type="button"
                             >
-                              Timeline item detail
+                              {row.detailActionLabel ?? "Inspect details"}
                             </button>
                           ) : null}
                         </article>
@@ -1291,7 +1290,7 @@ export function ChatView({
               <h2>
                 {detailSelection.kind === "request_detail"
                   ? "Request detail"
-                  : "Timeline item detail"}
+                  : (selectedTimelineItemDetail?.title ?? "Timeline detail")}
               </h2>
             </header>
 
@@ -1374,15 +1373,48 @@ export function ChatView({
               </div>
             ) : null}
 
-            {detailSelection.kind === "timeline_item_detail" && selectedTimelineItem ? (
+            {detailSelection.kind === "timeline_item_detail" &&
+            selectedTimelineItem &&
+            selectedTimelineItemDetail ? (
               <div className="detail-stack">
                 <p className="workspace-meta">
                   {selectedTimelineItem.kind} at {formatTimestamp(selectedTimelineItem.occurred_at)}
                 </p>
-                <p>{timelineItemLabel(selectedTimelineItem)}</p>
-                <pre className="detail-json">
-                  {JSON.stringify(selectedTimelineItem.payload, null, 2)}
-                </pre>
+                <p>{selectedTimelineItemDetail.summary}</p>
+                {selectedTimelineItemDetail.sections.map((section) => (
+                  <div className="request-operation-summary" key={section.title}>
+                    <strong>{section.title}</strong>
+                    <ul className="detail-list">
+                      {section.items.map((entry) => (
+                        <li key={entry}>{section.code ? <code>{entry}</code> : entry}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+                {selectedTimelineItemDetail.fields.length > 0 ? (
+                  <dl className="request-detail-list">
+                    {selectedTimelineItemDetail.fields.map((field) => (
+                      <div key={`${field.label}:${field.value}`}>
+                        <dt>{field.label}</dt>
+                        <dd>
+                          {field.href ? (
+                            <a href={field.href} rel="noreferrer" target="_blank">
+                              {field.value}
+                            </a>
+                          ) : (
+                            field.value
+                          )}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : null}
+                <details className="detail-debug">
+                  <summary>Debug: raw timeline payload JSON</summary>
+                  <pre className="detail-json">
+                    {JSON.stringify(selectedTimelineItem.payload, null, 2)}
+                  </pre>
+                </details>
               </div>
             ) : null}
           </aside>

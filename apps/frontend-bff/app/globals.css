@@ -886,6 +886,19 @@ textarea {
   padding: 10px 12px;
 }
 
+.detail-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.detail-list li + li {
+  margin-top: 6px;
+}
+
+.detail-debug summary {
+  cursor: pointer;
+}
+
 .request-detail-actions {
   margin-top: 2px;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PublicThreadStreamEvent, PublicTimelineItem } from "../src/thread-types";
 import { buildTimelineDisplayModel, classifyTimelineDensity } from "../src/timeline-display-model";
+import { getTimelineItemDetail } from "../src/timeline-item-detail";
 
 function timelineItem(overrides: Partial<PublicTimelineItem>): PublicTimelineItem {
   return {
@@ -546,12 +547,20 @@ describe("timeline display model", () => {
             summary: "Updated src/app.ts",
           },
         }),
+        timelineItem({
+          timeline_item_id: "note_001",
+          sequence: 3,
+          kind: "thread.note",
+          payload: {
+            summary: "Saved progress",
+          },
+        }),
       ],
       streamEvents: [
         streamEvent({
           event_id: "status_001",
           event_type: "session.status_changed",
-          sequence: 3,
+          sequence: 4,
           payload: {
             summary: "Running tool",
           },
@@ -570,6 +579,13 @@ describe("timeline display model", () => {
         id: "timeline:file_001",
         label: "File update",
         showDetailButton: true,
+        detailActionLabel: "Inspect artifacts",
+      }),
+      expect.objectContaining({
+        id: "timeline:note_001",
+        label: "Thread update",
+        showDetailButton: false,
+        detailActionLabel: null,
       }),
       expect.objectContaining({
         id: "stream:status_001",
@@ -617,5 +633,78 @@ describe("timeline display model", () => {
       "Request needs attention",
       "Turn failed",
     ]);
+  });
+
+  it("extracts contextual artifacts and operational fields from timeline payloads", () => {
+    const detail = getTimelineItemDetail(
+      timelineItem({
+        kind: "approval.requested",
+        payload: {
+          summary: "Run release flow",
+          request_id: "req_219",
+          command: "npm run build",
+          file_paths: ["apps/frontend-bff/src/chat-view.tsx"],
+          tests: ["node ./node_modules/vitest/vitest.mjs run tests/chat-view.test.tsx"],
+          diff: "diff --git a/src/chat-view.tsx b/src/chat-view.tsx",
+          issue_url: "https://github.com/example/repo/issues/219",
+          generated_outputs: ["artifacts/visual-inspection/issue-219.png"],
+          operation_summary: "Create release candidate",
+          target: "Issue #219 detail surface",
+          consequence: "Approval required before publish",
+        },
+      }),
+    );
+
+    expect(detail.actionLabel).toBe("Inspect request");
+    expect(detail.hasContext).toBe(true);
+    expect(detail.sections).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Commands",
+          items: ["npm run build"],
+        }),
+        expect.objectContaining({
+          title: "Files",
+          items: ["apps/frontend-bff/src/chat-view.tsx"],
+        }),
+        expect.objectContaining({
+          title: "Tests",
+          items: ["node ./node_modules/vitest/vitest.mjs run tests/chat-view.test.tsx"],
+        }),
+        expect.objectContaining({
+          title: "Diffs",
+          items: ["diff --git a/src/chat-view.tsx b/src/chat-view.tsx"],
+        }),
+        expect.objectContaining({
+          title: "Generated outputs",
+          items: ["artifacts/visual-inspection/issue-219.png"],
+        }),
+      ]),
+    );
+    expect(detail.fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: "Request ID",
+          value: "req_219",
+        }),
+        expect.objectContaining({
+          label: "Issue",
+          value: "https://github.com/example/repo/issues/219",
+          href: "https://github.com/example/repo/issues/219",
+        }),
+        expect.objectContaining({
+          label: "Operation",
+          value: "Create release candidate",
+        }),
+        expect.objectContaining({
+          label: "Target",
+          value: "Issue #219 detail surface",
+        }),
+        expect.objectContaining({
+          label: "Consequence",
+          value: "Approval required before publish",
+        }),
+      ]),
+    );
   });
 });

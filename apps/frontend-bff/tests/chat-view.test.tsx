@@ -639,7 +639,8 @@ describe("ChatView", () => {
     expect(markup).toContain("timeline-row-prominent");
     expect(markup).toContain("Status update");
     expect(markup).toContain("timeline-row-compact");
-    expect(markup.match(/Timeline item detail/g) ?? []).toHaveLength(1);
+    expect(markup).toContain("Inspect artifacts");
+    expect(markup).not.toContain("Timeline item detail");
     expect(markup).not.toContain("approval.requested");
     expect(markup).not.toContain("session.status_changed");
     expect(markup.match(/<textarea/g) ?? []).toHaveLength(1);
@@ -692,6 +693,123 @@ describe("ChatView", () => {
     expect(markup).toContain("Failed to interrupt the thread.");
     expect(markup.indexOf("chat-feedback-stack")).toBeLessThan(
       markup.indexOf("chat-panel create-card"),
+    );
+  });
+
+  it("renders structured timeline detail before collapsed debug JSON", async () => {
+    await act(async () => {
+      root.render(
+        <ChatView
+          backgroundPriorityNotice={null}
+          connectionState="idle"
+          draftAssistantMessages={{}}
+          errorMessage={null}
+          isCreatingThread={false}
+          isCreatingWorkspace={false}
+          isInterruptingThread={false}
+          isLoadingThread={false}
+          isLoadingThreads={false}
+          isLoadingWorkspaces={false}
+          isRespondingToRequest={false}
+          isSendingMessage={false}
+          composerDraft=""
+          onApproveRequest={() => {}}
+          onSubmitComposer={() => {}}
+          onCreateWorkspace={() => {}}
+          onDenyRequest={() => {}}
+          onInterruptThread={() => {}}
+          onOpenBackgroundPriorityThread={() => {}}
+          onAskCodex={() => {}}
+          onComposerDraftChange={() => {}}
+          onSelectThread={() => {}}
+          onSelectWorkspace={() => {}}
+          onWorkspaceNameChange={() => {}}
+          selectedRequestDetail={null}
+          selectedThreadId="thread_001"
+          selectedThreadView={{
+            thread: {
+              thread_id: "thread_001",
+              title: "Failure thread",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "idle",
+                active_flags: [],
+                latest_turn_status: "failed",
+              },
+              updated_at: "2026-03-27T05:22:00Z",
+            },
+            current_activity: {
+              kind: "latest_turn_failed",
+              label: "Latest turn failed",
+            },
+            pending_request: null,
+            latest_resolved_request: null,
+            composer: {
+              accepting_user_input: true,
+              interrupt_available: false,
+              blocked_by_request: false,
+              input_unavailable_reason: null,
+            },
+            timeline: {
+              items: [
+                {
+                  timeline_item_id: "evt_failure_001",
+                  thread_id: "thread_001",
+                  turn_id: "turn_001",
+                  item_id: "item_failure_001",
+                  sequence: 1,
+                  occurred_at: "2026-03-27T05:15:00Z",
+                  kind: "turn.failed",
+                  payload: {
+                    summary: "Tests failed after the patch",
+                    command: "npm run check",
+                    file_paths: ["apps/frontend-bff/src/chat-view.tsx"],
+                    tests: ["tests/chat-view.test.tsx"],
+                    diff: "diff --git a/apps/frontend-bff/src/chat-view.tsx b/apps/frontend-bff/src/chat-view.tsx",
+                    request_id: "req_failure_001",
+                    output: "artifacts/visual-inspection/issue-219-failure.txt",
+                    operation: "Validate timeline detail surface",
+                    target: "Issue #219",
+                    consequence: "Turn halted until review",
+                    error: "Expected contextual detail button",
+                  },
+                },
+              ],
+              next_cursor: null,
+              has_more: false,
+            },
+          }}
+          statusMessage={null}
+          streamEvents={[]}
+          threads={[]}
+          workspaceId="ws_alpha"
+          workspaceName=""
+          workspaces={[]}
+        />,
+      );
+    });
+
+    const inspectButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Inspect failure",
+    );
+    expect(inspectButton).not.toBeUndefined();
+
+    await act(async () => {
+      inspectButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(container.textContent).toContain("Failure detail");
+    expect(container.textContent).toContain("Commands");
+    expect(container.textContent).toContain("apps/frontend-bff/src/chat-view.tsx");
+    expect(container.textContent).toContain("tests/chat-view.test.tsx");
+    expect(container.textContent).toContain("Request ID");
+    expect(container.textContent).toContain("Debug: raw timeline payload JSON");
+
+    const debugDetails = container.querySelector("details.detail-debug");
+    expect(debugDetails).not.toBeNull();
+    expect(debugDetails?.hasAttribute("open")).toBe(false);
+    expect(container.innerHTML.indexOf("Commands")).toBeLessThan(
+      container.innerHTML.indexOf("Debug: raw timeline payload JSON"),
     );
   });
 
