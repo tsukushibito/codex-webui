@@ -73,6 +73,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Archived Task Packages
 
+- [issue-218-feedback-recovery](./archive/issue-218-feedback-recovery/README.md)
 - [issue-217-navigation-return-surface](./archive/issue-217-navigation-return-surface/README.md)
 - [issue-216-timeline-chronology](./archive/issue-216-timeline-chronology/README.md)
 - [issue-215-first-input-composer](./archive/issue-215-first-input-composer/README.md)

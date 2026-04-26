@@ -637,12 +637,44 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.thread-feedback-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(35, 24, 15, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 14px;
+}
+
+.thread-feedback-card .workspace-status {
+  margin: 0;
+}
+
+.thread-feedback-actions {
+  margin-top: 0;
+}
+
 .thread-view-scroll-region {
   display: grid;
   gap: 14px;
   min-height: 0;
   overflow: auto;
   padding-bottom: 12px;
+}
+
+.latest-activity-cta {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid rgba(35, 24, 15, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 252, 245, 0.96);
+  box-shadow: 0 10px 24px rgba(42, 25, 9, 0.1);
+  padding: 10px 12px;
 }
 
 .timeline-section {
@@ -1051,6 +1083,7 @@ textarea {
   }
 
   .current-activity-card,
+  .thread-feedback-card,
   .request-detail-card,
   .chat-composer {
     border-radius: 16px;
@@ -1084,6 +1117,12 @@ textarea {
 
   .thread-interrupt-actions {
     margin-top: 8px;
+  }
+
+  .latest-activity-cta {
+    align-items: stretch;
+    border-radius: 16px;
+    padding: 10px;
   }
 
   .timeline-section {

@@ -624,6 +624,10 @@ describe("ChatView", () => {
     expect(markup).toContain("Workspace alpha");
     expect(markup).toContain("Approval required");
     expect(markup).toContain("Codex is paused until you approve or deny the request below.");
+    expect(markup).toContain("Thread feedback");
+    expect(markup).toContain(
+      "Codex is blocked until you approve or deny the pending request in this thread.",
+    );
     expect(markup).toContain("Approve request");
     expect(markup).toContain("Input is paused while this thread waits for your approval response.");
     expect(markup).toContain("Operation: git push origin main");
@@ -843,6 +847,81 @@ describe("ChatView", () => {
     expect(markup).toContain("Open thread");
   });
 
+  it("renders ready-state recovery CTA to focus the composer", () => {
+    const markup = renderToStaticMarkup(
+      <ChatView
+        backgroundPriorityNotice={null}
+        connectionState="live"
+        draftAssistantMessages={{}}
+        errorMessage={null}
+        isCreatingThread={false}
+        isCreatingWorkspace={false}
+        isInterruptingThread={false}
+        isLoadingThread={false}
+        isLoadingThreads={false}
+        isLoadingWorkspaces={false}
+        isRespondingToRequest={false}
+        isSendingMessage={false}
+        composerDraft=""
+        onCreateWorkspace={() => {}}
+        onApproveRequest={() => {}}
+        onSubmitComposer={() => {}}
+        onDenyRequest={() => {}}
+        onInterruptThread={() => {}}
+        onOpenBackgroundPriorityThread={() => {}}
+        onAskCodex={() => {}}
+        onComposerDraftChange={() => {}}
+        onSelectWorkspace={() => {}}
+        onSelectThread={() => {}}
+        onWorkspaceNameChange={() => {}}
+        selectedRequestDetail={null}
+        selectedThreadId="thread_001"
+        selectedThreadView={{
+          thread: {
+            thread_id: "thread_001",
+            title: "Ready thread",
+            workspace_id: "ws_alpha",
+            native_status: {
+              thread_status: "waiting_input",
+              active_flags: [],
+              latest_turn_status: null,
+            },
+            updated_at: "2026-03-27T05:22:00Z",
+          },
+          current_activity: {
+            kind: "waiting_on_user_input",
+            label: "Waiting for your input",
+          },
+          pending_request: null,
+          latest_resolved_request: null,
+          composer: {
+            accepting_user_input: true,
+            interrupt_available: false,
+            blocked_by_request: false,
+            input_unavailable_reason: null,
+          },
+          timeline: {
+            items: [],
+            next_cursor: null,
+            has_more: false,
+          },
+        }}
+        statusMessage={null}
+        streamEvents={[]}
+        threads={[]}
+        workspaceId="ws_alpha"
+        workspaceName=""
+        workspaces={[]}
+      />,
+    );
+
+    expect(markup).toContain("Ready for your next input");
+    expect(markup).toContain(
+      "Codex is idle and the composer below is available for the next instruction.",
+    );
+    expect(markup).toContain("Focus composer");
+  });
+
   it("renders recovery input-unavailable reason as the single disabled composer state", () => {
     const markup = renderToStaticMarkup(
       <ChatView
@@ -916,5 +995,305 @@ describe("ChatView", () => {
     expect(markup).toContain("disabled");
     expect(markup).not.toContain('id="thread-input"');
     expect(markup).not.toContain('id="message-input"');
+  });
+
+  it("surfaces a latest-activity CTA when auto-scroll is suppressed", async () => {
+    const baseProps = {
+      backgroundPriorityNotice: null,
+      connectionState: "live" as const,
+      draftAssistantMessages: {},
+      errorMessage: null,
+      isCreatingThread: false,
+      isCreatingWorkspace: false,
+      isInterruptingThread: false,
+      isLoadingThread: false,
+      isLoadingThreads: false,
+      isLoadingWorkspaces: false,
+      isRespondingToRequest: false,
+      isSendingMessage: false,
+      composerDraft: "",
+      onCreateWorkspace: () => {},
+      onApproveRequest: () => {},
+      onSubmitComposer: () => {},
+      onDenyRequest: () => {},
+      onInterruptThread: () => {},
+      onOpenBackgroundPriorityThread: () => {},
+      onAskCodex: () => {},
+      onComposerDraftChange: () => {},
+      onSelectWorkspace: () => {},
+      onSelectThread: () => {},
+      onWorkspaceNameChange: () => {},
+      selectedRequestDetail: null,
+      selectedThreadId: "thread_001",
+      statusMessage: null,
+      threads: [],
+      workspaceId: "ws_alpha",
+      workspaceName: "",
+      workspaces: [],
+    };
+
+    await act(async () => {
+      root.render(
+        <ChatView
+          {...baseProps}
+          selectedThreadView={{
+            thread: {
+              thread_id: "thread_001",
+              title: "Scroll thread",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "running",
+                active_flags: [],
+                latest_turn_status: "running",
+              },
+              updated_at: "2026-03-27T05:22:00Z",
+            },
+            current_activity: {
+              kind: "running",
+              label: "Running",
+            },
+            pending_request: null,
+            latest_resolved_request: null,
+            composer: {
+              accepting_user_input: false,
+              interrupt_available: true,
+              blocked_by_request: false,
+              input_unavailable_reason: null,
+            },
+            timeline: {
+              items: [
+                {
+                  timeline_item_id: "evt_001",
+                  thread_id: "thread_001",
+                  turn_id: null,
+                  item_id: null,
+                  sequence: 1,
+                  occurred_at: "2026-03-27T05:22:00Z",
+                  kind: "message.user",
+                  payload: {
+                    summary: "user input accepted",
+                    content: "First item",
+                  },
+                },
+              ],
+              next_cursor: null,
+              has_more: false,
+            },
+          }}
+          streamEvents={[]}
+        />,
+      );
+    });
+
+    const scrollRegion = container.querySelector(".thread-view-scroll-region") as HTMLDivElement;
+    expect(scrollRegion).not.toBeNull();
+    Object.defineProperty(scrollRegion, "clientHeight", {
+      configurable: true,
+      value: 100,
+    });
+    Object.defineProperty(scrollRegion, "scrollHeight", {
+      configurable: true,
+      value: 1000,
+      writable: true,
+    });
+    Object.defineProperty(scrollRegion, "scrollTop", {
+      configurable: true,
+      value: 780,
+      writable: true,
+    });
+
+    await act(async () => {
+      scrollRegion.dispatchEvent(new Event("scroll", { bubbles: true }));
+    });
+
+    await act(async () => {
+      root.render(
+        <ChatView
+          {...baseProps}
+          selectedThreadView={{
+            thread: {
+              thread_id: "thread_001",
+              title: "Scroll thread",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "running",
+                active_flags: [],
+                latest_turn_status: "running",
+              },
+              updated_at: "2026-03-27T05:23:00Z",
+            },
+            current_activity: {
+              kind: "running",
+              label: "Running",
+            },
+            pending_request: null,
+            latest_resolved_request: null,
+            composer: {
+              accepting_user_input: false,
+              interrupt_available: true,
+              blocked_by_request: false,
+              input_unavailable_reason: null,
+            },
+            timeline: {
+              items: [
+                {
+                  timeline_item_id: "evt_001",
+                  thread_id: "thread_001",
+                  turn_id: null,
+                  item_id: null,
+                  sequence: 1,
+                  occurred_at: "2026-03-27T05:22:00Z",
+                  kind: "message.user",
+                  payload: {
+                    summary: "user input accepted",
+                    content: "First item",
+                  },
+                },
+                {
+                  timeline_item_id: "evt_002",
+                  thread_id: "thread_001",
+                  turn_id: null,
+                  item_id: null,
+                  sequence: 2,
+                  occurred_at: "2026-03-27T05:23:00Z",
+                  kind: "message.assistant.completed",
+                  payload: {
+                    summary: "assistant completed",
+                    content: "Second item",
+                  },
+                },
+              ],
+              next_cursor: null,
+              has_more: false,
+            },
+          }}
+          streamEvents={[]}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("New activity is available below.");
+    const jumpButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Jump to latest activity",
+    );
+    expect(jumpButton).not.toBeUndefined();
+
+    await act(async () => {
+      jumpButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(scrollRegion.scrollTop).toBe(1000);
+    expect(container.textContent).not.toContain("New activity is available below.");
+  });
+
+  it("keeps following latest activity when live assistant content grows on the same row", async () => {
+    const baseProps = {
+      backgroundPriorityNotice: null,
+      connectionState: "live" as const,
+      errorMessage: null,
+      isCreatingThread: false,
+      isCreatingWorkspace: false,
+      isInterruptingThread: false,
+      isLoadingThread: false,
+      isLoadingThreads: false,
+      isLoadingWorkspaces: false,
+      isRespondingToRequest: false,
+      isSendingMessage: false,
+      composerDraft: "",
+      onCreateWorkspace: () => {},
+      onApproveRequest: () => {},
+      onSubmitComposer: () => {},
+      onDenyRequest: () => {},
+      onInterruptThread: () => {},
+      onOpenBackgroundPriorityThread: () => {},
+      onAskCodex: () => {},
+      onComposerDraftChange: () => {},
+      onSelectWorkspace: () => {},
+      onSelectThread: () => {},
+      onWorkspaceNameChange: () => {},
+      selectedRequestDetail: null,
+      selectedThreadId: "thread_001",
+      selectedThreadView: {
+        thread: {
+          thread_id: "thread_001",
+          title: "Streaming thread",
+          workspace_id: "ws_alpha",
+          native_status: {
+            thread_status: "running",
+            active_flags: [],
+            latest_turn_status: "running",
+          },
+          updated_at: "2026-03-27T05:22:00Z",
+        },
+        current_activity: {
+          kind: "running",
+          label: "Running",
+        },
+        pending_request: null,
+        latest_resolved_request: null,
+        composer: {
+          accepting_user_input: false,
+          interrupt_available: true,
+          blocked_by_request: false,
+          input_unavailable_reason: null,
+        },
+        timeline: {
+          items: [],
+          next_cursor: null,
+          has_more: false,
+        },
+      },
+      statusMessage: null,
+      streamEvents: [],
+      threads: [],
+      workspaceId: "ws_alpha",
+      workspaceName: "",
+      workspaces: [],
+    };
+
+    await act(async () => {
+      root.render(<ChatView {...baseProps} draftAssistantMessages={{ msg_live_001: "Working" }} />);
+    });
+
+    const scrollRegion = container.querySelector(".thread-view-scroll-region") as HTMLDivElement;
+    expect(scrollRegion).not.toBeNull();
+    Object.defineProperty(scrollRegion, "clientHeight", {
+      configurable: true,
+      value: 100,
+    });
+    Object.defineProperty(scrollRegion, "scrollHeight", {
+      configurable: true,
+      value: 1000,
+      writable: true,
+    });
+    Object.defineProperty(scrollRegion, "scrollTop", {
+      configurable: true,
+      value: 1000,
+      writable: true,
+    });
+
+    await act(async () => {
+      root.render(
+        <ChatView {...baseProps} draftAssistantMessages={{ msg_live_001: "Working longer now" }} />,
+      );
+    });
+
+    Object.defineProperty(scrollRegion, "scrollHeight", {
+      configurable: true,
+      value: 1400,
+      writable: true,
+    });
+
+    await act(async () => {
+      root.render(
+        <ChatView
+          {...baseProps}
+          draftAssistantMessages={{ msg_live_001: "Working longer now with more streamed detail" }}
+        />,
+      );
+    });
+
+    expect(scrollRegion.scrollTop).toBe(1400);
+    expect(container.textContent).not.toContain("New activity is available below.");
   });
 });
