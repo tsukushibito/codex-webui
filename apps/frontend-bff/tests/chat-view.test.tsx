@@ -629,6 +629,8 @@ describe("ChatView", () => {
       "Codex is blocked until you approve or deny the pending request in this thread.",
     );
     expect(markup).toContain("Approve request");
+    expect(markup).toContain(">Threads<");
+    expect(markup).toContain(">Details<");
     expect(markup).toContain("Input is paused while this thread waits for your approval response.");
     expect(markup).toContain("Operation: git push origin main");
     expect(markup).toContain("Interrupt thread");

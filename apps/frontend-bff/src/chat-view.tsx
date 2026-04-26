@@ -558,6 +558,7 @@ export function ChatView({
     streamEvents,
     draftAssistantMessages,
   });
+  const hasRequestDetailAffordance = selectedRequestDetail !== null;
   const latestTimelineGroup = timelineModel.groups[timelineModel.groups.length - 1] ?? null;
   const latestTimelineRow = latestTimelineGroup?.rows[latestTimelineGroup.rows.length - 1] ?? null;
   const latestActivitySignature = selectedThreadId
@@ -1229,6 +1230,24 @@ export function ChatView({
                   ))}
                 </div>
               </section>
+            </div>
+
+            <div className="thread-mobile-footer-actions">
+              <button
+                className="secondary-link action-button compact-button"
+                onClick={() => setIsNavigationOpen(true)}
+                type="button"
+              >
+                Threads
+              </button>
+              <button
+                className="secondary-link action-button compact-button"
+                disabled={!hasRequestDetailAffordance}
+                onClick={() => setDetailSelection({ kind: "request_detail" })}
+                type="button"
+              >
+                Details
+              </button>
             </div>
 
             <div className="chat-composer" data-composer-mode={isStartingThread ? "start" : "send"}>

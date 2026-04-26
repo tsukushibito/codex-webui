@@ -37,17 +37,19 @@
 
 ## Artifacts / evidence
 
-- Planned validation:
-  - `npm run check`
-  - `node ./node_modules/typescript/bin/tsc --noEmit --pretty false`
-  - focused Vitest for chat view behavior
+- Sprint validation:
+  - `npm run check`: passed
+  - `node ./node_modules/typescript/bin/tsc --noEmit --pretty false`: passed
+  - `node ./node_modules/vitest/vitest.mjs run tests/chat-view.test.tsx`: passed, 12 tests
+  - `node ./node_modules/@playwright/test/cli.js test e2e/issue-220-mobile-thread-density.spec.ts --project=mobile-chromium`: passed, 1 test
+- Sprint evaluator: approved
 
 ## Status / handoff notes
 
-- Status: `in progress`
+- Status: `locally complete pending pre-push validation`
 - Active branch: `issue-220-mobile-thread-density`
 - Active worktree: `.worktrees/issue-220-mobile-thread-density`
-- Notes: Started from `origin/main` after #219 reached main. Keep #221 visual language and #222 broad validation out of this package.
+- Notes: Implemented mobile-only selected-thread density changes, sticky pending approval reachability, bottom Threads/Details affordances, and focused 360x780 Playwright coverage. Keep #221 visual language and #222 broad validation out of this package.
 
 ## Archive conditions
 
