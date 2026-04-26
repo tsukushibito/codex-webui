@@ -1,11 +1,249 @@
 import type { Page, Route } from "@playwright/test";
 
-function json(route: Route, body: unknown, status = 200) {
+export function fulfillJson(route: Route, body: unknown, status = 200) {
   return route.fulfill({
     status,
     contentType: "application/json",
     body: JSON.stringify(body),
   });
+}
+
+const json = fulfillJson;
+
+export function mockWorkspaceFixture(
+  overrides: Partial<{
+    workspace_id: string;
+    workspace_name: string;
+    created_at: string;
+    updated_at: string;
+    active_session_summary: {
+      session_id: string;
+      status: string;
+      last_message_at: string | null;
+    } | null;
+    pending_approval_count: number;
+  }> = {},
+) {
+  return {
+    workspace_id: "ws_alpha",
+    workspace_name: "alpha",
+    created_at: "2026-04-05T02:20:00Z",
+    updated_at: "2026-04-05T02:21:00Z",
+    active_session_summary: null,
+    pending_approval_count: 0,
+    ...overrides,
+  };
+}
+
+export function mockThreadSummaryFixture(
+  overrides: Partial<{
+    thread_id: string;
+    workspace_id: string;
+    native_status: {
+      thread_status: string;
+      active_flags: string[];
+      latest_turn_status: string | null;
+    };
+    updated_at: string;
+  }> = {},
+) {
+  return {
+    thread_id: "thread_001",
+    workspace_id: "ws_alpha",
+    native_status: {
+      thread_status: "idle",
+      active_flags: [],
+      latest_turn_status: "completed",
+    },
+    updated_at: "2026-04-05T02:21:00Z",
+    ...overrides,
+  };
+}
+
+export function mockThreadListItemFixture(
+  overrides: Partial<{
+    thread_id: string;
+    workspace_id: string;
+    native_status: {
+      thread_status: string;
+      active_flags: string[];
+      latest_turn_status: string | null;
+    };
+    updated_at: string;
+    current_activity: {
+      kind: string;
+      label: string;
+    };
+    badge: {
+      kind: string;
+      label: string;
+    } | null;
+    blocked_cue: {
+      kind: string;
+      label: string;
+    } | null;
+    resume_cue: {
+      reason_kind: string;
+      priority_band: "low" | "medium" | "high" | "highest";
+      label: string;
+    } | null;
+  }> = {},
+) {
+  return {
+    ...mockThreadSummaryFixture(),
+    current_activity: {
+      kind: "waiting_on_user_input",
+      label: "Waiting for your input",
+    },
+    badge: null,
+    blocked_cue: null,
+    resume_cue: {
+      reason_kind: "active_thread",
+      priority_band: "medium" as const,
+      label: "Active now",
+    },
+    ...overrides,
+  };
+}
+
+export function mockTimelineItemFixture(
+  overrides: Partial<{
+    timeline_item_id: string;
+    thread_id: string;
+    turn_id: string | null;
+    item_id: string | null;
+    sequence: number;
+    occurred_at: string;
+    kind: string;
+    payload: Record<string, unknown>;
+  }> = {},
+) {
+  return {
+    timeline_item_id: "evt_001",
+    thread_id: "thread_001",
+    turn_id: null,
+    item_id: null,
+    sequence: 1,
+    occurred_at: "2026-04-05T02:21:00Z",
+    kind: "message.assistant.completed",
+    payload: {
+      summary: "assistant completed",
+      content: "Fixture message",
+    },
+    ...overrides,
+  };
+}
+
+export function mockApprovalRequestFixture(
+  overrides: Partial<{
+    request_id: string;
+    thread_id: string;
+    turn_id: string;
+    item_id: string;
+    request_kind: string;
+    status: "pending" | "resolved";
+    risk_category: string;
+    summary: string;
+    requested_at: string;
+    responded_at?: string | null;
+    decision?: "approved" | "denied" | "pending" | null;
+  }> = {},
+) {
+  return {
+    request_id: "req_001",
+    thread_id: "thread_001",
+    turn_id: "turn_001",
+    item_id: "item_001",
+    request_kind: "approval",
+    status: "pending" as const,
+    risk_category: "external_side_effect",
+    summary: "Run deployment",
+    requested_at: "2026-04-05T02:40:00Z",
+    ...overrides,
+  };
+}
+
+export function mockThreadViewFixture(
+  overrides: Partial<{
+    thread: ReturnType<typeof mockThreadSummaryFixture>;
+    current_activity: {
+      kind: string;
+      label: string;
+    };
+    pending_request: ReturnType<typeof mockApprovalRequestFixture> | null;
+    latest_resolved_request: Record<string, unknown> | null;
+    composer: {
+      accepting_user_input: boolean;
+      interrupt_available: boolean;
+      blocked_by_request: boolean;
+    };
+    timeline: {
+      items: ReturnType<typeof mockTimelineItemFixture>[];
+      next_cursor: string | null;
+      has_more: boolean;
+    };
+  }> = {},
+) {
+  return {
+    thread: mockThreadSummaryFixture(),
+    current_activity: {
+      kind: "waiting_on_user_input",
+      label: "Waiting for your input",
+    },
+    pending_request: null,
+    latest_resolved_request: null,
+    composer: {
+      accepting_user_input: true,
+      interrupt_available: false,
+      blocked_by_request: false,
+    },
+    timeline: {
+      items: [mockTimelineItemFixture()],
+      next_cursor: null,
+      has_more: false,
+    },
+    ...overrides,
+  };
+}
+
+export function mockApprovalRequestDetailFixture(
+  overrides: Partial<{
+    request_id: string;
+    thread_id: string;
+    turn_id: string;
+    item_id: string;
+    request_kind: string;
+    status: "pending" | "resolved";
+    risk_category: string;
+    summary: string;
+    reason: string;
+    operation_summary: string;
+    requested_at: string;
+    responded_at: string | null;
+    decision: "approved" | "denied" | "pending" | null;
+    decision_options: {
+      policy_scope_supported: boolean;
+      default_policy_scope: string;
+    };
+    context: Record<string, unknown>;
+  }> = {},
+) {
+  return {
+    ...mockApprovalRequestFixture(),
+    reason: "Apply the prepared deployment plan.",
+    operation_summary: "Deploy the latest checked-in build to staging.",
+    responded_at: null,
+    decision: null,
+    decision_options: {
+      policy_scope_supported: false,
+      default_policy_scope: "once",
+    },
+    context: {
+      environment: "staging",
+      change_ticket: "CHG-93",
+    },
+    ...overrides,
+  };
 }
 
 type MockEventSourceInstance = {
