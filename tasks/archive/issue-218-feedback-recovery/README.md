@@ -35,14 +35,30 @@
 
 ## Artifacts / evidence
 
-- Planned: focused frontend validation command output in handoff notes.
+- Sprint validation:
+  - `npm run check`: passed
+  - `node ./node_modules/typescript/bin/tsc --noEmit --pretty false`: passed
+  - `npm test -- chat-view.test.tsx chat-page-client.test.tsx`: passed, 29 tests
+- Dedicated pre-push validation:
+  - `npm run check`: passed
+  - `node ./node_modules/typescript/bin/tsc --noEmit --pretty false`: passed
+  - focused Vitest: 2 files passed, 29 tests passed
+  - full `npm test`: 11 files passed, 88 tests passed
 
 ## Status / handoff notes
 
-- Status: `started`
+- Status: `locally complete`
 - Active branch: `issue-218-feedback-recovery`
 - Active worktree: `.worktrees/issue-218-feedback-recovery`
-- Notes: Package created from #218 before implementation.
+- Notes: Implemented Thread View feedback/recovery states, supported CTAs, and bounded scroll anchoring with a latest-activity CTA. Evaluator approved after same-row live assistant content growth was added to the scroll-follow trigger.
+- Completion retrospective:
+  - Completion boundary: package archive after local completion and pre-push validation.
+  - Contract check: Issue #218 acceptance criteria are satisfied locally; Issue close still requires PR merge to `main`, parent checkout sync, worktree cleanup, and GitHub tracking update.
+  - What worked: evaluator caught a live-stream scroll anchoring gap that jsdom tests could target directly.
+  - Workflow problems: none requiring durable workflow changes.
+  - Improvements to adopt: scroll anchoring tests should include same-row content growth, not only appended rows.
+  - Skill candidates or skill updates: none required.
+  - Follow-up updates: none required before archive; publish-oriented GitHub handoff remains required.
 
 ## Archive conditions
 

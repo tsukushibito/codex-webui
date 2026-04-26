@@ -435,6 +435,10 @@ describe("ChatPageClient", () => {
     expect((textarea as HTMLTextAreaElement).value).toBe("");
     expect(container.textContent).toContain("Running");
     expect(container.textContent).toContain("Continue with the fix.");
+    expect(container.textContent).toContain("Connecting live updates");
+    expect(container.textContent).toContain(
+      "The thread is active while Thread View waits for the live stream to open.",
+    );
   });
 
   it("clears the selected thread from Navigation and starts a workspace-scoped thread", async () => {
@@ -490,6 +494,8 @@ describe("ChatPageClient", () => {
     expect(container.textContent).toContain(
       "First input will create a new thread in this workspace.",
     );
+    expect(container.textContent).toContain("Ready for first input");
+    expect(container.textContent).toContain("Focus composer");
     expect(container.querySelectorAll("textarea")).toHaveLength(1);
     expect(chatDataMocks.sendThreadInput).not.toHaveBeenCalled();
 
@@ -1252,6 +1258,45 @@ describe("ChatPageClient", () => {
 
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain("Request pending. Respond from the current thread.");
+  });
+
+  it("shows reconnecting feedback when the thread stream drops", async () => {
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [buildThreadListItem()],
+      next_cursor: null,
+      has_more: false,
+    });
+    chatDataMocks.loadChatThreadBundle.mockResolvedValue({
+      view: buildThreadView({
+        current_activity: {
+          kind: "running",
+          label: "Running",
+        },
+        composer: {
+          accepting_user_input: false,
+          interrupt_available: true,
+          blocked_by_request: false,
+          input_unavailable_reason: null,
+        },
+      }),
+      pendingRequestDetail: null,
+    });
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    await act(async () => {
+      MockEventSource.instances[0]?.onerror?.(new Event("error"));
+    });
+    await flushUi();
+
+    expect(container.textContent).toContain("Reconnecting live updates");
+    expect(container.textContent).toContain(
+      "Live delivery dropped. Thread View is reacquiring the latest activity for this thread.",
+    );
+    expect(container.textContent).toContain("Refresh thread");
   });
 
   it("marks stream sequence gaps as inconsistent and reacquires selected thread state", async () => {
