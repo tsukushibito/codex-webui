@@ -53,7 +53,7 @@ export class RuntimeClient {
     } catch (error) {
       throw new BffError(
         503,
-        "session_runtime_error",
+        "thread_runtime_error",
         "backend dependency temporarily unavailable",
         {
           cause: error instanceof Error ? error.message : "failed to connect to codex-runtime",
@@ -100,7 +100,7 @@ export class RuntimeClient {
     } catch (error) {
       throw new BffError(
         503,
-        "session_runtime_error",
+        "thread_runtime_error",
         "backend dependency temporarily unavailable",
         {
           cause: error instanceof Error ? error.message : "failed to connect to codex-runtime",

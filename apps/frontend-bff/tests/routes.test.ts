@@ -373,8 +373,9 @@ describe("frontend-bff route handlers", () => {
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({
       error: {
-        code: "session_not_found",
-        message: "thread list missing",
+        code: "thread_not_found",
+        message: "thread was not found",
+        details: {},
       },
     });
   });
@@ -648,6 +649,50 @@ describe("frontend-bff route handlers", () => {
     });
   });
 
+  it("normalizes session-era runtime thread input errors to v0.9 thread vocabulary", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          error: {
+            code: "session_invalid_state",
+            message: "session is not ready to accept messages",
+            details: {
+              session_id: "thread_001",
+              current_status: "waiting_approval",
+            },
+          },
+        },
+        409,
+      ),
+    );
+
+    const response = await postThreadInput(
+      new Request("http://localhost/api/v1/threads/thread_001/inputs", {
+        method: "POST",
+        body: JSON.stringify({
+          client_request_id: "input_002",
+          content: "Show me the root cause.",
+        }),
+      }),
+      "thread_001",
+    );
+
+    expect(response.status).toBe(409);
+    const json = await response.json();
+    expect(json).toEqual({
+      error: {
+        code: "thread_not_accepting_input",
+        message: "thread is not accepting user input",
+        details: {
+          thread_id: "thread_001",
+          status: "waiting_approval",
+        },
+      },
+    });
+    expect(json.error.details).not.toHaveProperty("session_id");
+  });
+
   it("forwards thread interrupts and maps runtime thread wrappers to the public thread facade", async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockResolvedValueOnce(
@@ -823,6 +868,90 @@ describe("frontend-bff route handlers", () => {
         },
       },
     });
+  });
+
+  it("normalizes session-era runtime request errors to v0.9 request vocabulary", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          error: {
+            code: "session_not_found",
+            message: "session was not found",
+            details: {
+              session_id: "thread_001",
+            },
+          },
+        },
+        404,
+      ),
+    );
+
+    const response = await postRequestResponse(
+      new Request("http://localhost/api/v1/requests/req_001/response", {
+        method: "POST",
+        body: JSON.stringify({
+          client_response_id: "resp_001",
+          decision: "approved",
+        }),
+      }),
+      "req_001",
+    );
+
+    expect(response.status).toBe(404);
+    const json = await response.json();
+    expect(json).toEqual({
+      error: {
+        code: "request_not_found",
+        message: "request was not found",
+        details: {
+          request_id: "req_001",
+          thread_id: "thread_001",
+        },
+      },
+    });
+    expect(json.error.details).not.toHaveProperty("session_id");
+  });
+
+  it("normalizes generic session-era runtime envelopes without leaking session detail keys", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          error: {
+            code: "session_runtime_error",
+            message: "session backend dependency temporarily unavailable",
+            details: {
+              session_id: "thread_001",
+              active_session_id: "thread_active",
+              cause: "upstream timeout",
+            },
+          },
+        },
+        503,
+      ),
+    );
+
+    const response = await getThread(
+      new Request("http://localhost/api/v1/threads/thread_001"),
+      "thread_001",
+    );
+
+    expect(response.status).toBe(503);
+    const json = await response.json();
+    expect(json).toEqual({
+      error: {
+        code: "thread_runtime_error",
+        message: "thread backend dependency temporarily unavailable",
+        details: {
+          thread_id: "thread_001",
+          active_thread_id: "thread_active",
+          cause: "upstream timeout",
+        },
+      },
+    });
+    expect(json.error.details).not.toHaveProperty("session_id");
+    expect(json.error.details).not.toHaveProperty("active_session_id");
   });
 
   it("preserves pending_request null semantics", async () => {
@@ -1300,7 +1429,7 @@ describe("frontend-bff route handlers", () => {
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({
       error: {
-        code: "session_runtime_error",
+        code: "thread_runtime_error",
         message: "backend dependency temporarily unavailable",
         details: {
           cause: "connect ECONNREFUSED",

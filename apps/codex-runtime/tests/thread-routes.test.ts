@@ -1194,6 +1194,43 @@ describe("thread routes", () => {
     database.db
       .insert(sessions)
       .values({
+        sessionId: "thread_orphan",
+        workspaceId: "ws_alpha",
+        title: "Orphaned request thread",
+        status: "waiting_approval",
+        createdAt: "2026-04-09T00:00:30.000Z",
+        updatedAt: "2026-04-09T00:01:30.000Z",
+        startedAt: "2026-04-09T00:00:30.000Z",
+        lastMessageAt: "2026-04-09T00:01:00.000Z",
+        activeApprovalId: "apr_orphan",
+        currentTurnId: "turn_orphan",
+        pendingAssistantMessageId: null,
+        appSessionOverlayState: "open",
+      })
+      .run();
+
+    database.db
+      .insert(approvals)
+      .values({
+        approvalId: "apr_orphan",
+        sessionId: "thread_orphan",
+        workspaceId: "ws_alpha",
+        status: "pending",
+        resolution: null,
+        approvalCategory: "external_side_effect",
+        summary: "Run git push",
+        reason: "Codex requests permission to push changes to remote.",
+        operationSummary: "git push origin main",
+        context: null,
+        createdAt: "2026-04-09T00:01:30.000Z",
+        resolvedAt: null,
+        nativeRequestKind: "approval",
+      })
+      .run();
+
+    database.db
+      .insert(sessions)
+      .values({
         sessionId: "thread_001",
         workspaceId: "ws_alpha",
         title: "Resolved request thread",
@@ -1208,6 +1245,18 @@ describe("thread routes", () => {
         appSessionOverlayState: "open",
       })
       .run();
+
+    const orphanDetailResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/requests/apr_orphan",
+    });
+
+    expect(orphanDetailResponse.statusCode).toBe(200);
+    expect(orphanDetailResponse.json()).toMatchObject({
+      request_id: "apr_orphan",
+      thread_id: "thread_orphan",
+      status: "pending",
+    });
 
     database.db
       .insert(approvals)
@@ -1246,6 +1295,33 @@ describe("thread routes", () => {
         },
       },
     });
+
+    app.runtimeServices.nativeSessionGateway.resolveApproval = async () => {
+      throw new RuntimeError(404, "session_not_found", "session was not found", {
+        session_id: "thread_orphan",
+      });
+    };
+
+    const orphanResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/requests/apr_orphan/response",
+      payload: {
+        decision: "approved",
+      },
+    });
+
+    expect(orphanResponse.statusCode).toBe(404);
+    const orphanJson = orphanResponse.json();
+    expect(orphanJson).toMatchObject({
+      error: {
+        code: "request_not_found",
+        details: {
+          request_id: "apr_orphan",
+          thread_id: "thread_orphan",
+        },
+      },
+    });
+    expect(orphanJson.error.details).not.toHaveProperty("session_id");
 
     await app.close();
   });
