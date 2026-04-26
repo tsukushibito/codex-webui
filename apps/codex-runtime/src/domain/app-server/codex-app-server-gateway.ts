@@ -11,6 +11,7 @@ import type {
   NativeSessionGateway,
   SendNativeSessionMessageInput,
 } from "../sessions/native-session-gateway.js";
+import { translateNativeCommandApprovalEvent } from "./app-server-event-translation.js";
 import type { AppServerController, AppServerSnapshot } from "./app-server-supervisor.js";
 
 export interface CodexAppServerGatewayConfig {
@@ -95,14 +96,6 @@ function turnStateKey(sessionId: string, turnId: string) {
 
 function mapApprovalDecision(resolution: "approved" | "denied") {
   return resolution === "approved" ? "accept" : "cancel";
-}
-
-function summarizeApprovalRequest(command: string) {
-  return `Approval requested to run: ${command}`;
-}
-
-function reasonForApprovalRequest(command: string) {
-  return `Codex requested permission to run the command: ${command}`;
 }
 
 export class CodexAppServerGateway implements NativeSessionGateway, AppServerController {
@@ -512,40 +505,30 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
     }
 
     if (method === "item/commandExecution/requestApproval") {
-      const command = String(params.command ?? "");
-      const requestId = Number(message.id);
-      if (!sessionId || !turnId || !Number.isFinite(requestId) || command.length === 0) {
+      const translatedApproval = translateNativeCommandApprovalEvent(message);
+      if (!translatedApproval) {
         return;
       }
 
-      const state = this.ensureTurnState(sessionId, turnId);
+      const state = this.ensureTurnState(
+        translatedApproval.sessionId,
+        translatedApproval.sinkInput.turn_id,
+      );
       state.waitingForApproval = true;
 
       logLiveChatDebug("app-server", "forwarding approval request", {
-        session_id: sessionId,
-        turn_id: turnId,
-        command,
+        session_id: translatedApproval.sessionId,
+        turn_id: translatedApproval.sinkInput.turn_id,
+        command: translatedApproval.command,
       });
 
-      const approval = await this.eventSink.ingestApprovalRequest(sessionId, {
-        turn_id: turnId,
-        approval_category: "external_side_effect",
-        summary: summarizeApprovalRequest(command),
-        reason: reasonForApprovalRequest(command),
-        operation_summary: command,
-        context: {
-          thread_id: sessionId,
-          turn_id: turnId,
-          item_id: params.itemId ?? null,
-          cwd: params.cwd ?? null,
-          command_actions: params.commandActions ?? [],
-          available_decisions: params.availableDecisions ?? [],
-        },
-        native_request_kind: "item/commandExecution/requestApproval",
-      });
+      const approval = await this.eventSink.ingestApprovalRequest(
+        translatedApproval.sessionId,
+        translatedApproval.sinkInput,
+      );
 
       this.pendingApprovals.set(approval.approval_id, {
-        requestId,
+        requestId: translatedApproval.requestId,
       });
       return;
     }
