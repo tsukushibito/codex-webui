@@ -14,6 +14,8 @@ import { createTempDatabase, createTempWorkspaceRoot } from "./helpers.js";
 const cleanupPaths: string[] = [];
 
 class StubNativeSessionGateway implements NativeSessionGateway {
+  readonly sendUserMessages: Array<{ sessionId: string; content: string }> = [];
+
   constructor(
     private readonly sessionIds: string[] = [],
     private readonly turnIds: string[] = [],
@@ -35,6 +37,7 @@ class StubNativeSessionGateway implements NativeSessionGateway {
   }
 
   async sendUserMessage(_input: { sessionId: string; content: string }) {
+    this.sendUserMessages.push(_input);
     const turnId = this.turnIds.shift();
     if (!turnId) {
       throw new Error("no stub turn id available");
@@ -1331,6 +1334,8 @@ describe("thread routes", () => {
     const database = await createTempDatabase("thread-routes-db");
     cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
 
+    const nativeSessionGateway = new StubNativeSessionGateway([], ["turn_001"]);
+
     const app = await buildApp({
       config: {
         workspaceRoot,
@@ -1341,7 +1346,7 @@ describe("thread routes", () => {
       },
       database,
       services: {
-        nativeSessionGateway: new StubNativeSessionGateway([], ["turn_001"]),
+        nativeSessionGateway,
       },
     });
 
@@ -1384,6 +1389,68 @@ describe("thread routes", () => {
     });
 
     expect(inputResponse.statusCode).toBe(202);
+    expect(nativeSessionGateway.sendUserMessages).toEqual([
+      {
+        sessionId: "thread_001",
+        content: "Continue the runtime cutover",
+      },
+    ]);
+
+    const persistedMessage = database.db
+      .select()
+      .from(messages)
+      .where(eq(messages.sessionId, "thread_001"))
+      .all();
+    expect(persistedMessage).toEqual([
+      expect.objectContaining({
+        sessionId: "thread_001",
+        role: "user",
+        content: "Continue the runtime cutover",
+        clientMessageId: "req_followup_002",
+      }),
+    ]);
+
+    const persistedThread = database.db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.sessionId, "thread_001"))
+      .limit(1)
+      .all()[0];
+    expect(persistedThread).toMatchObject({
+      sessionId: "thread_001",
+      status: "running",
+      currentTurnId: "turn_001",
+      lastMessageAt: expect.any(String),
+    });
+
+    const persistedWorkspace = database.db
+      .select()
+      .from(workspaces)
+      .where(eq(workspaces.workspaceId, "ws_alpha"))
+      .limit(1)
+      .all()[0];
+    expect(persistedWorkspace.updatedAt).not.toBe("2026-04-09T00:00:00.000Z");
+
+    const storedEvents = database.db
+      .select()
+      .from(sessionEvents)
+      .where(eq(sessionEvents.sessionId, "thread_001"))
+      .orderBy(sessionEvents.sequence)
+      .all();
+    expect(storedEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: "message.user",
+        }),
+        expect.objectContaining({
+          eventType: "session.status_changed",
+          payload: JSON.stringify({
+            from_status: "waiting_input",
+            to_status: "running",
+          }),
+        }),
+      ]),
+    );
 
     const viewResponse = await app.inject({
       method: "GET",
