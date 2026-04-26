@@ -51,82 +51,12 @@ textarea {
   font: inherit;
 }
 
-.home-shell,
-.placeholder-shell {
-  display: flex;
-  justify-content: center;
-  padding: 20px 12px 40px;
-}
-
-.home-layout,
-.placeholder-card {
-  width: min(100%, 720px);
-}
-
-.home-layout {
-  display: grid;
-  gap: 16px;
-}
-
-.hero-card,
 .workspace-card,
-.create-card,
-.placeholder-card {
+.create-card {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 24px;
   box-shadow: var(--shadow);
-}
-
-.hero-card {
-  overflow: hidden;
-}
-
-.hero-body {
-  display: grid;
-  gap: 18px;
-  padding: 20px;
-}
-
-.home-app-shell {
-  display: grid;
-  gap: 18px;
-  padding: 18px;
-}
-
-.home-topbar,
-.workspace-context,
-.home-primary-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.home-topbar {
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.workspace-context {
-  align-items: end;
-  justify-content: space-between;
-  border: 1px solid rgba(22, 47, 52, 0.08);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.74);
-  padding: 14px;
-}
-
-.workspace-context-main {
-  display: grid;
-  gap: 6px;
-  min-width: min(100%, 18rem);
-}
-
-.workspace-context-main h2 {
-  margin: 0;
-  font-size: 1.35rem;
-  line-height: 1.15;
-  overflow-wrap: anywhere;
 }
 
 .workspace-switcher {
@@ -169,10 +99,6 @@ textarea {
   outline-offset: 1px;
 }
 
-.home-primary-actions {
-  align-items: center;
-}
-
 .eyebrow {
   margin: 0;
   color: var(--accent);
@@ -182,16 +108,6 @@ textarea {
   text-transform: uppercase;
 }
 
-.hero-card h1,
-.placeholder-card h1 {
-  margin: 0;
-  font-family: "IBM Plex Serif", Georgia, serif;
-  font-size: clamp(2rem, 6vw, 3.2rem);
-  line-height: 0.95;
-}
-
-.hero-copy,
-.placeholder-card p,
 .workspace-meta,
 .workspace-status,
 .empty-state,
@@ -199,21 +115,6 @@ textarea {
 .field-hint,
 .status-message {
   color: var(--text-muted);
-}
-
-.hero-copy {
-  margin: 0;
-  max-width: 36rem;
-  line-height: 1.5;
-}
-
-.hero-metrics,
-.hero-actions,
-.workspace-actions,
-.workspace-meta-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
 }
 
 .metric-chip,
@@ -248,6 +149,14 @@ textarea {
 .status-badge.warning {
   background: var(--warning-soft);
   color: var(--warning);
+}
+
+.hero-metrics,
+.workspace-actions,
+.workspace-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .primary-link,
@@ -310,14 +219,8 @@ textarea {
   box-shadow: 0 8px 18px rgba(17, 31, 39, 0.08);
 }
 
-.workspace-grid {
-  display: grid;
-  gap: 14px;
-}
-
 .workspace-card,
-.create-card,
-.placeholder-card {
+.create-card {
   padding: 18px;
 }
 
@@ -1104,25 +1007,9 @@ textarea {
   color: var(--danger);
 }
 
-.placeholder-card {
-  display: grid;
-  gap: 14px;
-}
-
 .text-link {
   color: var(--accent-strong);
   font-weight: 700;
-}
-
-@media (min-width: 720px) {
-  .home-shell,
-  .placeholder-shell {
-    padding: 28px 20px 48px;
-  }
-
-  .hero-body {
-    padding: 28px;
-  }
 }
 
 @media (max-width: 719px) {
@@ -1551,8 +1438,7 @@ textarea {
     border-color: rgba(35, 24, 15, 0.08);
   }
 
-  .chat-feedback-stack,
-  .placeholder-card {
+  .chat-feedback-stack {
     grid-column: 1 / -1;
   }
 
