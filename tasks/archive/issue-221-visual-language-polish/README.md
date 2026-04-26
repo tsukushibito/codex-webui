@@ -55,6 +55,14 @@
 - Active branch: `issue-221-visual-language-polish`
 - Active worktree: `.worktrees/issue-221-visual-language-polish`
 - Notes: Implemented a CSS-dominant visual-language polish pass that shifts the shell toward teal/neutral identity, reserves orange/green/red for operational state, reduces neutral pill styling, and improves coding-artifact treatment. Mobile remains visually dense near the lower viewport, but inspection evidence reports no horizontal scroll or overflowing labels, and approval controls remain visible. Keep #222 broad validation out of this package.
+- Completion retrospective:
+  - Completion boundary: package archive after local completion, evaluator approval, visual evidence capture, and pre-push validation.
+  - Contract check: Issue #221 acceptance criteria are satisfied locally; Issue close still requires PR merge to `main`, parent checkout sync, worktree cleanup, and GitHub tracking update.
+  - What worked: visual evidence plus evaluator review caught the approval-state color semantics before publish.
+  - Workflow problems: one evaluator rejection was required because pending approval used success styling; fixed within the same sprint without widening scope.
+  - Improvements to adopt: visual polish slices should explicitly inspect state color semantics in screenshots, not just palette tokens.
+  - Skill candidates or skill updates: none required.
+  - Follow-up updates: none required before archive; #222 remains the broader validation slice.
 
 ## Archive conditions
 
