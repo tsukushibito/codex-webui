@@ -22,14 +22,13 @@ import type {
 import type { WorkspaceFilesystem } from "../workspaces/workspace-filesystem.js";
 import type { WorkspaceRegistry } from "../workspaces/workspace-registry.js";
 import { ThreadInputOrchestrator } from "./thread-input-orchestrator.js";
+import { buildThreadRequestHelperLifecycleState } from "./thread-request-helper-lifecycle.js";
 import {
   ThreadRequestPersistence,
   type ThreadRequestRecord,
 } from "./thread-request-persistence.js";
 import type {
-  LatestResolvedRequestSummary,
   NotificationEvent,
-  PendingRequestSummary,
   RequestDetailView,
   ThreadSummary,
   ThreadViewHelper,
@@ -121,44 +120,6 @@ function toTimelineItem(event: SessionEventProjection): TimelineItem {
     summary: summarizeTimelineEvent(event),
     content,
     request_id: requestId,
-  };
-}
-
-function toPendingRequestSummary(request: ThreadRequestRecord): PendingRequestSummary {
-  return {
-    request_id: request.request_id,
-    thread_id: request.thread_id,
-    turn_id: null,
-    item_id: request.request_id,
-    request_kind: request.request_kind,
-    status: request.status,
-    risk_classification: request.risk_classification,
-    summary: request.summary,
-    requested_at: request.requested_at,
-  };
-}
-
-function toLatestResolvedRequestSummary(
-  request: ThreadRequestRecord,
-): LatestResolvedRequestSummary | null {
-  if (
-    request.status === "pending" ||
-    request.resolution === null ||
-    request.responded_at === null
-  ) {
-    return null;
-  }
-
-  return {
-    request_id: request.request_id,
-    thread_id: request.thread_id,
-    turn_id: null,
-    item_id: request.request_id,
-    request_kind: request.request_kind,
-    status: "resolved",
-    decision: request.resolution,
-    requested_at: request.requested_at,
-    responded_at: request.responded_at,
   };
 }
 
@@ -512,19 +473,12 @@ export class ThreadService {
     await this.getThread(threadId);
 
     const threadRequests = this.threadRequestPersistence.listThreadRequests(threadId);
-    const pending = threadRequests.find((request) => request.status === "pending") ?? null;
-    const latestResolved =
-      threadRequests
-        .filter((request) => request.status !== "pending" && request.responded_at !== null)
-        .sort((left, right) =>
-          (right.responded_at ?? "").localeCompare(left.responded_at ?? ""),
-        )[0] ?? null;
+    const helperState = buildThreadRequestHelperLifecycleState(threadRequests);
 
     return {
       thread_id: threadId,
-      pending_request: pending ? toPendingRequestSummary(pending) : null,
-      latest_resolved_request:
-        pending || latestResolved === null ? null : toLatestResolvedRequestSummary(latestResolved),
+      pending_request: helperState.pending_request,
+      latest_resolved_request: helperState.latest_resolved_request,
       checked_at: this.now().toISOString(),
     };
   }

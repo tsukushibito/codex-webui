@@ -610,6 +610,246 @@ describe("thread routes", () => {
     await app.close();
   });
 
+  it("returns the newest resolved request when no pending helper is reachable", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("thread-routes-root");
+    const database = await createTempDatabase("thread-routes-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+    });
+
+    database.db
+      .insert(workspaces)
+      .values({
+        workspaceId: "ws_alpha",
+        workspaceName: "alpha",
+        directoryName: "alpha",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:00:00.000Z",
+      })
+      .run();
+
+    database.db
+      .insert(sessions)
+      .values({
+        sessionId: "thread_001",
+        workspaceId: "ws_alpha",
+        title: "Existing thread",
+        status: "waiting_input",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:03:00.000Z",
+        startedAt: "2026-04-09T00:00:00.000Z",
+        lastMessageAt: "2026-04-09T00:02:00.000Z",
+        activeApprovalId: null,
+        currentTurnId: null,
+        pendingAssistantMessageId: null,
+        appSessionOverlayState: "open",
+      })
+      .run();
+
+    database.db
+      .insert(approvals)
+      .values([
+        {
+          approvalId: "apr_old",
+          sessionId: "thread_001",
+          workspaceId: "ws_alpha",
+          status: "denied",
+          resolution: "denied",
+          approvalCategory: "external_side_effect",
+          summary: "Declined old request",
+          reason: "Older helper request.",
+          operationSummary: "git push origin old-branch",
+          context: null,
+          createdAt: "2026-04-09T00:01:00.000Z",
+          resolvedAt: "2026-04-09T00:02:00.000Z",
+          nativeRequestKind: "approval",
+        },
+        {
+          approvalId: "apr_new",
+          sessionId: "thread_001",
+          workspaceId: "ws_alpha",
+          status: "approved",
+          resolution: "approved",
+          approvalCategory: "external_side_effect",
+          summary: "Accepted newer request",
+          reason: "Newer helper request.",
+          operationSummary: "git push origin main",
+          context: null,
+          createdAt: "2026-04-09T00:01:30.000Z",
+          resolvedAt: "2026-04-09T00:02:30.000Z",
+          nativeRequestKind: "approval",
+        },
+      ])
+      .run();
+
+    const pendingResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/threads/thread_001/pending_request",
+    });
+
+    expect(pendingResponse.statusCode).toBe(200);
+    expect(pendingResponse.json()).toMatchObject({
+      thread_id: "thread_001",
+      pending_request: null,
+      latest_resolved_request: {
+        request_id: "apr_new",
+        thread_id: "thread_001",
+        status: "resolved",
+        decision: "approved",
+        requested_at: "2026-04-09T00:01:30.000Z",
+        responded_at: "2026-04-09T00:02:30.000Z",
+      },
+    });
+
+    const viewResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/threads/thread_001/view",
+    });
+
+    expect(viewResponse.statusCode).toBe(200);
+    expect(viewResponse.json()).toMatchObject({
+      thread: {
+        thread_id: "thread_001",
+      },
+      pending_request: null,
+      latest_resolved_request: {
+        request_id: "apr_new",
+        thread_id: "thread_001",
+        status: "resolved",
+        decision: "approved",
+      },
+    });
+
+    await app.close();
+  });
+
+  it("suppresses retained latest-resolved helpers when any pending request exists", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("thread-routes-root");
+    const database = await createTempDatabase("thread-routes-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+    });
+
+    database.db
+      .insert(workspaces)
+      .values({
+        workspaceId: "ws_alpha",
+        workspaceName: "alpha",
+        directoryName: "alpha",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:00:00.000Z",
+      })
+      .run();
+
+    database.db
+      .insert(sessions)
+      .values({
+        sessionId: "thread_001",
+        workspaceId: "ws_alpha",
+        title: "Existing thread",
+        status: "waiting_approval",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:03:00.000Z",
+        startedAt: "2026-04-09T00:00:00.000Z",
+        lastMessageAt: "2026-04-09T00:02:30.000Z",
+        activeApprovalId: "apr_pending",
+        currentTurnId: "turn_001",
+        pendingAssistantMessageId: "msg_assistant_pending_001",
+        appSessionOverlayState: "open",
+      })
+      .run();
+
+    database.db
+      .insert(approvals)
+      .values([
+        {
+          approvalId: "apr_resolved",
+          sessionId: "thread_001",
+          workspaceId: "ws_alpha",
+          status: "approved",
+          resolution: "approved",
+          approvalCategory: "external_side_effect",
+          summary: "Accepted earlier request",
+          reason: "Earlier helper request.",
+          operationSummary: "git push origin main",
+          context: null,
+          createdAt: "2026-04-09T00:01:00.000Z",
+          resolvedAt: "2026-04-09T00:02:00.000Z",
+          nativeRequestKind: "approval",
+        },
+        {
+          approvalId: "apr_pending",
+          sessionId: "thread_001",
+          workspaceId: "ws_alpha",
+          status: "pending",
+          resolution: null,
+          approvalCategory: "external_side_effect",
+          summary: "Pending retained request",
+          reason: "Current helper request.",
+          operationSummary: "git push origin feature",
+          context: null,
+          createdAt: "2026-04-09T00:02:30.000Z",
+          resolvedAt: null,
+          nativeRequestKind: "approval",
+        },
+      ])
+      .run();
+
+    const pendingResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/threads/thread_001/pending_request",
+    });
+
+    expect(pendingResponse.statusCode).toBe(200);
+    expect(pendingResponse.json()).toMatchObject({
+      thread_id: "thread_001",
+      pending_request: {
+        request_id: "apr_pending",
+        thread_id: "thread_001",
+        summary: "Pending retained request",
+        status: "pending",
+      },
+      latest_resolved_request: null,
+    });
+
+    const viewResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/threads/thread_001/view",
+    });
+
+    expect(viewResponse.statusCode).toBe(200);
+    expect(viewResponse.json()).toMatchObject({
+      thread: {
+        thread_id: "thread_001",
+      },
+      pending_request: {
+        request_id: "apr_pending",
+        summary: "Pending retained request",
+      },
+      latest_resolved_request: null,
+    });
+
+    await app.close();
+  });
+
   it("resolves denied requests through thread routes and clears turn-tracking state", async () => {
     const workspaceRoot = await createTempWorkspaceRoot("thread-routes-root");
     const database = await createTempDatabase("thread-routes-db");
