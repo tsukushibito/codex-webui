@@ -15,18 +15,19 @@ The MVP targets browser access from both PC and smartphone while keeping the pub
 
 This repository currently contains two application directories under [`apps/`](./apps/README.md):
 
-- [`apps/codex-runtime/`](./apps/codex-runtime/README.md): private runtime service that manages `codex app-server`, workspace and session state, and app-owned persistence
-- [`apps/frontend-bff/`](./apps/frontend-bff/README.md): public BFF and browser UI built on Next.js, including REST facade and SSE relay responsibilities
+- [`apps/codex-runtime/`](./apps/codex-runtime/README.md): private runtime service that manages `codex app-server`, workspace state, and v0.9 thread/request/timeline projections
+- [`apps/frontend-bff/`](./apps/frontend-bff/README.md): public BFF and browser UI built on Next.js, including the v0.9 REST facade, browser shaping, and SSE relay responsibilities
 
 ## Source-of-truth documents
 
 Start with these maintained documents when you need project intent or interface boundaries:
 
 - [`docs/codex_webui_mvp_roadmap_v0_1.md`](./docs/codex_webui_mvp_roadmap_v0_1.md)
-- [`docs/requirements/codex_webui_mvp_requirements_v0_8.md`](./docs/requirements/codex_webui_mvp_requirements_v0_8.md)
-- [`docs/specs/codex_webui_common_spec_v0_8.md`](./docs/specs/codex_webui_common_spec_v0_8.md)
-- [`docs/specs/codex_webui_public_api_v0_8.md`](./docs/specs/codex_webui_public_api_v0_8.md)
-- [`docs/specs/codex_webui_internal_api_v0_8.md`](./docs/specs/codex_webui_internal_api_v0_8.md)
+- [`docs/requirements/codex_webui_mvp_requirements_v0_9.md`](./docs/requirements/codex_webui_mvp_requirements_v0_9.md)
+- [`docs/specs/codex_webui_common_spec_v0_9.md`](./docs/specs/codex_webui_common_spec_v0_9.md)
+- [`docs/specs/codex_webui_public_api_v0_9.md`](./docs/specs/codex_webui_public_api_v0_9.md)
+- [`docs/specs/codex_webui_internal_api_v0_9.md`](./docs/specs/codex_webui_internal_api_v0_9.md)
+- [`docs/specs/codex_webui_ui_layout_spec_v0_9.md`](./docs/specs/codex_webui_ui_layout_spec_v0_9.md)
 - [`docs/specs/codex_webui_technical_stack_decision_v0_1.md`](./docs/specs/codex_webui_technical_stack_decision_v0_1.md)
 
 ## Development entrypoints
