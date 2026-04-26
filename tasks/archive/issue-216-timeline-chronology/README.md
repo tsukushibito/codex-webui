@@ -38,15 +38,30 @@
 
 ## Artifacts / evidence
 
-- Planned: focused frontend test and validation command output in handoff notes.
-- Planned if visually material: `artifacts/visual-inspection/issue-216-timeline-chronology/`
+- Sprint validation:
+  - `npm test -- --run tests/timeline-display-model.test.ts tests/chat-view.test.tsx`: passed, 22 tests
+  - `node ./node_modules/typescript/bin/tsc --noEmit --pretty false`: passed
+  - `npm run check`: passed
+- Dedicated pre-push validation:
+  - `npm run check`: passed
+  - `node ./node_modules/typescript/bin/tsc --noEmit --pretty false`: passed
+  - focused Vitest: 2 files passed, 22 tests passed
+  - full `npm test`: 11 files passed, 82 tests passed
 
 ## Status / handoff notes
 
-- Status: `started`
+- Status: `locally complete`
 - Active branch: `issue-216-timeline-chronology`
 - Active worktree: `.worktrees/issue-216-timeline-chronology`
-- Notes: Package created from #216 before implementation.
+- Notes: Implemented timeline display-model normalization for assistant delta/completion collapse, REST/stream convergence, routine status suppression, failure/recovery preservation, and detail-button gating. Evaluator approved after regressions covered public REST assistant shape, live REST/SSE overlap, and canonical `to_status` failure/recovery payloads.
+- Completion retrospective:
+  - Completion boundary: package archive after local completion and pre-push validation.
+  - Contract check: Issue #216 acceptance criteria are satisfied locally; Issue close still requires PR merge to `main`, parent checkout sync, worktree cleanup, and GitHub tracking update.
+  - What worked: evaluator passes caught important real-shape convergence gaps that synthetic tests initially missed.
+  - Workflow problems: the sprint required several rejection cycles because early tests used idealized assistant identifiers rather than the mapped public REST shape.
+  - Improvements to adopt: timeline display-model tests should include public-mapped REST fixtures whenever behavior depends on payload identity.
+  - Skill candidates or skill updates: consider adding evaluator prompt guidance for UI model changes to inspect public mapping shape before approval.
+  - Follow-up updates: none required before archive; publish-oriented GitHub handoff remains required.
 
 ## Archive conditions
 
