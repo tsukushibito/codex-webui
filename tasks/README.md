@@ -69,7 +69,7 @@ Each active task package `README.md` must include at least the following section
 
 ## Current Active Tasks
 
-- `None`
+- [issue-221-visual-language-polish](./issue-221-visual-language-polish/README.md)
 
 ## Archived Task Packages
 
