@@ -1,14 +1,21 @@
 # frontend-bff
 
-This directory contains the first public API BFF slice for Phase 4A.
+This directory contains the public BFF and browser UI for the MVP implementation described in the maintained v0.9 specifications.
 
-## Scope in this slice
+## Current scope
 
-- Next.js 15 Route Handlers for the public REST facade
-- Runtime client wiring to `codex-runtime`
-- Public-to-internal schema mapping for workspace, session, message, event, and approval REST routes
+- Next.js 15 Route Handlers for the public v0.9 REST facade
+- Runtime client wiring to private `codex-runtime`
+- Public shaping for workspace, thread, thread view, timeline, request helper, and notification stream data
+- Browser-facing SSE relay responsibilities for thread and notification streams
+- Thread-first browser UI surfaces for navigation, timeline, details, request response, and composer workflows
 - Public error passthrough and runtime-unavailable handling
-- `can_*` derivation in the BFF
+
+Use the maintained v0.9 public API and UI layout specs for current behavior boundaries:
+
+- `../../docs/specs/codex_webui_public_api_v0_9.md`
+- `../../docs/specs/codex_webui_ui_layout_spec_v0_9.md`
+- `../../docs/codex_webui_mvp_roadmap_v0_1.md`
 
 ## Stack
 

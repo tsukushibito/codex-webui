@@ -1,13 +1,19 @@
 # codex-runtime
 
-This directory contains the first implementation slice of the MVP runtime described in the maintained specifications.
+This directory contains the private runtime service for the MVP implementation described in the maintained v0.9 specifications.
 
-## Scope in this slice
+## Current scope
 
 - App-server supervisor lifecycle wired into runtime startup and shutdown
-- SQLite-backed workspace registry
-- `workspace_id <-> session_id` correspondence storage helpers
-- Internal `GET /api/v1/workspaces`, `POST /api/v1/workspaces`, and `GET /api/v1/workspaces/{workspace_id}`
+- SQLite-backed workspace registry and app-owned persistence
+- Internal v0.9 workspace, thread, request-helper, timeline, and stream routes
+- Thread/request projections over the native `codex app-server` thread lifecycle
+- Recovery-oriented helper state that can be rebuilt from native facts plus minimal app-owned metadata
+
+Use the maintained v0.9 internal API spec and roadmap for current behavior boundaries:
+
+- `../../docs/specs/codex_webui_internal_api_v0_9.md`
+- `../../docs/codex_webui_mvp_roadmap_v0_1.md`
 
 ## Stack
 
