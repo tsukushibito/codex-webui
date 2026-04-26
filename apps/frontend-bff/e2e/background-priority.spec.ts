@@ -255,11 +255,14 @@ test("returns to a high-priority background thread from the lightweight notifica
 
   await page.goto("/chat?workspaceId=ws_alpha&threadId=thread_001");
   await expect(page).toHaveURL(/\/chat\?workspaceId=ws_alpha&threadId=thread_001$/);
-  await expect(page.getByRole("heading", { name: "thread_001", exact: true })).toBeVisible();
-  await expect(page.getByText("Primary thread is idle.")).toBeVisible();
+  const threadView = page.getByRole("region", { name: "Thread View", exact: true });
+  await expect(threadView).toBeVisible();
+  await expect(threadView.getByText("Primary thread is idle.")).toBeVisible();
 
   if (!isDesktop) {
-    await expect(page.getByRole("button", { name: "Threads", exact: true })).toBeVisible();
+    await expect(
+      page.locator("header.chat-topbar").getByRole("button", { name: "Threads", exact: true }),
+    ).toBeVisible();
   }
 
   await emitNotificationEvent(page, {
@@ -280,7 +283,7 @@ test("returns to a high-priority background thread from the lightweight notifica
   await page.getByRole("button", { name: "Open thread", exact: true }).click();
 
   await expect(page).toHaveURL(/\/chat\?workspaceId=ws_alpha&threadId=thread_background$/);
-  await expect(page.getByRole("heading", { name: "thread_background", exact: true })).toBeVisible();
+  await expect(threadView.getByText("Deploy background fix").first()).toBeVisible();
   await expect(page.locator(".request-detail-card.pending-request-card")).toBeVisible();
   await expect(page.locator(".request-detail-card.pending-request-card")).toContainText(
     "Deploy background fix",
@@ -288,7 +291,12 @@ test("returns to a high-priority background thread from the lightweight notifica
   await expect(page.locator(".request-detail-card.pending-request-card")).toContainText(
     "The background deployment needs approval.",
   );
-  await expect(page.getByRole("button", { name: "Approve request", exact: true })).toBeVisible();
+  await expect(
+    page.locator(".request-detail-card.pending-request-card").getByRole("button", {
+      name: "Approve request",
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(page.locator(".background-priority-notice")).toHaveCount(0);
   await expect(page).not.toHaveURL(/\/approvals(\/|$)/);
 });

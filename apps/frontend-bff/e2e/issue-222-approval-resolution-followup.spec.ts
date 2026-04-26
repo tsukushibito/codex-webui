@@ -98,6 +98,7 @@ test.describe("Issue #222 approval resolution follow-up", () => {
       await expect(resolvedRequestCard).toContainText("Latest resolved request");
       await expect(resolvedRequestCard).toContainText(`Decision: ${decision}`);
       await expect(threadHeaderStack).toContainText("Waiting for your input");
+      await expect(threadFeedbackCard).toHaveCount(0);
       await expect(composer).toBeVisible();
       await expect(composerInput).toBeVisible();
       await expect(composerInput).toBeEnabled();

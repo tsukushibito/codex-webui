@@ -532,3 +532,81 @@ Notes:
 - made public thread `title` exposure explicit for Navigation rows and thread header
 - fixed workspace-scoped public `Recommended` ordering semantics and aligned internal helper inputs
 - clarified P0 request-detail confirmation scope and just-resolved request-detail recovery reachability
+
+## [2026-04-26] query | Thread View information architecture cleanup note
+
+Source:
+
+- user review of the latest desktop `workspace01` Thread View screenshot
+- `artifacts/visual-inspection/workspace01-thread-latest-2026-04-26-wait8s/desktop-chromium-workspace01-thread-latest-wait8s.png`
+- `apps/frontend-bff/src/chat-view.tsx`
+
+Updated:
+
+- `docs/notes/codex_webui_thread_view_information_architecture_note_v0_1.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- captured reusable UI cleanup findings from the chat review
+- identified `Current activity` as redundant with existing status surfaces
+- recommended moving normal `Thread feedback`, metadata chips, and detailed status into Thread Details
+- recommended simplifying Navigation thread cards so Timeline regains priority in the main viewport
+
+## [2026-04-26] query | redundant Thread View area labels
+
+Source:
+
+- user follow-up review noting visible `NAVIGATION`, `CURRENT THREAD`, and similar area labels are redundant
+- `docs/notes/codex_webui_thread_view_information_architecture_note_v0_1.md`
+
+Updated:
+
+- `docs/notes/codex_webui_thread_view_information_architecture_note_v0_1.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- added the principle that structural area labels should be removed when layout, content, controls, and accessible names already identify the region
+- updated the implementation order to remove redundant labels before deeper layout compression
+
+## [2026-04-26] query | Navigation sidebar and minibar modes
+
+Source:
+
+- user follow-up requesting switchable normal Navigation and minibar displays
+- `docs/notes/codex_webui_thread_view_information_architecture_note_v0_1.md`
+
+Updated:
+
+- `docs/notes/codex_webui_thread_view_information_architecture_note_v0_1.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- added Navigation sidebar modes as an information-density control
+- specified that the minibar should preserve workflow access while giving Timeline more space
+- added mode-switch persistence, accessibility, and context-preservation expectations
+
+## [2026-04-26] query | Thread View note implementation readiness
+
+Source:
+
+- user request to rewrite the Thread View information-architecture note with the reviewed recommendations
+- `docs/notes/codex_webui_thread_view_information_architecture_note_v0_1.md`
+
+Updated:
+
+- `docs/notes/codex_webui_thread_view_information_architecture_note_v0_1.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- added visibility decision rules for always-visible content, inline alerts, Thread Details, accessible-only labels, and recoverability
+- added Timeline-specific design requirements so reclaimed viewport space becomes a stronger primary work surface
+- clarified thread title behavior across normal sidebar, minibar, mobile, and direct URL entry contexts
+- expanded Thread Details behavior, Navigation minibar expectations, implementation order, and follow-up acceptance criteria

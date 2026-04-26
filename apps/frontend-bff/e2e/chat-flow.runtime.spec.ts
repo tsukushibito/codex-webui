@@ -25,33 +25,21 @@ async function openMobileThreadNavigation(page: Page, isDesktop: boolean) {
   }
 
   await page.getByRole("button", { name: "Threads", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Start or resume a thread", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("region", { name: "Navigation", exact: true })).toBeVisible();
 }
 
-async function expectThreadWaitingForInput(page: Page, threadId: string, isDesktop: boolean) {
-  if (isDesktop) {
-    await expect(
-      page
-        .locator(".thread-summary-card")
-        .filter({ hasText: threadId })
-        .getByText("Waiting for your input", { exact: true }),
-    ).toBeVisible({ timeout: 15_000 });
-  }
+async function expectThreadWaitingForInput(page: Page) {
+  const threadView = page.getByRole("region", { name: "Thread View", exact: true });
 
-  await expect(
-    page
-      .locator("section.chat-panel.workspace-card")
-      .filter({ has: page.getByText("Current thread", { exact: true }) })
-      .getByText("Waiting for your input", { exact: true }),
-  ).toBeVisible({ timeout: 15_000 });
+  await expect(threadView.getByText("Waiting for your input", { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
 async function startThreadFromFirstInput(page: Page, isDesktop: boolean, firstInput: string) {
-  const inputScope = isDesktop ? page : page.locator(".thread-navigation.open");
-  const firstInputField = inputScope.getByLabel("First input");
-  const startThreadButton = inputScope.getByRole("button", { name: "Start new thread" });
+  const inputScope = isDesktop ? page : page.getByRole("region", { name: "Thread View" });
+  const firstInputField = inputScope.getByLabel("Ask Codex");
+  const startThreadButton = inputScope.getByRole("button", { name: "Start thread" });
 
   await firstInputField.fill(firstInput);
   await expect(startThreadButton).toBeVisible();
@@ -80,34 +68,36 @@ test("runs the main thread flow against the live runtime stack", async ({ page }
   try {
     await page.goto("/");
     await dismissNgrokInterstitial(page);
-    await expect(page.getByRole("heading", { name: "Home", exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Thread workspace", exact: true }),
+    ).toBeVisible();
     await expect(page.getByText("Updated: Waiting")).not.toBeVisible({ timeout: 15_000 });
 
-    const workspaceNameInput = page.getByLabel("Workspace name");
+    await page.locator("details.workspace-switcher summary").click();
+    const workspaceNameInput = page.getByLabel("New workspace");
     const createWorkspaceButton = page.getByRole("button", { name: "Create workspace" });
     await workspaceNameInput.fill(workspaceName);
     await expect(workspaceNameInput).toHaveValue(workspaceName);
     await expect(createWorkspaceButton).toBeEnabled({ timeout: 15_000 });
     await createWorkspaceButton.click();
-    await expect(page.getByText(`Workspace "${workspaceName}" created.`)).toBeVisible();
+    await expect(page.getByText(`Created workspace ${workspaceName}.`)).toBeVisible();
 
-    await page.locator(".home-primary-actions").getByRole("link", { name: "Ask Codex" }).click();
     await expect(page).toHaveURL(/\/chat\?workspaceId=/);
     const workspaceId = new URL(page.url()).searchParams.get("workspaceId") ?? "";
     expect(workspaceId).not.toBe("");
-    await expect(page.getByRole("heading", { name: "Chat", exact: true })).toBeVisible();
+    await expect(page.locator("header.chat-topbar h1")).toHaveText(workspaceName);
 
     await openMobileThreadNavigation(page, isDesktop);
     await startThreadFromFirstInput(page, isDesktop, firstInput);
 
+    await expect(page).toHaveURL(/threadId=/, { timeout: 15_000 });
+    const threadId = new URL(page.url()).searchParams.get("threadId") ?? "";
+    expect(threadId).not.toBe("");
     const currentThreadHeading = page
-      .locator("section.chat-panel.workspace-card")
-      .filter({ has: page.getByText("Current thread", { exact: true }) })
+      .getByRole("region", { name: "Thread View", exact: true })
       .getByRole("heading")
       .first();
-    await expect(currentThreadHeading).not.toHaveText("Select a thread", { timeout: 15_000 });
-    const threadId = (await currentThreadHeading.textContent())?.trim() ?? "";
-    expect(threadId).not.toBe("");
+    await expect(currentThreadHeading).not.toHaveText("Select workspace", { timeout: 15_000 });
 
     await expect
       .poll(() => sawThreadStreamRequest(debugCapture, threadId), {
@@ -116,9 +106,9 @@ test("runs the main thread flow against the live runtime stack", async ({ page }
       })
       .toBe(true);
 
-    const sendReplyButton = page.getByRole("button", { name: "Send reply" });
+    const sendReplyButton = page.getByRole("button", { name: "Send input" });
     await expect(sendReplyButton).toBeDisabled();
-    await expectThreadWaitingForInput(page, threadId, isDesktop);
+    await expectThreadWaitingForInput(page);
 
     const threadViewPath = `/api/v1/threads/${threadId}/view`;
     const threadStreamPath = `/api/v1/threads/${threadId}/stream`;
@@ -127,8 +117,8 @@ test("runs the main thread flow against the live runtime stack", async ({ page }
 
     await page.reload();
     await expect(page).toHaveURL(new RegExp(`/chat\\?workspaceId=${workspaceId}`));
-    await expect(page.getByRole("heading", { name: "Chat", exact: true })).toBeVisible();
-    await expect(currentThreadHeading).toHaveText(threadId, { timeout: 15_000 });
+    await expect(page.locator("header.chat-topbar h1")).toHaveText(workspaceName);
+    await expect(currentThreadHeading).toHaveText(firstInput, { timeout: 15_000 });
     await expect
       .poll(() => countNetworkLines(debugCapture, threadViewPath), {
         timeout: 15_000,
@@ -142,8 +132,8 @@ test("runs the main thread flow against the live runtime stack", async ({ page }
       })
       .toBeGreaterThan(threadStreamRequestCountBeforeReload);
 
-    await expectThreadWaitingForInput(page, threadId, isDesktop);
-    await page.getByLabel("Send follow-up input").fill(followUpInput);
+    await expectThreadWaitingForInput(page);
+    await page.getByLabel("Send input").fill(followUpInput);
     await expect(sendReplyButton).toBeEnabled({ timeout: 15_000 });
     await sendReplyButton.click();
     await expect(page.getByText("Input accepted. Waiting for thread updates.")).toBeVisible({
@@ -153,7 +143,7 @@ test("runs the main thread flow against the live runtime stack", async ({ page }
       page
         .locator("article")
         .filter({
-          has: page.getByText("message.user", { exact: true }),
+          has: page.getByText("You", { exact: true }),
           hasText: followUpInput,
         })
         .first(),
@@ -161,10 +151,10 @@ test("runs the main thread flow against the live runtime stack", async ({ page }
     await expectThreadWaitingForInput(page, threadId, isDesktop);
 
     const interruptThreadButton = page.getByRole("button", { name: "Interrupt thread" });
-    if (await interruptThreadButton.isEnabled()) {
+    if ((await interruptThreadButton.count()) > 0 && (await interruptThreadButton.isEnabled())) {
       await interruptThreadButton.click();
       await expect(page.getByText("Interrupt requested.")).toBeVisible({ timeout: 15_000 });
-    } else {
+    } else if ((await interruptThreadButton.count()) > 0) {
       await expect(interruptThreadButton).toBeDisabled();
     }
   } finally {

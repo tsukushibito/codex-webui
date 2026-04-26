@@ -16,7 +16,7 @@ async function locatorBox(locator: ReturnType<Page["locator"]>) {
 }
 
 async function timelineBox(page: Page) {
-  return locatorBox(page.getByRole("region", { name: "Timeline", exact: true }));
+  return locatorBox(page.locator(".thread-view-body"));
 }
 
 async function threadCards(page: Page) {
@@ -32,7 +32,10 @@ async function openMobileThreadNavigation(page: Page, isDesktop: boolean) {
     return;
   }
 
-  const threadsButton = page.getByRole("button", { name: "Threads", exact: true });
+  const threadsButton = page.locator("header.chat-topbar").getByRole("button", {
+    name: "Threads",
+    exact: true,
+  });
   if (await threadsButton.isVisible()) {
     await threadsButton.click();
   }
@@ -72,10 +75,7 @@ function expectDesktopThreadLayoutStable(
 async function expectThreadRunning(page: Page, isDesktop: boolean) {
   if (isDesktop) {
     await expect(
-      page
-        .locator(".thread-summary-card")
-        .filter({ hasText: "thread_001" })
-        .getByText("Running", { exact: true }),
+      page.getByRole("region", { name: "Thread View", exact: true }).getByText("Running").first(),
     ).toBeVisible();
     return;
   }
@@ -114,11 +114,17 @@ test("runs the main thread flow from Home through interrupt on desktop and mobil
     let baselineLayout: Awaited<ReturnType<typeof threadCards>> | undefined;
     if (isDesktop) {
       baselineLayout = await threadCards(page);
-      await expect(page.getByRole("heading", { name: "New thread", exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("region", { name: "Thread View", exact: true }).getByLabel("Ask Codex"),
+      ).toBeVisible();
+      await expect(page.locator(".current-activity-card")).toHaveCount(0);
+      await expect(page.locator(".thread-feedback-card-inline")).toHaveCount(0);
     } else {
       await openMobileThreadNavigation(page, isDesktop);
       await expect(page.locator("section.thread-navigation")).toBeVisible();
-      await expect(page.getByRole("heading", { name: "New thread", exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("region", { name: "Thread View", exact: true }).getByLabel("Ask Codex"),
+      ).toBeVisible();
       await expect(page.getByRole("region", { name: "Timeline", exact: true })).toBeVisible();
       await page.getByRole("button", { name: "Close threads", exact: true }).click();
     }
@@ -127,7 +133,10 @@ test("runs the main thread flow from Home through interrupt on desktop and mobil
     if (isDesktop) {
       await expect(page.getByText("Started thread thread_001.")).toBeVisible();
     }
-    await expect(page.getByRole("heading", { name: "thread_001", exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/threadId=thread_001/);
+    await expect(
+      page.getByRole("region", { name: "Thread View", exact: true }).getByText("Fix build error"),
+    ).toBeVisible();
     await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
     if (isDesktop) {
       expectDesktopThreadLayoutStable(baselineLayout!, await threadCards(page));

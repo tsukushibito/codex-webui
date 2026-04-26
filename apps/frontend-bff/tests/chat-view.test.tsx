@@ -169,7 +169,9 @@ describe("ChatView", () => {
       />,
     );
 
-    expect(markup).toContain("Navigation");
+    expect(markup).toContain('aria-label="Navigation"');
+    expect(markup).toContain('aria-label="Thread View"');
+    expect(markup).toContain('aria-label="Timeline"');
     expect(markup).toContain("Switch workspace");
     expect(markup).toContain("Create workspace");
     expect(markup).toContain(">Ask Codex<");
@@ -623,8 +625,7 @@ describe("ChatView", () => {
     expect(markup).toContain("Approval thread");
     expect(markup).toContain("Workspace alpha");
     expect(markup).toContain("Approval required");
-    expect(markup).toContain("Codex is paused until you approve or deny the request below.");
-    expect(markup).toContain("Thread feedback");
+    expect(markup).toContain("thread-feedback-card-inline");
     expect(markup).toContain(
       "Codex is blocked until you approve or deny the pending request in this thread.",
     );
@@ -635,7 +636,6 @@ describe("ChatView", () => {
     expect(markup).toContain(
       'Operation: <code class="artifact-inline">git push origin main</code>',
     );
-    expect(markup).toContain("Interrupt thread");
     expect(markup).toContain("Please explain the diff.");
     expect(markup).toContain("Updated apps/frontend-bff/src/chat-view.tsx");
     expect(markup).toContain("Streaming update");
@@ -759,14 +759,16 @@ describe("ChatView", () => {
     });
 
     const headerBadge = container.querySelector(".thread-view-header-stack header .status-badge");
-    const activityCardBadge = container.querySelector(".current-activity-card .status-badge");
+    const inlineFeedbackBadge = container.querySelector(
+      ".thread-feedback-card-inline .status-badge",
+    );
 
     expect(headerBadge?.textContent).toContain("Approval required");
     expect(headerBadge?.className).toContain("warning");
     expect(headerBadge?.className).not.toContain("success");
-    expect(activityCardBadge?.textContent).toContain("Approval required");
-    expect(activityCardBadge?.className).toContain("warning");
-    expect(activityCardBadge?.className).not.toContain("success");
+    expect(inlineFeedbackBadge?.textContent).toContain("Approval required");
+    expect(inlineFeedbackBadge?.className).toContain("warning");
+    expect(inlineFeedbackBadge?.className).not.toContain("success");
   });
 
   it("renders transient feedback above the chat panels", () => {
@@ -1156,11 +1158,12 @@ describe("ChatView", () => {
       />,
     );
 
-    expect(markup).toContain("Ready for your next input");
-    expect(markup).toContain(
+    expect(markup).not.toContain("Ready for your next input");
+    expect(markup).not.toContain(
       "Codex is idle and the composer below is available for the next instruction.",
     );
-    expect(markup).toContain("Focus composer");
+    expect(markup).not.toContain("Focus composer");
+    expect(markup).not.toContain("thread-feedback-card-inline");
   });
 
   it("renders recovery input-unavailable reason as the single disabled composer state", () => {

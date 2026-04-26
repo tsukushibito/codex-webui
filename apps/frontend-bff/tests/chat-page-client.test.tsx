@@ -491,11 +491,9 @@ describe("ChatPageClient", () => {
     expect(window.location.search).toBe("?workspaceId=ws_alpha");
     expect(container.textContent).toContain("Ask Codex in alpha");
     expect(container.textContent).toContain("Ready for workspace input");
-    expect(container.textContent).toContain(
-      "First input will create a new thread in this workspace.",
-    );
-    expect(container.textContent).toContain("Ready for first input");
-    expect(container.textContent).toContain("Focus composer");
+    expect(container.textContent).toContain("First input starts a new thread in this workspace.");
+    expect(container.textContent).not.toContain("Ready for first input");
+    expect(container.textContent).not.toContain("Focus composer");
     expect(container.querySelectorAll("textarea")).toHaveLength(1);
     expect(chatDataMocks.sendThreadInput).not.toHaveBeenCalled();
 

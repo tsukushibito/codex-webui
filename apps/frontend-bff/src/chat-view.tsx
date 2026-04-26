@@ -200,6 +200,7 @@ type ThreadFeedbackAction =
 
 type ThreadFeedbackDescriptor = {
   badgeTone: "default" | "success" | "warning";
+  isVisible: boolean;
   title: string;
   summary: string;
   actions: ThreadFeedbackAction[];
@@ -334,6 +335,7 @@ function buildThreadFeedbackDescriptor({
   if (!workspaceId) {
     return {
       badgeTone: "default",
+      isVisible: false,
       title: "Workspace required",
       summary: "Select or create a workspace before Thread View can start or resume work.",
       actions: [],
@@ -343,6 +345,7 @@ function buildThreadFeedbackDescriptor({
   if (isSendingMessage) {
     return {
       badgeTone: "success",
+      isVisible: true,
       title: isStartingThread ? "Submitting first input" : "Submitting follow-up input",
       summary: isStartingThread
         ? "Input is accepted locally while Thread View waits for the new thread to open."
@@ -354,6 +357,7 @@ function buildThreadFeedbackDescriptor({
   if (isOpeningSelectedThread) {
     return {
       badgeTone: "default",
+      isVisible: true,
       title: "Opening thread",
       summary:
         "Restoring timeline context, request state, and the live connection for this thread.",
@@ -364,15 +368,21 @@ function buildThreadFeedbackDescriptor({
   if (!selectedThreadView) {
     return {
       badgeTone: "success",
+      isVisible: false,
       title: "Ready for first input",
       summary: "The next composer submission will create a new thread in this workspace.",
       actions: [{ kind: "focus_composer", label: "Focus composer" }],
     };
   }
 
-  if (selectedThreadView.pending_request || selectedThreadView.composer.blocked_by_request) {
+  if (
+    selectedThreadView.pending_request ||
+    selectedThreadView.composer.blocked_by_request ||
+    selectedThreadView.current_activity.kind === "waiting_on_approval"
+  ) {
     return {
       badgeTone: "warning",
+      isVisible: true,
       title: "Approval required",
       summary: "Codex is blocked until you approve or deny the pending request in this thread.",
       actions: [
@@ -388,6 +398,7 @@ function buildThreadFeedbackDescriptor({
   if (connectionState === "reconnecting") {
     return {
       badgeTone: "warning",
+      isVisible: true,
       title: "Reconnecting live updates",
       summary:
         "Live delivery dropped. Thread View is reacquiring the latest activity for this thread.",
@@ -408,6 +419,7 @@ function buildThreadFeedbackDescriptor({
   if (connectionState === "idle" && selectedThreadView.current_activity.kind === "running") {
     return {
       badgeTone: "default",
+      isVisible: true,
       title: "Connecting live updates",
       summary: "The thread is active while Thread View waits for the live stream to open.",
       actions: [
@@ -427,6 +439,7 @@ function buildThreadFeedbackDescriptor({
   if (selectedThreadView.current_activity.kind === "running") {
     return {
       badgeTone: "success",
+      isVisible: true,
       title: "Codex is running",
       summary: "Thread View is waiting for more live activity, a request, or the turn to finish.",
       actions: selectedThreadView.composer.interrupt_available
@@ -447,6 +460,7 @@ function buildThreadFeedbackDescriptor({
   ) {
     return {
       badgeTone: "warning",
+      isVisible: true,
       title:
         selectedThreadView.current_activity.kind === "system_error"
           ? "System error"
@@ -484,6 +498,7 @@ function buildThreadFeedbackDescriptor({
   if (selectedThreadView.current_activity.kind === "waiting_on_user_input") {
     return {
       badgeTone: "success",
+      isVisible: false,
       title: "Ready for your next input",
       summary: "Codex is idle and the composer below is available for the next instruction.",
       actions: [{ kind: "focus_composer", label: "Focus composer" }],
@@ -492,6 +507,7 @@ function buildThreadFeedbackDescriptor({
 
   return {
     badgeTone: "default",
+    isVisible: false,
     title: selectedThreadView.current_activity.label,
     summary: currentActivitySummary(selectedThreadView, false),
     actions: hasSelectedThread ? [{ kind: "refresh", label: "Refresh thread" }] : [],
@@ -790,7 +806,6 @@ export function ChatView({
     <main className="chat-shell">
       <header className="chat-topbar">
         <div>
-          <p className="eyebrow">thread_view</p>
           <h1>{selectedWorkspace?.workspace_name ?? "Thread workspace"}</h1>
         </div>
         <div className="chat-topbar-actions">
@@ -844,6 +859,7 @@ export function ChatView({
         ) : null}
 
         <section
+          aria-label="Navigation"
           className={
             isNavigationOpen
               ? "chat-panel create-card thread-navigation open"
@@ -851,7 +867,6 @@ export function ChatView({
           }
         >
           <header>
-            <p className="eyebrow">Navigation</p>
             <h2>{selectedWorkspace?.workspace_name ?? "Select workspace"}</h2>
             <p className="workspace-meta">
               {workspaceId ? "Workspace scope active" : "Choose or create a workspace."}
@@ -1014,11 +1029,10 @@ export function ChatView({
           </div>
         </section>
 
-        <section className="chat-panel workspace-card thread-view-card">
+        <section aria-label="Thread View" className="chat-panel workspace-card thread-view-card">
           <div className="thread-view-header-stack">
             <header>
               <div className="workspace-meta-row">
-                <p className="eyebrow">{isStartingThread ? "Workspace input" : "Current thread"}</p>
                 {selectedThreadView ? (
                   <span className={activityBadgeClass(selectedThreadView.current_activity.kind)}>
                     {selectedThreadView.current_activity.label}
@@ -1071,42 +1085,6 @@ export function ChatView({
                 ) : null}
               </div>
             </header>
-
-            <div className="current-activity-card">
-              <div className="workspace-meta-row">
-                <strong>Current activity</strong>
-                <span
-                  className={activityBadgeClass(selectedThreadView?.current_activity.kind ?? null)}
-                >
-                  {selectedThreadView?.current_activity.label ??
-                    (isOpeningSelectedThread
-                      ? "Opening"
-                      : workspaceId
-                        ? "Ready for first input"
-                        : "Workspace required")}
-                </span>
-              </div>
-              <p className="workspace-meta">
-                {workspaceId
-                  ? currentActivitySummary(selectedThreadView, isOpeningSelectedThread)
-                  : "Choose a workspace to enable the composer."}
-              </p>
-            </div>
-
-            <div className="thread-feedback-card">
-              <div className="workspace-meta-row">
-                <strong>Thread feedback</strong>
-                <span className={threadFeedbackBadgeClass(threadFeedback)}>
-                  {threadFeedback.title}
-                </span>
-              </div>
-              <p className="workspace-status">{threadFeedback.summary}</p>
-              {threadFeedback.actions.length > 0 ? (
-                <div className="workspace-actions thread-feedback-actions">
-                  {threadFeedback.actions.map((action) => renderThreadFeedbackAction(action))}
-                </div>
-              ) : null}
-            </div>
           </div>
 
           <div className="thread-view-body">
@@ -1207,25 +1185,23 @@ export function ChatView({
                 </div>
               ) : null}
 
-              {selectedThreadView?.composer.interrupt_available ? (
-                <div className="workspace-actions thread-interrupt-actions">
-                  <button
-                    className="secondary-link action-button"
-                    disabled={isInterruptingThread}
-                    onClick={onInterruptThread}
-                    type="button"
-                  >
-                    {isInterruptingThread ? "Interrupting..." : "Interrupt thread"}
-                  </button>
+              {threadFeedback.isVisible ? (
+                <div className="thread-feedback-card thread-feedback-card-inline">
+                  <div className="workspace-meta-row">
+                    <span className={threadFeedbackBadgeClass(threadFeedback)}>
+                      {threadFeedback.title}
+                    </span>
+                  </div>
+                  <p className="workspace-status">{threadFeedback.summary}</p>
+                  {threadFeedback.actions.length > 0 ? (
+                    <div className="workspace-actions thread-feedback-actions">
+                      {threadFeedback.actions.map((action) => renderThreadFeedbackAction(action))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
               <section className="timeline-section" aria-label="Timeline">
-                <header>
-                  <p className="eyebrow">Timeline</p>
-                  <h2>Thread context</h2>
-                </header>
-
                 {isLoadingThread ? (
                   <p className="workspace-status">
                     {selectedThreadId
