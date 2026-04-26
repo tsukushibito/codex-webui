@@ -69,10 +69,11 @@ Each active task package `README.md` must include at least the following section
 
 ## Current Active Tasks
 
-- `None`
+- None
 
 ## Archived Task Packages
 
+- [issue-248-bff-mapping-boundaries](./archive/issue-248-bff-mapping-boundaries/README.md)
 - [issue-247-bff-type-boundaries](./archive/issue-247-bff-type-boundaries/README.md)
 - [issue-246-bff-resource-handlers](./archive/issue-246-bff-resource-handlers/README.md)
 - [issue-245-request-helper-lifecycle](./archive/issue-245-request-helper-lifecycle/README.md)
