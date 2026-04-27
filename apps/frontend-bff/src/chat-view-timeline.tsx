@@ -113,12 +113,6 @@ export function ChatViewTimeline({
             data-turn-id={group.turnId ?? undefined}
             key={group.id}
           >
-            {group.turnId ? (
-              <div className="timeline-turn-label">
-                <span>Turn</span>
-                <strong>{group.turnId}</strong>
-              </div>
-            ) : null}
             {group.rows.map((row) => {
               const requestContext = requestRowContexts[row.id] ?? null;
               const contentPreview = row.defaultFoldEligible
