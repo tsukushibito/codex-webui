@@ -952,6 +952,47 @@ textarea {
   gap: 8px;
 }
 
+.timeline-row-live-status {
+  align-items: center;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.timeline-row-live-placeholder .timeline-row-content {
+  min-height: 1.25em;
+}
+
+.timeline-row-live-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(15, 95, 93, 0.18);
+  animation: timeline-row-live-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes timeline-row-live-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.92);
+    box-shadow: 0 0 0 0 rgba(15, 95, 93, 0.16);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0.44rem rgba(15, 95, 93, 0.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timeline-row-live-dot {
+    animation: none;
+    box-shadow: none;
+  }
+}
+
 .timeline-request-inline-details {
   display: grid;
   gap: 6px;

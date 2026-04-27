@@ -113,9 +113,108 @@ describe("ChatViewTimeline", () => {
     expect(markup).toContain(
       'class="timeline-row timeline-row-prominent timeline-row-event timeline-row-tone-request"',
     );
-    expect(markup).toContain("Live");
+    expect(markup).toContain("Streaming");
+    expect(markup).toContain("Codex is streaming progress in this assistant row.");
     expect(markup).toContain("formatted:2026-03-27T05:21:00Z");
     expect(markup).toContain("Inspect approval context");
+  });
+
+  it("renders live assistant rows with inline streaming status and leaves completed assistant rows timestamped", async () => {
+    const groups: TimelineDisplayGroup[] = [
+      {
+        id: "group-turn-001",
+        turnId: "turn_001",
+        rows: [
+          {
+            id: "row-live-assistant",
+            turnId: "turn_001",
+            itemId: null,
+            requestId: null,
+            requestState: null,
+            sequence: 1,
+            occurredAt: "2026-03-27T05:20:00Z",
+            label: "Codex",
+            content: "Streaming answer",
+            density: "primary",
+            role: "assistant",
+            tone: "codex",
+            timelineItemId: null,
+            isLive: true,
+            defaultFoldEligible: false,
+            showDetailButton: false,
+            detailActionLabel: null,
+          },
+          {
+            id: "row-completed-assistant",
+            turnId: "turn_001",
+            itemId: null,
+            requestId: null,
+            requestState: null,
+            sequence: 2,
+            occurredAt: "2026-03-27T05:21:00Z",
+            label: "Codex",
+            content: "Final answer",
+            density: "primary",
+            role: "assistant",
+            tone: "codex",
+            timelineItemId: null,
+            isLive: false,
+            defaultFoldEligible: false,
+            showDetailButton: false,
+            detailActionLabel: null,
+          },
+        ],
+      },
+    ];
+
+    await act(async () => {
+      root.render(<ChatViewTimeline {...buildTimelineProps({ groups })} />);
+    });
+
+    const liveStatus = container.querySelector(".timeline-row-live-status");
+    expect(liveStatus?.textContent).toContain("Streaming");
+    expect(container.querySelector(".timeline-row-live-status .sr-only")?.textContent).toContain(
+      "Codex is streaming progress in this assistant row.",
+    );
+    expect(container.querySelectorAll(".timeline-row-live-status")).toHaveLength(1);
+    expect(container.textContent).toContain("formatted:2026-03-27T05:21:00Z");
+  });
+
+  it("renders an empty live assistant placeholder row with the same in-row streaming status", () => {
+    const groups: TimelineDisplayGroup[] = [
+      {
+        id: "group-turn-001",
+        turnId: "turn_001",
+        rows: [
+          {
+            id: "row-live-placeholder",
+            turnId: "turn_001",
+            itemId: null,
+            requestId: null,
+            requestState: null,
+            sequence: 1,
+            occurredAt: null,
+            label: "Codex is responding",
+            content: "",
+            density: "primary",
+            role: "assistant",
+            tone: "codex",
+            timelineItemId: null,
+            isLive: true,
+            defaultFoldEligible: false,
+            showDetailButton: false,
+            detailActionLabel: null,
+          },
+        ],
+      },
+    ];
+
+    const markup = renderToStaticMarkup(<ChatViewTimeline {...buildTimelineProps({ groups })} />);
+
+    expect(markup).toContain("timeline-row-live-placeholder");
+    expect(markup).toContain("Codex is responding");
+    expect(markup).toContain("Streaming");
+    expect(markup).toContain("Codex is streaming progress in this assistant row.");
   });
 
   it("renders muted system rows and error rows with their semantic tone classes", () => {
