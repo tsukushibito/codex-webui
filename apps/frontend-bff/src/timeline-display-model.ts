@@ -431,11 +431,12 @@ export function buildTimelineDisplayModel({
   streamEvents: PublicThreadStreamEvent[];
   draftAssistantMessages: Record<string, string>;
 }): TimelineDisplayModel {
+  void draftAssistantMessages;
+
   const sortedTimelineItems = timelineItems.toSorted(
     (left, right) => left.sequence - right.sequence,
   );
   const rows: TimelineDisplayRow[] = [];
-  const restAssistantKeys = new Set<string>();
   const restCompletedAssistantKeys = new Set<string>();
   const restAssistantContents = new Set<string>();
   const restDedupKeys = new Set<string>();
@@ -477,9 +478,6 @@ export function buildTimelineDisplayModel({
 
     const content = timelineItemContent(item);
     if (isAssistantTimelineItem(item)) {
-      for (const key of timelineAssistantKeys(item)) {
-        restAssistantKeys.add(key);
-      }
       const explicitKey = assistantTimelineKey(item);
       const key: string =
         explicitKey ??
@@ -649,6 +647,10 @@ export function buildTimelineDisplayModel({
     }
 
     const isCompleted = group.completedContent !== null;
+    if (!isCompleted) {
+      continue;
+    }
+
     rows.push({
       id: `assistant:${group.key}`,
       turnId: group.turnId,
@@ -677,6 +679,10 @@ export function buildTimelineDisplayModel({
     }
 
     const isCompleted = group.completedContent !== null;
+    if (!isCompleted) {
+      continue;
+    }
+
     rows.push({
       id: `timeline-assistant:${group.key}`,
       turnId: group.turnId,
@@ -692,32 +698,6 @@ export function buildTimelineDisplayModel({
       tone: "codex",
       timelineItemId: group.timelineItemId,
       isLive: !isCompleted,
-      defaultFoldEligible: false,
-      showDetailButton: false,
-      detailActionLabel: null,
-    });
-  }
-
-  for (const [messageId, content] of Object.entries(draftAssistantMessages)) {
-    if (assistantDeltaGroups.has(messageId) || restAssistantKeys.has(messageId) || !content) {
-      continue;
-    }
-
-    rows.push({
-      id: `draft:${messageId}`,
-      turnId: null,
-      itemId: null,
-      requestId: null,
-      requestState: null,
-      sequence: Number.MAX_SAFE_INTEGER,
-      occurredAt: null,
-      label: timelineDisplayLabel("message.assistant.delta", true),
-      content: `${content}...`,
-      density: "primary",
-      role: "assistant",
-      tone: "codex",
-      timelineItemId: null,
-      isLive: true,
       defaultFoldEligible: false,
       showDetailButton: false,
       detailActionLabel: null,
