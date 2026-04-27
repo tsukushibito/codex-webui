@@ -55,8 +55,18 @@
 
 ## Status / handoff notes
 
-- Status: `pre-push-validated`
-- Notes: Normal Timeline rendering no longer emits visible turn-label rows. Internal turn grouping remains on `.timeline-turn-group` and `data-turn-id`, so request matching and metadata recovery continue to work. Focused tests cover hidden visible labels and identical outer structure for live and completed assistant groups. Desktop and mobile screenshots confirm live/completed Timeline rows render without visible turn IDs. Sprint evaluator and pre-push validation passed in the worktree.
+- Status: `merged`
+- Notes: Normal Timeline rendering no longer emits visible turn-label rows. Internal turn grouping remains on `.timeline-turn-group` and `data-turn-id`, so request matching and metadata recovery continue to work. Focused tests cover hidden visible labels and identical outer structure for live and completed assistant groups. Desktop and mobile screenshots confirm live/completed Timeline rows render without visible turn IDs. Sprint evaluator and pre-push validation passed in the worktree. PR #295 merged to `main` as `8efa637` and closed Issue #290.
+
+## Completion retrospective
+
+- Completion boundary: Issue #290 and this package reached `main` through PR #295.
+- Contract check: satisfied by hidden visible turn labels, preserved `data-turn-id`, unchanged grouping/request matching paths, focused unit tests, and desktop/mobile visual evidence for live and completed Timeline states.
+- What worked: the narrow render-layer change preserved the display model and request matching behavior while removing the layout-shifting header.
+- Workflow problems: the first Playwright capture run hit an existing runtime port and the live assertion needed an exact text locator; both were local capture issues, not product defects.
+- Improvements to adopt: use external `PLAYWRIGHT_BASE_URL` with mocked route specs for visual-only captures when the full Playwright runtime stack is unnecessary.
+- Skill candidates or skill updates: none.
+- Follow-up updates: none.
 
 ## Archive conditions
 

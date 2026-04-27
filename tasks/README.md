@@ -73,6 +73,7 @@ None.
 
 ## Archived Task Packages
 
+- [issue-290-remove-turn-labels](./archive/issue-290-remove-turn-labels/README.md)
 - [issue-289-active-codex-progress](./archive/issue-289-active-codex-progress/README.md)
 - [issue-259-shared-contract-strategy](./archive/issue-259-shared-contract-strategy/README.md)
 - [issue-256-architecture-boundary-checks](./archive/issue-256-architecture-boundary-checks/README.md)
