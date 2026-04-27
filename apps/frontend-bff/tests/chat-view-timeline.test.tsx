@@ -306,6 +306,9 @@ describe("ChatViewTimeline", () => {
                 state: "pending",
                 badgeClassName: "status-badge warning",
                 badgeLabel: "Pending request",
+                requestSummary: "Run git push",
+                requestReason: "Codex requests permission to push changes to remote.",
+                requestOperationSummary: "git push origin main",
                 showRequestDetailButton: true,
                 showResponseActions: true,
               },
@@ -316,6 +319,12 @@ describe("ChatViewTimeline", () => {
     });
 
     expect(container.textContent).toContain("Pending request");
+    expect(container.textContent).toContain("Request summary");
+    expect(container.textContent).toContain("Run git push");
+    expect(container.textContent).toContain("Reason");
+    expect(container.textContent).toContain("Codex requests permission to push changes to remote.");
+    expect(container.textContent).toContain("Operation");
+    expect(container.textContent).toContain("git push origin main");
 
     const approveButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Approve request",
@@ -336,5 +345,62 @@ describe("ChatViewTimeline", () => {
     expect(onApproveRequest).toHaveBeenCalledTimes(1);
     expect(onDenyRequest).toHaveBeenCalledTimes(1);
     expect(onOpenRequestDetail).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps resolved request rows compact and action-free", async () => {
+    const groups: TimelineDisplayGroup[] = [
+      {
+        id: "group-turn-resolved",
+        turnId: "turn_resolved",
+        rows: [
+          {
+            id: "row-request",
+            turnId: "turn_resolved",
+            itemId: "item_approval_001",
+            requestId: "req_001",
+            requestState: "resolved",
+            sequence: 4,
+            occurredAt: "2026-03-27T05:24:00Z",
+            label: "Request resolved",
+            content: "Push request was approved",
+            density: "compact",
+            role: "event",
+            timelineItemId: "timeline_request_001",
+            isLive: false,
+            defaultFoldEligible: false,
+            showDetailButton: true,
+            detailActionLabel: "Inspect request",
+          },
+        ],
+      },
+    ];
+
+    await act(async () => {
+      root.render(
+        <ChatViewTimeline
+          {...buildTimelineProps({
+            groups,
+            requestRowContexts: {
+              "row-request": {
+                state: "resolved",
+                badgeClassName: "status-badge success",
+                badgeLabel: "Resolved: approved",
+                requestSummary: "Run git push",
+                requestReason: null,
+                requestOperationSummary: null,
+                showRequestDetailButton: true,
+                showResponseActions: false,
+              },
+            },
+          })}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("Resolved: approved");
+    expect(container.textContent).toContain("Inspect request");
+    expect(container.querySelector(".timeline-request-inline-details")).toBeNull();
+    expect(container.textContent).not.toContain("Approve request");
+    expect(container.textContent).not.toContain("Deny request");
   });
 });
