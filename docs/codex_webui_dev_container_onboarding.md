@@ -1,6 +1,6 @@
 # Codex WebUI dev container onboarding
 
-Last updated: 2026-04-21
+Last updated: 2026-04-27
 
 ## 1. Purpose
 
@@ -22,6 +22,7 @@ The repository root includes the following development entrypoints:
 - `Dockerfile`: development image for this repository
 - `docker-compose.yml`: recommended way to run the dev container
 - `scripts/start-codex-webui.sh`: starts `codex-runtime` and `frontend-bff`, with optional interactive ngrok launch
+- `scripts/stop-codex-webui.sh`: stops local `codex-runtime` and `frontend-bff` dev processes, with optional ngrok cleanup
 - `scripts/start-tunnel.sh`: starts `code tunnel`
 - `scripts/doctor.sh`: validates the development container toolchain
 
@@ -134,6 +135,14 @@ The launcher still supports local-only startup when you omit ngrok flags. App-lo
 
 The local browser-facing port remains `3000`, and the runtime stays on `3001`.
 
+If an earlier local WebUI run is still using the default ports, stop it before starting a fresh launcher session:
+
+```bash
+scripts/stop-codex-webui.sh
+```
+
+The stop helper targets local `codex-runtime` and `frontend-bff` dev processes from this checkout. It leaves an existing ngrok tunnel running by default so a subsequent launcher run can reuse it; pass `--with-ngrok` when the tunnel should also be stopped.
+
 ### 5.3 Expose the browser entrypoint with ngrok
 
 If you used `scripts/start-codex-webui.sh --interactive` or `--with-ngrok`, the launcher starts ngrok for you and prints the public URL after the local services are ready.
@@ -214,15 +223,26 @@ scripts/start-codex-webui.sh --interactive
 
 If the browser still cannot load the UI, confirm the frontend is listening on `127.0.0.1:3000` inside the container.
 
-### 8.4 ngrok endpoint is already online
+### 8.4 Port `3000` is already in use
+
+If the launcher reports `EADDRINUSE` for `0.0.0.0:3000`, an earlier `frontend-bff` process is still bound to the browser-facing port. Stop the local WebUI processes and start again:
+
+```bash
+scripts/stop-codex-webui.sh
+scripts/start-codex-webui.sh --interactive
+```
+
+Use `scripts/stop-codex-webui.sh --with-ngrok` when you also want to stop the local ngrok agent for the frontend port.
+
+### 8.5 ngrok endpoint is already online
 
 For fixed ngrok URLs, `ERR_NGROK_334` means another endpoint with the same URL is already online. Stop the existing ngrok process or dashboard endpoint, then rerun the launcher. If the existing process is a local ngrok agent for the same frontend port, the launcher should detect and reuse it automatically.
 
-### 8.5 The runtime fails because the workspace root does not exist
+### 8.6 The runtime fails because the workspace root does not exist
 
 The local startup process creates the default workspace root for you. If you override `CODEX_WEBUI_WORKSPACE_ROOT`, make sure the target path is valid and writable inside the container.
 
-### 8.6 `vulkaninfo` only shows `llvmpipe`
+### 8.7 `vulkaninfo` only shows `llvmpipe`
 
 If `nvidia-smi` works but `vulkaninfo --summary` still falls back to `llvmpipe`, the container runtime is exposing compute/NVML but not the NVIDIA graphics stack or Vulkan ICD.
 
@@ -230,7 +250,7 @@ This repository now ships `scripts/with-vulkan-driver.sh`, which can repair the 
 
 If the helper still cannot surface an NVIDIA Vulkan device, the host runtime is not providing the required graphics libraries. Native Linux Docker Engine with NVIDIA Container Toolkit is the recommended path for containerized Vulkan validation. Docker Desktop on Windows with the WSL2 backend is reliable for GPU compute, but may not expose the full graphics/Vulkan stack needed for Vulkan app development inside containers.
 
-### 8.7 Vulkan SDK download 404s during image build
+### 8.8 Vulkan SDK download 404s during image build
 
 The Dockerfile uses LunarG's automated download API with the generic Linux file name, `vulkan_sdk.tar.xz`, instead of constructing the embedded-version tarball name directly.
 
