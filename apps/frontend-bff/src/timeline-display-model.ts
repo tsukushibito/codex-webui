@@ -5,6 +5,8 @@ export type TimelineRowDensity = "primary" | "prominent" | "compact";
 
 export type TimelineRowRole = "user" | "assistant" | "event";
 
+export type TimelineRowTone = "user" | "codex" | "request" | "tool" | "error" | "muted";
+
 export interface TimelineDisplayRow {
   id: string;
   turnId: string | null;
@@ -17,6 +19,7 @@ export interface TimelineDisplayRow {
   content: string;
   density: TimelineRowDensity;
   role: TimelineRowRole;
+  tone?: TimelineRowTone;
   timelineItemId: string | null;
   isLive: boolean;
   defaultFoldEligible: boolean;
@@ -107,6 +110,10 @@ function payloadText(payload: Record<string, unknown>) {
 
 function normalizedStatusValue(value: unknown) {
   return asNonEmptyString(value)?.replaceAll("_", " ") ?? null;
+}
+
+function normalizeKind(kind: string) {
+  return kind.trim().toLowerCase();
 }
 
 function statusChangedContent(payload: Record<string, unknown>) {
@@ -206,6 +213,61 @@ function shouldHideRow(kind: string, content: string, payload: Record<string, un
   }
 
   return false;
+}
+
+function hasErrorTone(kind: string, content: string) {
+  const normalizedKind = normalizeKind(kind);
+  const normalizedContent = normalizeContent(content);
+
+  return (
+    normalizedKind.includes("error") ||
+    normalizedKind.includes("failed") ||
+    normalizedContent.includes("error") ||
+    normalizedContent.includes("failed") ||
+    normalizedContent.includes("fatal") ||
+    normalizedContent.includes("exception")
+  );
+}
+
+export function classifyTimelineTone(
+  kind: string,
+  role: TimelineRowRole,
+  content: string,
+): TimelineRowTone {
+  if (role === "user") {
+    return "user";
+  }
+
+  if (role === "assistant") {
+    return "codex";
+  }
+
+  if (hasErrorTone(kind, content)) {
+    return "error";
+  }
+
+  if (kind.includes("approval") || kind.includes("request")) {
+    return "request";
+  }
+
+  if (
+    kind.includes("tool") ||
+    kind.includes("command") ||
+    kind.includes("log") ||
+    kind.includes("trace") ||
+    kind.includes("diff") ||
+    kind.includes("patch") ||
+    kind.includes("output") ||
+    kind.includes("file")
+  ) {
+    return "tool";
+  }
+
+  if (kind.includes("status") || kind.includes("note")) {
+    return "muted";
+  }
+
+  return "muted";
 }
 
 function timelineRowDetail(item: PublicTimelineItem, role: TimelineRowRole) {
@@ -493,6 +555,7 @@ export function buildTimelineDisplayModel({
       content,
       density: classifyTimelineDensity(item.kind),
       role,
+      tone: classifyTimelineTone(item.kind, role, content),
       timelineItemId: item.timeline_item_id,
       isLive: false,
       defaultFoldEligible: isDefaultFoldEligible(item.kind, role, content),
@@ -598,6 +661,7 @@ export function buildTimelineDisplayModel({
       content: isCompleted ? content : `${content}...`,
       density: "primary",
       role: "assistant",
+      tone: "codex",
       timelineItemId: null,
       isLive: !isCompleted,
       defaultFoldEligible: false,
@@ -625,6 +689,7 @@ export function buildTimelineDisplayModel({
       content: isCompleted ? content : `${content}...`,
       density: "primary",
       role: "assistant",
+      tone: "codex",
       timelineItemId: group.timelineItemId,
       isLive: !isCompleted,
       defaultFoldEligible: false,
@@ -650,6 +715,7 @@ export function buildTimelineDisplayModel({
       content: `${content}...`,
       density: "primary",
       role: "assistant",
+      tone: "codex",
       timelineItemId: null,
       isLive: true,
       defaultFoldEligible: false,
@@ -688,6 +754,7 @@ export function buildTimelineDisplayModel({
       content,
       density: classifyTimelineDensity(event.event_type),
       role,
+      tone: classifyTimelineTone(event.event_type, role, content),
       timelineItemId: null,
       isLive: false,
       defaultFoldEligible: isDefaultFoldEligible(event.event_type, role, content),

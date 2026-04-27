@@ -28,7 +28,10 @@ export interface ChatViewTimelineProps {
 }
 
 function timelineRowClass(row: TimelineDisplayRow) {
-  return `timeline-row timeline-row-${row.density} timeline-row-${row.role}`;
+  const tone =
+    row.tone ?? (row.role === "user" ? "user" : row.role === "assistant" ? "codex" : "muted");
+
+  return `timeline-row timeline-row-${row.density} timeline-row-${row.role} timeline-row-tone-${tone}`;
 }
 
 const TIMELINE_PREVIEW_LINE_LIMIT = 8;

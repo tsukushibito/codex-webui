@@ -904,12 +904,52 @@ textarea {
   border-color: rgba(22, 47, 52, 0.12);
 }
 
-.timeline-row-meta {
-  gap: 8px;
-}
-
 .timeline-row-content {
   white-space: pre-wrap;
+}
+
+.timeline-row-tone-user {
+  border-color: rgba(15, 95, 93, 0.28);
+  background: linear-gradient(180deg, rgba(238, 247, 247, 0.98), rgba(255, 255, 255, 0.94));
+  box-shadow: inset 3px 0 0 rgba(15, 95, 93, 0.7);
+}
+
+.timeline-row-tone-codex {
+  border-color: rgba(22, 47, 52, 0.12);
+  background: linear-gradient(180deg, rgba(249, 252, 252, 0.98), rgba(255, 255, 255, 0.94));
+  box-shadow: inset 3px 0 0 rgba(22, 47, 52, 0.22);
+}
+
+.timeline-row-tone-request {
+  border-color: rgba(185, 98, 31, 0.28);
+  background: linear-gradient(180deg, rgba(255, 248, 239, 0.98), rgba(255, 255, 255, 0.94));
+  box-shadow: inset 3px 0 0 rgba(185, 98, 31, 0.72);
+}
+
+.timeline-row-tone-tool {
+  border-color: rgba(30, 63, 73, 0.16);
+  background: linear-gradient(180deg, rgba(242, 247, 248, 0.98), rgba(255, 255, 255, 0.94));
+  box-shadow: inset 3px 0 0 rgba(30, 63, 73, 0.58);
+}
+
+.timeline-row-tone-error {
+  border-color: rgba(178, 65, 60, 0.26);
+  background: linear-gradient(180deg, rgba(255, 246, 245, 0.98), rgba(255, 255, 255, 0.94));
+  box-shadow: inset 3px 0 0 rgba(178, 65, 60, 0.74);
+}
+
+.timeline-row-tone-muted {
+  border-color: rgba(22, 47, 52, 0.08);
+  background: rgba(244, 247, 247, 0.94);
+}
+
+.timeline-row-tone-muted .timeline-row-content,
+.timeline-row-tone-muted .workspace-meta-row {
+  color: var(--text-muted);
+}
+
+.timeline-row-meta {
+  gap: 8px;
 }
 
 .timeline-request-inline-details {
@@ -1616,6 +1656,30 @@ textarea {
 
   .timeline-row-primary {
     border-color: rgba(35, 24, 15, 0.08);
+  }
+
+  .timeline-row.timeline-row-tone-user {
+    background: linear-gradient(180deg, rgba(238, 247, 247, 0.98), rgba(255, 255, 255, 0.94));
+  }
+
+  .timeline-row.timeline-row-tone-codex {
+    background: linear-gradient(180deg, rgba(249, 252, 252, 0.98), rgba(255, 255, 255, 0.94));
+  }
+
+  .timeline-row.timeline-row-tone-request {
+    background: linear-gradient(180deg, rgba(255, 248, 239, 0.98), rgba(255, 255, 255, 0.94));
+  }
+
+  .timeline-row.timeline-row-tone-tool {
+    background: linear-gradient(180deg, rgba(242, 247, 248, 0.98), rgba(255, 255, 255, 0.94));
+  }
+
+  .timeline-row.timeline-row-tone-error {
+    background: linear-gradient(180deg, rgba(255, 246, 245, 0.98), rgba(255, 255, 255, 0.94));
+  }
+
+  .timeline-row.timeline-row-tone-muted {
+    background: rgba(244, 247, 247, 0.94);
   }
 
   .chat-feedback-stack {

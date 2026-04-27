@@ -72,6 +72,7 @@ describe("ChatViewTimeline", () => {
             content: "Streaming answer",
             density: "primary",
             role: "assistant",
+            tone: "codex",
             timelineItemId: null,
             isLive: true,
             defaultFoldEligible: false,
@@ -90,6 +91,7 @@ describe("ChatViewTimeline", () => {
             content: "Approval required",
             density: "prominent",
             role: "event",
+            tone: "request",
             timelineItemId: "timeline_002",
             isLive: false,
             defaultFoldEligible: false,
@@ -105,10 +107,73 @@ describe("ChatViewTimeline", () => {
     expect(markup).toContain('aria-label="Timeline"');
     expect(markup).toContain('class="timeline-turn-group"');
     expect(markup).toContain('data-turn-id="turn_001"');
-    expect(markup).toContain('class="timeline-row timeline-row-primary timeline-row-assistant"');
+    expect(markup).toContain(
+      'class="timeline-row timeline-row-primary timeline-row-assistant timeline-row-tone-codex"',
+    );
+    expect(markup).toContain(
+      'class="timeline-row timeline-row-prominent timeline-row-event timeline-row-tone-request"',
+    );
     expect(markup).toContain("Live");
     expect(markup).toContain("formatted:2026-03-27T05:21:00Z");
     expect(markup).toContain("Inspect approval context");
+  });
+
+  it("renders muted system rows and error rows with their semantic tone classes", () => {
+    const groups: TimelineDisplayGroup[] = [
+      {
+        id: "group-system",
+        turnId: null,
+        rows: [
+          {
+            id: "row-system",
+            turnId: null,
+            itemId: null,
+            requestId: null,
+            requestState: null,
+            sequence: 1,
+            occurredAt: "2026-03-27T05:19:00Z",
+            label: "Status update",
+            content: "running",
+            density: "compact",
+            role: "event",
+            tone: "muted",
+            timelineItemId: null,
+            isLive: false,
+            defaultFoldEligible: false,
+            showDetailButton: false,
+            detailActionLabel: null,
+          },
+          {
+            id: "row-error",
+            turnId: null,
+            itemId: null,
+            requestId: null,
+            requestState: null,
+            sequence: 2,
+            occurredAt: "2026-03-27T05:19:30Z",
+            label: "System error",
+            content: "failed",
+            density: "prominent",
+            role: "event",
+            tone: "error",
+            timelineItemId: null,
+            isLive: false,
+            defaultFoldEligible: false,
+            showDetailButton: false,
+            detailActionLabel: null,
+          },
+        ],
+      },
+    ];
+
+    const markup = renderToStaticMarkup(<ChatViewTimeline {...buildTimelineProps({ groups })} />);
+
+    expect(markup).toContain(
+      'class="timeline-row timeline-row-compact timeline-row-event timeline-row-tone-muted"',
+    );
+    expect(markup).toContain(
+      'class="timeline-row timeline-row-prominent timeline-row-event timeline-row-tone-error"',
+    );
   });
 
   it("keeps long primary conversation rows expanded by default", async () => {
@@ -130,6 +195,7 @@ describe("ChatViewTimeline", () => {
             content: longContent,
             density: "primary",
             role: "user",
+            tone: "user",
             timelineItemId: null,
             isLive: false,
             defaultFoldEligible: false,
@@ -147,6 +213,7 @@ describe("ChatViewTimeline", () => {
 
     expect(container.querySelector("button[aria-expanded]")).toBeNull();
     expect(container.querySelector(".timeline-row-folded")).toBeNull();
+    expect(container.querySelector(".timeline-row-tone-user")).not.toBeNull();
     expect(container.textContent).toContain("Line 10");
     expect(onToggleRowExpansion).not.toHaveBeenCalled();
   });
@@ -170,6 +237,7 @@ describe("ChatViewTimeline", () => {
             content: longContent,
             density: "compact",
             role: "event",
+            tone: "tool",
             timelineItemId: null,
             isLive: false,
             defaultFoldEligible: true,
@@ -190,6 +258,7 @@ describe("ChatViewTimeline", () => {
     ) as HTMLButtonElement | null;
     expect(foldedToggle?.textContent).toBe("Show more");
     expect(foldedToggle?.getAttribute("aria-label")).toBe("Expand Tool activity content");
+    expect(container.querySelector(".timeline-row-tone-tool")).not.toBeNull();
     expect(container.querySelector(".timeline-row-folded")).not.toBeNull();
 
     await act(async () => {
@@ -237,6 +306,7 @@ describe("ChatViewTimeline", () => {
             content: "Ran a command",
             density: "compact",
             role: "event",
+            tone: "tool",
             timelineItemId: "timeline_detail_001",
             isLive: false,
             defaultFoldEligible: false,
@@ -283,6 +353,7 @@ describe("ChatViewTimeline", () => {
             content: "Push requires approval",
             density: "prominent",
             role: "event",
+            tone: "request",
             timelineItemId: "timeline_request_001",
             isLive: false,
             defaultFoldEligible: false,
@@ -365,6 +436,7 @@ describe("ChatViewTimeline", () => {
             content: "Push request was approved",
             density: "compact",
             role: "event",
+            tone: "request",
             timelineItemId: "timeline_request_001",
             isLive: false,
             defaultFoldEligible: false,
