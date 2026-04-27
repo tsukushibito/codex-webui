@@ -50,8 +50,18 @@
 
 ## Status / handoff notes
 
-- Status: `pre-push-validated`
-- Notes: Live Codex progress now renders inside active assistant timeline rows with accessible streaming status text, including an empty placeholder row before the first assistant delta arrives. Normal running feedback no longer appears as the inline thread feedback card when a live assistant row is present, while reconnecting and error states remain on the thread feedback surface. Sprint evaluator and pre-push validation passed in the worktree.
+- Status: `merged`
+- Notes: Live Codex progress now renders inside active assistant timeline rows with accessible streaming status text, including an empty placeholder row before the first assistant delta arrives. Normal running feedback no longer appears as the inline thread feedback card when a live assistant row is present, while reconnecting and error states remain on the thread feedback surface. Sprint evaluator and pre-push validation passed in the worktree. PR #294 merged to `main` as `1326d8d` and closed Issue #289.
+
+## Completion retrospective
+
+- Completion boundary: Issue #289 and this package reached `main` through PR #294.
+- Contract check: satisfied by live in-row assistant progress, a pre-content placeholder row, preserved reconnecting feedback, completed-row timestamp behavior, and focused tests.
+- What worked: the evaluator caught the initial reconnecting and pre-delta gaps before publish.
+- Workflow problems: none requiring repo guidance changes.
+- Improvements to adopt: keep testing both streaming-with-content and running-before-content cases for Timeline live-state work.
+- Skill candidates or skill updates: none.
+- Follow-up updates: none.
 
 ## Archive conditions
 

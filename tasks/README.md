@@ -73,6 +73,7 @@ None.
 
 ## Archived Task Packages
 
+- [issue-289-active-codex-progress](./archive/issue-289-active-codex-progress/README.md)
 - [issue-259-shared-contract-strategy](./archive/issue-259-shared-contract-strategy/README.md)
 - [issue-256-architecture-boundary-checks](./archive/issue-256-architecture-boundary-checks/README.md)
 - [issue-255-e2e-mock-builders](./archive/issue-255-e2e-mock-builders/README.md)
