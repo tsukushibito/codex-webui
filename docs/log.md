@@ -29,6 +29,28 @@ After the heading, keep the body concise:
 
 ## Entries
 
+## [2026-04-27] query | desktop thread view composer and header refinement
+
+Source:
+
+- user review of `workspace01` latest-thread desktop screenshots
+- `artifacts/visual-inspection/workspace01-latest-thread-2026-04-27/desktop-chromium-workspace01-latest-thread-wait10s.png`
+- `artifacts/visual-inspection/workspace01-latest-thread-2026-04-27/desktop-chromium-workspace01-latest-thread-timeline-top.png`
+- `docs/notes/codex_webui_thread_view_information_architecture_note_v0_1.md`
+
+Updated:
+
+- `docs/notes/codex_webui_thread_view_information_architecture_note_v0_1.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- captured the design direction to demote idle `Waiting for your input` from the top of the main column into a compact lower status treatment or Details
+- recorded that the composer should become one integrated input frame with icon-first controls, tooltips, and no redundant idle caption
+- added guidance for moving low-frequency header chips and utilities into Details or a non-modal top-right overflow menu
+- added additional desktop refinements for resolved request weight, scroll anchoring, Navigation density, request labels, code preview rendering, and keyboard/accessibility affordances
+
 ## [2026-04-27] ingest | launcher ngrok duplicate endpoint guard
 
 Source:

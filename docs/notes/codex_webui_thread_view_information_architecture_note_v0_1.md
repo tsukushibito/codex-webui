@@ -1,6 +1,6 @@
 # Codex WebUI Thread View Information Architecture Note v0.1
 
-Last updated: 2026-04-26
+Last updated: 2026-04-27
 
 ## Purpose
 
@@ -13,10 +13,13 @@ It is a maintained design note, not a normative specification. Promote stable de
 The review was based on the locally running latest WebUI desktop capture for `workspace01`:
 
 - `artifacts/visual-inspection/workspace01-thread-latest-2026-04-26-wait8s/desktop-chromium-workspace01-thread-latest-wait8s.png`
+- `artifacts/visual-inspection/workspace01-latest-thread-2026-04-27/desktop-chromium-workspace01-latest-thread-wait10s.png`
+- `artifacts/visual-inspection/workspace01-latest-thread-2026-04-27/desktop-chromium-workspace01-latest-thread-timeline-top.png`
 
 Observed route:
 
 - `/chat?workspaceId=ws_17daf81ea5774a298734540e1df3f7b2&threadId=019dc8a7-bedd-7ef2-ab96-abe0aa799a50`
+- `/chat?workspaceId=ws_17daf81ea5774a298734540e1df3f7b2&threadId=019dcd16-18ae-78f3-b33d-c4ccb69886c9`
 
 Relevant implementation surface:
 
@@ -69,8 +72,10 @@ Recommended direction:
 
 - make Timeline begin higher in the initial desktop viewport
 - keep event rows dense enough for scanning without collapsing meaningful content by default
-- fold long command output, logs, and verbose assistant text behind local expand controls
+- keep normal user and assistant message text expanded by default so the conversation can be read without extra clicks
+- fold long command output, logs, and other low-signal verbose payloads behind local expand controls; collapsed rows must keep a meaningful summary visible
 - keep approval/request events inline where they occurred, with action controls only while action is pending
+- anchor approval/request events to the originating turn or message context instead of hoisting them to the top of Timeline
 - preserve latest-event visibility while streaming, but avoid aggressive auto-scroll once the user scrolls away
 - provide an obvious return-to-latest affordance when new activity arrives off-screen
 - keep timestamps and status annotations compact; use tooltips or Details for full metadata
@@ -281,6 +286,97 @@ Recommended direction:
 - avoid making the submit button visually heavier than Timeline content
 - keep mode hints short, such as `Continue thread` or `Start new thread`
 
+## Composer as One Input Control
+
+The inspected desktop capture still treats `Send input` as a large form card:
+
+- visible card title: `Send input`
+- placeholder text: `Continue the current thread.`
+- caption text: `Input will continue the selected thread.`
+- full-width text submit button: `Send input`
+
+This duplicates the same action several times and makes the composer look like an admin form rather than a chat or coding-assistant input.
+
+Recommended direction:
+
+- make the composer one integrated input frame that contains the textarea and trailing controls
+- remove the idle caption under the textarea; the selected thread and placeholder already explain the mode
+- keep the text field visually primary and reduce the submit control to a compact icon button
+- use a send icon with an accessible label and tooltip such as `Send input`
+- use icon buttons for secondary controls when available, such as attach, options, interrupt, or voice/future controls
+- keep text labels only where ambiguity or risk is high, such as approval decisions or destructive actions
+- reserve a short inline warning below the input for exceptional states, such as blocked input, disconnected stream, or failed resend
+- let the input grow with content, but keep a stable maximum height so the composer does not consume the Timeline
+
+The desired model is closer to ChatGPT-style composition: one input surface, compact icon controls, clear focus state, and tooltips for explanation instead of visible instructional prose.
+
+## Current Status Placement
+
+The current main-column top badge, such as `Waiting for your input`, is useful as state, but its location and weight are questionable in idle states.
+
+Observed issue:
+
+- the badge appears at the top of the Thread View, above the title
+- the same meaning is also present in Navigation and composer availability
+- idle status takes priority over the Timeline even though it does not require action
+
+Recommended direction:
+
+- do not show idle `Waiting for your input` as a prominent top badge
+- move normal idle status into a compact footer/status-bar region near the composer or lower edge of the Thread View
+- use a small icon plus tooltip or short text, for example `Ready`, `Live`, `Offline`, or `Blocked`
+- keep prominent inline status above Timeline only for action-critical states: approval required, running with interrupt available, reconnecting, failed turn, system error, or blocked send
+- keep full current-activity detail in Thread Details
+- ensure the status-bar placement does not compete with or duplicate the composer placeholder
+
+This makes idle state available without letting it become the first visual object in the work column.
+
+## Header Actions and Overflow Menu
+
+The thread title area currently exposes several controls and chips inline:
+
+- workspace chip
+- stream chip
+- thread count chip
+- `Refresh`
+- `Details`
+
+These controls are recoverable context and utilities, not the main work object. They should not sit between the title and Timeline as a row of text-heavy buttons.
+
+Recommended direction:
+
+- keep the title row compact
+- move low-frequency actions and metadata into a top-right overflow icon button, such as `...`
+- open a lightweight menu or popover for common actions rather than a blocking dialog
+- reserve a modal dialog only for actions that need confirmation or complex input
+- keep `Details` as either a direct icon button or the first overflow action, depending on how central the Details surface becomes
+- put `Refresh`, copy thread ID, copy link, stream state, workspace/thread metadata, and debug links under overflow or Details
+- keep any action-critical command outside overflow, such as `Interrupt` while running or `Approve/Deny` while blocked
+- use tooltips and accessible names for icon-only header buttons
+
+A top-right overflow button is appropriate, but the default interaction should be a non-modal menu. A dialog would be too heavy for routine metadata and utility actions.
+
+## Additional Desktop Refinements
+
+The 2026-04-27 desktop capture suggests several additional improvements beyond the immediate status and composer changes.
+
+Recommended improvements:
+
+- reduce the `Latest resolved request` summary height and visual weight after approval has completed; keep pending approvals prominent, but make resolved state compact
+- avoid opening a thread with the Timeline scrolled so tightly that the first visible card is clipped; keep a small top buffer when auto-scrolling to latest activity
+- provide a visible `jump to latest` affordance when the user is reading older Timeline content and newer activity arrives
+- use relative times in Navigation cards where possible, while keeping exact timestamps in Details or tooltips
+- reduce the height of idle thread cards in Navigation so more threads fit without scroll
+- hide zero-count filter badges, or make inactive filters visually lighter
+- treat `Recent` as redundant when the thread list is already ordered by recency unless it will become an explicit filter mode
+- make request event rows use meaningful labels, operation summaries, and risk cues instead of generic `request pending` / `request resolved` content
+- keep approval/request rows visually attached to the prompt, assistant action, or tool operation that caused them so users can understand why the approval appeared
+- avoid default-collapsing normal conversation messages; use collapse controls primarily for long logs, command output, raw JSON, and other secondary payloads
+- render code fences and command output with proper monospace blocks instead of plain text that shows literal backticks in the folded preview
+- preserve scroll position when Details or overflow menus open and close
+- keep keyboard paths for focus composer, send, open overflow, open details, close popover, and jump to latest
+- ensure icon-only controls have visible focus rings, accessible names, and hover/focus tooltips
+
 ## Recommended Implementation Order
 
 1. Remove redundant visible area labels such as `THREAD VIEW`, `NAVIGATION`, `CURRENT THREAD`, and duplicate `TIMELINE` scaffolding where layout and controls already communicate the region.
@@ -291,7 +387,9 @@ Recommended direction:
 6. Add a Thread Details drawer or panel with status, metadata, requests, artifacts, and debug sections.
 7. Simplify Navigation thread cards around title, short time, status icon, selected affordance, and attention marker.
 8. Add normal-sidebar and minibar display modes for Navigation so users can trade thread triage density for Timeline space.
-9. Compact the composer so Timeline owns more of the initial viewport.
+9. Move idle current status into a compact lower status-bar treatment and keep top inline status for action-critical states only.
+10. Replace the composer card with one integrated ChatGPT-style input frame with compact icon controls.
+11. Move low-frequency header chips and utilities behind a top-right overflow menu or Details surface.
 
 This order intentionally removes obvious duplication first, then introduces the recoverability surfaces that make the cleanup safe.
 
@@ -300,8 +398,15 @@ This order intentionally removes obvious duplication first, then introduces the 
 Use these criteria when splitting this note into implementation Issues:
 
 - Desktop idle Thread View no longer shows the same idle state in multiple prose surfaces.
+- Desktop idle Thread View does not place `Waiting for your input` as the topmost main-column object; the state is available in a compact lower status area or Details.
 - Desktop initial viewport gives visibly more space to Timeline than the inspected capture.
 - Timeline begins higher in the main pane after redundant labels, status cards, and large header scaffolding are removed.
+- Approval/request Timeline rows remain in chronological context near the originating message, turn, or operation rather than being hoisted above unrelated earlier Timeline content.
+- Normal user and assistant messages are readable by default; collapse affordances do not hide ordinary conversation content before the user has a chance to inspect it.
+- Long command output, logs, raw JSON, and other secondary verbose payloads may collapse by default only when their collapsed state preserves an actionable summary and an obvious expand control.
+- Composer appears as one compact integrated input frame rather than a large form card with redundant caption and full-width text submit button.
+- Composer primary send control is icon-first with tooltip and accessible label.
+- Header metadata and low-frequency utilities are available through Details or a top-right overflow menu without blocking normal Timeline reading.
 - Normal idle feedback is available in Thread Details but not shown as a large main-flow card.
 - Approval, error, reconnecting, interruption, and blocked-send states still produce visible inline affordances.
 - Thread metadata, current activity explanation, feedback summary, request state, artifacts, and debug data remain reachable from Thread Details.
@@ -321,3 +426,7 @@ Use these criteria when splitting this note into implementation Issues:
 - Which states deserve an inline alert above Timeline rather than only a status icon plus Details entry?
 - Should Navigation filters remain text labels, move to icons, or become a menu when the thread count is small?
 - Which Timeline row types should support local expansion in the first implementation slice?
+- What length or row-type threshold should trigger default collapse for secondary payloads while keeping ordinary conversation expanded?
+- How should approval/request rows visually indicate the originating message, turn, or operation without adding heavy connector UI?
+- Should the lower status-bar be visually attached to the composer frame, or sit as a separate compact footer line?
+- Which header actions deserve direct icon buttons versus placement in the overflow menu?
