@@ -404,7 +404,7 @@ describe("ChatPageClient", () => {
 
     expect(container.textContent).toContain("Investigate build");
     expectSelectedThreadTitle("Investigate build");
-    expect(container.textContent).toContain("Waiting for your input");
+    expect(container.textContent).not.toContain("Ready for your next input.");
     expect(MockEventSource.instances[0]?.url).toBe("/api/v1/threads/thread_001/stream");
 
     const textarea = container.querySelector("#thread-composer-input");
@@ -422,10 +422,10 @@ describe("ChatPageClient", () => {
     });
     await flushUi();
 
-    const sendButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Send input",
-    );
-    expect(sendButton).not.toBeUndefined();
+    const sendButton = container.querySelector(
+      'button[aria-label="Send message"]',
+    ) as HTMLButtonElement | null;
+    expect(sendButton).not.toBeNull();
 
     await act(async () => {
       sendButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -496,8 +496,8 @@ describe("ChatPageClient", () => {
     expect(window.location.pathname).toBe("/chat");
     expect(window.location.search).toBe("?workspaceId=ws_alpha");
     expect(container.textContent).toContain("Ask Codex in alpha");
-    expect(container.textContent).toContain("Ready for workspace input");
-    expect(container.textContent).toContain("First input starts a new thread in this workspace.");
+    expect(container.textContent).toContain("Start a new thread from the composer");
+    expect(container.textContent).not.toContain("First input starts a new thread.");
     expect(container.textContent).not.toContain("Ready for first input");
     expect(container.textContent).not.toContain("Focus composer");
     expect(container.querySelectorAll("textarea")).toHaveLength(1);
@@ -517,10 +517,10 @@ describe("ChatPageClient", () => {
     });
     await flushUi();
 
-    const startThreadButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Start thread",
-    );
-    expect(startThreadButton).not.toBeUndefined();
+    const startThreadButton = container.querySelector(
+      'button[aria-label="Start thread"]',
+    ) as HTMLButtonElement | null;
+    expect(startThreadButton).not.toBeNull();
 
     await act(async () => {
       startThreadButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -575,7 +575,7 @@ describe("ChatPageClient", () => {
 
     expect(window.location.search).toBe("?workspaceId=ws_alpha");
     expect(container.textContent).toContain("Ask Codex in alpha");
-    expect(container.textContent).toContain("Ready for workspace input");
+    expect(container.textContent).toContain("Start a new thread from the composer");
     expect(container.textContent).not.toContain("Opening thread");
 
     await act(async () => {
@@ -620,7 +620,7 @@ describe("ChatPageClient", () => {
     await flushUi();
 
     expect(container.textContent).toContain("Ask Codex in alpha");
-    expect(container.textContent).toContain("Ready for workspace input");
+    expect(container.textContent).toContain("Start a new thread from the composer");
     expect(container.textContent).not.toContain("Delayed selected thread");
     expect(container.textContent).not.toContain("Approval required");
     expect(container.textContent).not.toContain("Approve request");
@@ -664,7 +664,7 @@ describe("ChatPageClient", () => {
       await flushUi();
 
       expect(window.location.search).toBe("?workspaceId=ws_alpha&threadId=thread_001");
-      expect(container.textContent).toContain("Waiting for your input");
+      expect(container.textContent).not.toContain("Ready for your next input.");
       expect(container.querySelectorAll("textarea")).toHaveLength(1);
 
       const textarea = container.querySelector("#thread-composer-input");
@@ -681,10 +681,10 @@ describe("ChatPageClient", () => {
       });
       await flushUi();
 
-      const sendButton = Array.from(container.querySelectorAll("button")).find(
-        (button) => button.textContent === "Send input",
-      );
-      expect(sendButton).not.toBeUndefined();
+      const sendButton = container.querySelector(
+        'button[aria-label="Send message"]',
+      ) as HTMLButtonElement | null;
+      expect(sendButton).not.toBeNull();
 
       await act(async () => {
         sendButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -948,10 +948,10 @@ describe("ChatPageClient", () => {
       });
       await flushUi();
 
-      const startThreadButton = Array.from(container.querySelectorAll("button")).find(
-        (button) => button.textContent === "Start thread",
-      );
-      expect(startThreadButton).not.toBeUndefined();
+      const startThreadButton = container.querySelector(
+        'button[aria-label="Start thread"]',
+      ) as HTMLButtonElement | null;
+      expect(startThreadButton).not.toBeNull();
 
       await act(async () => {
         startThreadButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -964,17 +964,17 @@ describe("ChatPageClient", () => {
       await flushUi();
 
       expect(container.textContent).toContain("Started thread thread_new.");
-      expect(container.textContent).toContain("Waiting for your input");
+      expect(container.textContent).not.toContain("Ready for your next input.");
 
       const followUpTextarea = container.querySelector("#thread-composer-input");
       expect(followUpTextarea).not.toBeNull();
       expect(container.querySelectorAll("textarea")).toHaveLength(1);
       expect((followUpTextarea as HTMLTextAreaElement).value).toBe("");
 
-      const sendButton = Array.from(container.querySelectorAll("button")).find(
-        (button) => button.textContent === "Send input",
-      );
-      expect(sendButton).not.toBeUndefined();
+      const sendButton = container.querySelector(
+        'button[aria-label="Send message"]',
+      ) as HTMLButtonElement | null;
+      expect(sendButton).not.toBeNull();
       expect((sendButton as HTMLButtonElement).disabled).toBe(true);
 
       await act(async () => {
@@ -1089,9 +1089,7 @@ describe("ChatPageClient", () => {
       });
       await flushUi();
 
-      expect(container.textContent).toContain(
-        "Select or create a workspace from Navigation before starting work.",
-      );
+      expect(container.textContent).toContain("Select a workspace to enable input.");
       const disabledComposer = container.querySelector("#thread-composer-input");
       expect(disabledComposer).not.toBeNull();
       expect((disabledComposer as HTMLTextAreaElement).disabled).toBe(true);
@@ -1140,10 +1138,10 @@ describe("ChatPageClient", () => {
       });
       await flushUi();
 
-      const startThreadButton = Array.from(container.querySelectorAll("button")).find(
-        (button) => button.textContent === "Start thread",
-      );
-      expect(startThreadButton).not.toBeUndefined();
+      const startThreadButton = container.querySelector(
+        'button[aria-label="Start thread"]',
+      ) as HTMLButtonElement | null;
+      expect(startThreadButton).not.toBeNull();
 
       await act(async () => {
         startThreadButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1298,16 +1296,27 @@ describe("ChatPageClient", () => {
     });
     await flushUi();
 
-    expect(container.textContent).toContain("Latest resolved request");
-    expect(container.textContent).toContain("Decision: denied");
+    expect(container.textContent).toContain("Latest resolved request in this thread was denied.");
 
-    const detailButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Reopen request detail",
-    );
-    expect(detailButton).not.toBeUndefined();
+    const detailButton = container.querySelector(
+      'button[aria-label="Thread details"]',
+    ) as HTMLButtonElement | null;
+    expect(detailButton).not.toBeNull();
 
     await act(async () => {
       detailButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushUi();
+
+    expect(container.textContent).toContain("Latest resolved request: denied");
+
+    const reopenRequestDetailButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Request detail",
+    );
+    expect(reopenRequestDetailButton).not.toBeUndefined();
+
+    await act(async () => {
+      reopenRequestDetailButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await flushUi();
 
@@ -1637,9 +1646,7 @@ describe("ChatPageClient", () => {
     await flushUi();
 
     expect(container.textContent).toContain("Opening thread");
-    expect(container.textContent).toContain(
-      "Opening this thread and restoring its latest context.",
-    );
+    expect(container.textContent).toContain("Opening selected thread.");
     expect(container.textContent).toContain(
       "Opening this thread and restoring its latest timeline",
     );
@@ -2058,7 +2065,7 @@ describe("ChatPageClient", () => {
 
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
     expect(chatDataMocks.listWorkspaceThreads).toHaveBeenCalledTimes(2);
-    expect(container.textContent).toContain("Waiting for your input");
+    expect(container.textContent).not.toContain("Ready for your next input.");
   });
 
   it("ignores stale refresh responses after send and keeps the latest thread state", async () => {
@@ -2246,10 +2253,10 @@ describe("ChatPageClient", () => {
     });
     await flushUi();
 
-    const sendButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Send input",
-    );
-    expect(sendButton).not.toBeUndefined();
+    const sendButton = container.querySelector(
+      'button[aria-label="Send message"]',
+    ) as HTMLButtonElement | null;
+    expect(sendButton).not.toBeNull();
 
     await act(async () => {
       sendButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -2271,7 +2278,7 @@ describe("ChatPageClient", () => {
     });
     await flushUi();
 
-    expect(container.textContent).toContain("Waiting for your input");
+    expect(container.textContent).not.toContain("Ready for your next input.");
     expect(container.textContent).toContain("Fix applied.");
 
     sendRefresh.resolve({
@@ -2281,7 +2288,7 @@ describe("ChatPageClient", () => {
     await flushUi();
 
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(3);
-    expect(container.textContent).toContain("Waiting for your input");
+    expect(container.textContent).not.toContain("Ready for your next input.");
     expect(container.textContent).not.toContain("Current threadRunning");
   });
 });

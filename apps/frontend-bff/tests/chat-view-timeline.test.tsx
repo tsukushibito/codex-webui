@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import type React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -10,6 +11,27 @@ import type { TimelineDisplayGroup } from "../src/timeline-display-model";
 
 function formatTimestamp(value: string | null) {
   return value ? `formatted:${value}` : "Not available";
+}
+
+function buildTimelineProps(
+  overrides: Partial<React.ComponentProps<typeof ChatViewTimeline>> = {},
+) {
+  return {
+    expandedRowIds: new Set<string>(),
+    formatTimestamp,
+    groups: [] as TimelineDisplayGroup[],
+    hasLoadedThreadView: true,
+    isLoadingThread: false,
+    isRespondingToRequest: false,
+    onApproveRequest: () => {},
+    onDenyRequest: () => {},
+    onOpenDetail: () => {},
+    onOpenRequestDetail: () => {},
+    onToggleRowExpansion: () => {},
+    requestRowContexts: {},
+    selectedThreadId: "thread_001",
+    ...overrides,
+  };
 }
 
 describe("ChatViewTimeline", () => {
@@ -41,6 +63,9 @@ describe("ChatViewTimeline", () => {
           {
             id: "row-live",
             turnId: "turn_001",
+            itemId: null,
+            requestId: null,
+            requestState: null,
             sequence: 1,
             occurredAt: "2026-03-27T05:20:00Z",
             label: "Codex",
@@ -49,12 +74,16 @@ describe("ChatViewTimeline", () => {
             role: "assistant",
             timelineItemId: null,
             isLive: true,
+            defaultFoldEligible: false,
             showDetailButton: false,
             detailActionLabel: null,
           },
           {
             id: "row-detail",
             turnId: "turn_001",
+            itemId: "item_approval_001",
+            requestId: "req_001",
+            requestState: "pending",
             sequence: 2,
             occurredAt: "2026-03-27T05:21:00Z",
             label: "Request needs attention",
@@ -63,6 +92,7 @@ describe("ChatViewTimeline", () => {
             role: "event",
             timelineItemId: "timeline_002",
             isLive: false,
+            defaultFoldEligible: false,
             showDetailButton: true,
             detailActionLabel: "Inspect approval context",
           },
@@ -70,18 +100,7 @@ describe("ChatViewTimeline", () => {
       },
     ];
 
-    const markup = renderToStaticMarkup(
-      <ChatViewTimeline
-        expandedRowIds={new Set()}
-        formatTimestamp={formatTimestamp}
-        groups={groups}
-        hasLoadedThreadView
-        isLoadingThread={false}
-        onOpenDetail={() => {}}
-        onToggleRowExpansion={() => {}}
-        selectedThreadId="thread_001"
-      />,
-    );
+    const markup = renderToStaticMarkup(<ChatViewTimeline {...buildTimelineProps({ groups })} />);
 
     expect(markup).toContain('aria-label="Timeline"');
     expect(markup).toContain('class="timeline-turn-group"');
@@ -92,7 +111,7 @@ describe("ChatViewTimeline", () => {
     expect(markup).toContain("Inspect approval context");
   });
 
-  it("preserves folded row affordance and aria-expanded state from props", async () => {
+  it("keeps long primary conversation rows expanded by default", async () => {
     const longContent = Array.from({ length: 10 }, (_, index) => `Line ${index + 1}`).join("\n");
     const groups: TimelineDisplayGroup[] = [
       {
@@ -102,6 +121,9 @@ describe("ChatViewTimeline", () => {
           {
             id: "row-folded",
             turnId: "turn_001",
+            itemId: null,
+            requestId: null,
+            requestState: null,
             sequence: 1,
             occurredAt: "2026-03-27T05:20:00Z",
             label: "You",
@@ -110,6 +132,7 @@ describe("ChatViewTimeline", () => {
             role: "user",
             timelineItemId: null,
             isLive: false,
+            defaultFoldEligible: false,
             showDetailButton: false,
             detailActionLabel: null,
           },
@@ -119,24 +142,54 @@ describe("ChatViewTimeline", () => {
     const onToggleRowExpansion = vi.fn();
 
     await act(async () => {
-      root.render(
-        <ChatViewTimeline
-          expandedRowIds={new Set()}
-          formatTimestamp={formatTimestamp}
-          groups={groups}
-          hasLoadedThreadView
-          isLoadingThread={false}
-          onOpenDetail={() => {}}
-          onToggleRowExpansion={onToggleRowExpansion}
-          selectedThreadId="thread_001"
-        />,
-      );
+      root.render(<ChatViewTimeline {...buildTimelineProps({ groups, onToggleRowExpansion })} />);
+    });
+
+    expect(container.querySelector("button[aria-expanded]")).toBeNull();
+    expect(container.querySelector(".timeline-row-folded")).toBeNull();
+    expect(container.textContent).toContain("Line 10");
+    expect(onToggleRowExpansion).not.toHaveBeenCalled();
+  });
+
+  it("preserves folded row affordance and aria-expanded state for secondary payload rows", async () => {
+    const longContent = Array.from({ length: 10 }, (_, index) => `Line ${index + 1}`).join("\n");
+    const groups: TimelineDisplayGroup[] = [
+      {
+        id: "group-turn-001",
+        turnId: "turn_001",
+        rows: [
+          {
+            id: "row-folded",
+            turnId: "turn_001",
+            itemId: null,
+            requestId: null,
+            requestState: null,
+            sequence: 1,
+            occurredAt: "2026-03-27T05:20:00Z",
+            label: "Tool activity",
+            content: longContent,
+            density: "compact",
+            role: "event",
+            timelineItemId: null,
+            isLive: false,
+            defaultFoldEligible: true,
+            showDetailButton: false,
+            detailActionLabel: null,
+          },
+        ],
+      },
+    ];
+    const onToggleRowExpansion = vi.fn();
+
+    await act(async () => {
+      root.render(<ChatViewTimeline {...buildTimelineProps({ groups, onToggleRowExpansion })} />);
     });
 
     const foldedToggle = container.querySelector(
       'button[aria-expanded="false"]',
     ) as HTMLButtonElement | null;
     expect(foldedToggle?.textContent).toBe("Show more");
+    expect(foldedToggle?.getAttribute("aria-label")).toBe("Expand Tool activity content");
     expect(container.querySelector(".timeline-row-folded")).not.toBeNull();
 
     await act(async () => {
@@ -148,14 +201,11 @@ describe("ChatViewTimeline", () => {
     await act(async () => {
       root.render(
         <ChatViewTimeline
-          expandedRowIds={new Set(["row-folded"])}
-          formatTimestamp={formatTimestamp}
-          groups={groups}
-          hasLoadedThreadView
-          isLoadingThread={false}
-          onOpenDetail={() => {}}
-          onToggleRowExpansion={onToggleRowExpansion}
-          selectedThreadId="thread_001"
+          {...buildTimelineProps({
+            expandedRowIds: new Set(["row-folded"]),
+            groups,
+            onToggleRowExpansion,
+          })}
         />,
       );
     });
@@ -164,6 +214,7 @@ describe("ChatViewTimeline", () => {
       'button[aria-expanded="true"]',
     ) as HTMLButtonElement | null;
     expect(expandedToggle?.textContent).toBe("Show less");
+    expect(expandedToggle?.getAttribute("aria-label")).toBe("Collapse Tool activity content");
     expect(container.querySelector(".timeline-row-folded")).toBeNull();
   });
 
@@ -177,6 +228,9 @@ describe("ChatViewTimeline", () => {
           {
             id: "row-detail",
             turnId: null,
+            itemId: null,
+            requestId: null,
+            requestState: null,
             sequence: 1,
             occurredAt: "2026-03-27T05:21:00Z",
             label: "Tool activity",
@@ -185,6 +239,7 @@ describe("ChatViewTimeline", () => {
             role: "event",
             timelineItemId: "timeline_detail_001",
             isLive: false,
+            defaultFoldEligible: false,
             showDetailButton: true,
             detailActionLabel: "Inspect details",
           },
@@ -193,18 +248,7 @@ describe("ChatViewTimeline", () => {
     ];
 
     await act(async () => {
-      root.render(
-        <ChatViewTimeline
-          expandedRowIds={new Set()}
-          formatTimestamp={formatTimestamp}
-          groups={groups}
-          hasLoadedThreadView
-          isLoadingThread={false}
-          onOpenDetail={onOpenDetail}
-          onToggleRowExpansion={() => {}}
-          selectedThreadId="thread_001"
-        />,
-      );
+      root.render(<ChatViewTimeline {...buildTimelineProps({ groups, onOpenDetail })} />);
     });
 
     const detailButton = Array.from(container.querySelectorAll("button")).find(
@@ -216,5 +260,81 @@ describe("ChatViewTimeline", () => {
     });
 
     expect(onOpenDetail).toHaveBeenCalledWith("timeline_detail_001");
+  });
+
+  it("renders pending request controls directly on the matching timeline row", async () => {
+    const onApproveRequest = vi.fn();
+    const onDenyRequest = vi.fn();
+    const onOpenRequestDetail = vi.fn();
+    const groups: TimelineDisplayGroup[] = [
+      {
+        id: "group-turn-approval",
+        turnId: "turn_approval",
+        rows: [
+          {
+            id: "row-request",
+            turnId: "turn_approval",
+            itemId: "item_approval_001",
+            requestId: "req_001",
+            requestState: "pending",
+            sequence: 4,
+            occurredAt: "2026-03-27T05:24:00Z",
+            label: "Request needs attention",
+            content: "Push requires approval",
+            density: "prominent",
+            role: "event",
+            timelineItemId: "timeline_request_001",
+            isLive: false,
+            defaultFoldEligible: false,
+            showDetailButton: true,
+            detailActionLabel: "Inspect request",
+          },
+        ],
+      },
+    ];
+
+    await act(async () => {
+      root.render(
+        <ChatViewTimeline
+          {...buildTimelineProps({
+            groups,
+            onApproveRequest,
+            onDenyRequest,
+            onOpenRequestDetail,
+            requestRowContexts: {
+              "row-request": {
+                state: "pending",
+                badgeClassName: "status-badge warning",
+                badgeLabel: "Pending request",
+                showRequestDetailButton: true,
+                showResponseActions: true,
+              },
+            },
+          })}
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("Pending request");
+
+    const approveButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Approve request",
+    );
+    const denyButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Deny request",
+    );
+    const requestDetailButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Request detail",
+    );
+
+    await act(async () => {
+      approveButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      denyButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      requestDetailButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(onApproveRequest).toHaveBeenCalledTimes(1);
+    expect(onDenyRequest).toHaveBeenCalledTimes(1);
+    expect(onOpenRequestDetail).toHaveBeenCalledTimes(1);
   });
 });

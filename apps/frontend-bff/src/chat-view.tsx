@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type { PublicWorkspaceSummary } from "./chat-data";
 import { ChatViewComposer } from "./chat-view-composer";
@@ -22,6 +22,7 @@ import type {
   PublicThreadStreamEvent,
   PublicThreadView,
 } from "./thread-types";
+import type { TimelineDisplayGroup, TimelineDisplayRow } from "./timeline-display-model";
 import { buildTimelineDisplayModel } from "./timeline-display-model";
 import { getTimelineItemDetail } from "./timeline-item-detail";
 
@@ -75,6 +76,17 @@ function formatTimestamp(value: string | null) {
   }).format(new Date(value));
 }
 
+function formatConnectionStateLabel(connectionState: "idle" | "live" | "reconnecting") {
+  switch (connectionState) {
+    case "live":
+      return "Live";
+    case "reconnecting":
+      return "Reconnecting";
+    default:
+      return "Idle";
+  }
+}
+
 function threadChatHref(workspaceId: string, threadId?: string) {
   const params = new URLSearchParams({
     workspaceId,
@@ -87,18 +99,6 @@ function threadChatHref(workspaceId: string, threadId?: string) {
   return `/chat?${params.toString()}`;
 }
 
-function activityBadgeClass(activityKind: PublicThreadListItem["current_activity"]["kind"] | null) {
-  if (activityKind === "waiting_on_approval") {
-    return "status-badge warning";
-  }
-
-  if (activityKind === "running") {
-    return "status-badge success";
-  }
-
-  return "status-badge";
-}
-
 function requestBadgeClass(request: PublicRequestDetail | null) {
   if (!request) {
     return "status-badge";
@@ -107,8 +107,26 @@ function requestBadgeClass(request: PublicRequestDetail | null) {
   return request.status === "pending" ? "status-badge warning" : "status-badge success";
 }
 
+function requestSummaryBadgeClass(state: "pending" | "resolved", decision?: string | null) {
+  if (state === "pending") {
+    return "status-badge warning";
+  }
+
+  return decision === "denied" || decision === "canceled"
+    ? "status-badge warning"
+    : "status-badge success";
+}
+
 function formatMachineLabel(value: string | null | undefined) {
   return value ? value.replaceAll("_", " ") : "Not available";
+}
+
+function SecondaryIcon({ children }: { children: ReactNode }) {
+  return (
+    <span aria-hidden="true" className="icon-button-glyph">
+      {children}
+    </span>
+  );
 }
 
 function composerUnavailableReason(threadView: PublicThreadView | null) {
@@ -117,13 +135,13 @@ function composerUnavailableReason(threadView: PublicThreadView | null) {
   }
 
   if (threadView.composer.blocked_by_request || threadView.pending_request) {
-    return "Input is paused while this thread waits for your approval response.";
+    return "Input paused for approval.";
   }
 
   if (threadView.current_activity.kind === "running") {
     return threadView.composer.interrupt_available
-      ? "Codex is running. Interrupt is available if you need to regain control."
-      : "Codex is running. New input will be available when the turn finishes.";
+      ? "Running. Interrupt is available."
+      : "Running. Input will reopen when the turn finishes.";
   }
 
   if (threadView.composer.input_unavailable_reason) {
@@ -131,7 +149,7 @@ function composerUnavailableReason(threadView: PublicThreadView | null) {
   }
 
   if (!threadView.composer.accepting_user_input) {
-    return "Input is not available for the current thread state.";
+    return "Input unavailable for this thread state.";
   }
 
   return null;
@@ -238,7 +256,7 @@ function buildThreadFeedbackDescriptor({
       badgeTone: "success",
       isVisible: false,
       title: "Ready for first input",
-      summary: "The next composer submission will create a new thread in this workspace.",
+      summary: "The next composer submission will start a new thread in this workspace.",
       actions: [{ kind: "focus_composer", label: "Focus composer" }],
     };
   }
@@ -307,7 +325,7 @@ function buildThreadFeedbackDescriptor({
   if (selectedThreadView.current_activity.kind === "running") {
     return {
       badgeTone: "success",
-      isVisible: true,
+      isVisible: selectedThreadView.composer.interrupt_available,
       title: "Codex is running",
       summary: "Thread View is waiting for more live activity, a request, or the turn to finish.",
       actions: selectedThreadView.composer.interrupt_available
@@ -382,6 +400,72 @@ function buildThreadFeedbackDescriptor({
   };
 }
 
+type MatchableRequest = {
+  state: "pending" | "resolved";
+  request_id: string;
+  turn_id: string | null;
+  item_id: string;
+};
+
+function requestRowMatchScore(row: TimelineDisplayRow, request: MatchableRequest) {
+  let score = -1;
+
+  if (row.requestId === request.request_id) {
+    score = 400;
+  } else if (row.itemId === request.item_id) {
+    score = 300;
+  } else if (
+    request.turn_id &&
+    row.turnId === request.turn_id &&
+    row.requestState === request.state
+  ) {
+    score = 200;
+  } else if (request.turn_id && row.turnId === request.turn_id && row.requestState !== null) {
+    score = 150;
+  }
+
+  if (score < 0) {
+    return null;
+  }
+
+  if (row.requestState === request.state) {
+    score += 50;
+  }
+
+  if (row.requestState !== null) {
+    score += 25;
+  }
+
+  return score;
+}
+
+function findMatchingRequestRow(
+  groups: TimelineDisplayGroup[],
+  request: MatchableRequest | null,
+): TimelineDisplayRow | null {
+  if (!request) {
+    return null;
+  }
+
+  let bestMatch: { row: TimelineDisplayRow; score: number } | null = null;
+
+  for (const group of groups) {
+    for (const row of group.rows) {
+      const score = requestRowMatchScore(row, request);
+      if (
+        score !== null &&
+        (bestMatch === null ||
+          score > bestMatch.score ||
+          (score === bestMatch.score && row.sequence > bestMatch.row.sequence))
+      ) {
+        bestMatch = { row, score };
+      }
+    }
+  }
+
+  return bestMatch?.row ?? null;
+}
+
 export function ChatView({
   workspaceId,
   workspaces,
@@ -440,27 +524,18 @@ export function ChatView({
     isSubmittingComposer ||
     (selectedThreadView ? !isThreadAcceptingInput : false) ||
     composerDraft.trim().length === 0;
-  const composerLabel = isStartingThread ? "Ask Codex" : "Send input";
+  const composerInputLabel = isStartingThread ? "Ask Codex" : "Continue thread";
   const composerPlaceholder = !workspaceId
     ? "Select a workspace before asking Codex."
     : isStartingThread
       ? "Describe the task to start a new thread."
-      : "Continue the current thread.";
-  const composerSubmitLabel = isSubmittingComposer
-    ? isStartingThread
-      ? "Starting thread..."
-      : "Sending..."
-    : isStartingThread
-      ? "Start thread"
-      : "Send input";
+      : "Ask a follow-up question or continue the work.";
+  const composerSubmitLabel = isStartingThread ? "Start thread" : "Send message";
   const composerGuidance = !workspaceId
-    ? "Select or create a workspace from Navigation before starting work."
+    ? "Select a workspace to enable input."
     : isOpeningSelectedThread
-      ? "Opening this thread and restoring its latest context."
+      ? "Opening selected thread."
       : unavailableReason;
-  const composerDefaultGuidance = isStartingThread
-    ? "First input starts a new thread in this workspace."
-    : "Input will continue the selected thread.";
   const isComposerTextareaDisabled =
     !workspaceId || isOpeningSelectedThread || isSubmittingComposer || Boolean(unavailableReason);
   const selectedTimelineItem =
@@ -480,6 +555,28 @@ export function ChatView({
   const hasRequestDetailAffordance = selectedRequestDetail !== null;
   const latestTimelineGroup = timelineModel.groups[timelineModel.groups.length - 1] ?? null;
   const latestTimelineRow = latestTimelineGroup?.rows[latestTimelineGroup.rows.length - 1] ?? null;
+  const matchedPendingRequestRow = findMatchingRequestRow(
+    timelineModel.groups,
+    selectedThreadView?.pending_request
+      ? {
+          state: "pending",
+          request_id: selectedThreadView.pending_request.request_id,
+          turn_id: selectedThreadView.pending_request.turn_id,
+          item_id: selectedThreadView.pending_request.item_id,
+        }
+      : null,
+  );
+  const matchedResolvedRequestRow = findMatchingRequestRow(
+    timelineModel.groups,
+    selectedThreadView?.latest_resolved_request
+      ? {
+          state: "resolved",
+          request_id: selectedThreadView.latest_resolved_request.request_id,
+          turn_id: selectedThreadView.latest_resolved_request.turn_id,
+          item_id: selectedThreadView.latest_resolved_request.item_id,
+        }
+      : null,
+  );
   const latestActivitySignature = selectedThreadId
     ? JSON.stringify({
         connectionState,
@@ -510,7 +607,85 @@ export function ChatView({
   const threadActivitySummary = workspaceId
     ? currentActivitySummary(selectedThreadView, isOpeningSelectedThread)
     : "Choose a workspace to enable the composer.";
+  const connectionStateLabel = formatConnectionStateLabel(connectionState);
   const isSidebarMinibar = sidebarMode === "mini" && !isNavigationOpen;
+  const showInlineThreadFeedback =
+    threadFeedback.isVisible &&
+    !selectedThreadView?.pending_request &&
+    !selectedThreadView?.latest_resolved_request;
+  const headerStatusDescriptor = threadFeedback.isVisible
+    ? threadFeedback
+    : selectedThreadView &&
+        (selectedThreadView.current_activity.kind === "system_error" ||
+          selectedThreadView.current_activity.kind === "latest_turn_failed")
+      ? {
+          badgeTone: "warning" as const,
+          title: selectedThreadView.current_activity.label,
+        }
+      : null;
+  const threadHeading = selectedThreadView?.thread.title
+    ? selectedThreadView.thread.title
+    : isOpeningSelectedThread
+      ? "Opening thread"
+      : workspaceId
+        ? `Ask Codex in ${selectedWorkspace?.workspace_name ?? workspaceId}`
+        : "Select workspace";
+  const threadContextLabel = selectedThreadView
+    ? `Started in ${selectedWorkspace?.workspace_name ?? selectedThreadView.thread.workspace_id}`
+    : isOpeningSelectedThread
+      ? "Restoring thread context"
+      : workspaceId
+        ? "Start a new thread from the composer"
+        : "Choose a workspace to begin";
+  const refreshHref = workspaceId
+    ? threadChatHref(workspaceId, selectedThreadId ?? undefined)
+    : null;
+  const requestRowContexts: Record<
+    string,
+    {
+      state: "pending" | "resolved";
+      badgeClassName: string;
+      badgeLabel: string;
+      showRequestDetailButton: boolean;
+      showResponseActions: boolean;
+    }
+  > = {};
+
+  if (matchedPendingRequestRow && selectedThreadView?.pending_request) {
+    requestRowContexts[matchedPendingRequestRow.id] = {
+      state: "pending",
+      badgeClassName: requestSummaryBadgeClass("pending"),
+      badgeLabel: "Pending request",
+      showRequestDetailButton: selectedRequestDetail !== null,
+      showResponseActions: true,
+    };
+  }
+
+  if (matchedResolvedRequestRow && selectedThreadView?.latest_resolved_request) {
+    requestRowContexts[matchedResolvedRequestRow.id] = {
+      state: "resolved",
+      badgeClassName: requestSummaryBadgeClass(
+        "resolved",
+        selectedThreadView.latest_resolved_request.decision,
+      ),
+      badgeLabel: `Resolved: ${formatMachineLabel(
+        selectedThreadView.latest_resolved_request.decision,
+      )}`,
+      showRequestDetailButton: selectedRequestDetail !== null,
+      showResponseActions: false,
+    };
+  }
+  const fallbackPendingRequest = selectedThreadView?.pending_request && !matchedPendingRequestRow;
+  const fallbackResolvedRequest =
+    !selectedThreadView?.pending_request &&
+    selectedThreadView?.latest_resolved_request &&
+    !matchedResolvedRequestRow;
+  const fallbackPendingRequestSummary =
+    fallbackPendingRequest && selectedThreadView ? selectedThreadView.pending_request : null;
+  const fallbackResolvedRequestSummary =
+    fallbackResolvedRequest && selectedThreadView
+      ? selectedThreadView.latest_resolved_request
+      : null;
 
   useEffect(() => {
     const storedMode = readStoredSidebarMode();
@@ -745,65 +920,63 @@ export function ChatView({
         <section aria-label="Thread View" className="chat-panel workspace-card thread-view-card">
           <div className="thread-view-header-stack">
             <header>
-              <div className="workspace-meta-row">
-                {selectedThreadView ? (
-                  <span className={activityBadgeClass(selectedThreadView.current_activity.kind)}>
-                    {selectedThreadView.current_activity.label}
-                  </span>
-                ) : isOpeningSelectedThread ? (
-                  <span className="status-badge">Opening</span>
-                ) : workspaceId ? (
-                  <span className="status-badge">Ready for workspace input</span>
-                ) : null}
-              </div>
-              <h2>
-                {selectedThreadView?.thread.title ??
-                  (isOpeningSelectedThread
-                    ? "Opening thread"
-                    : workspaceId
-                      ? `Ask Codex in ${selectedWorkspace?.workspace_name ?? workspaceId}`
-                      : "Select workspace")}
-              </h2>
-              <p className="workspace-meta">
-                {selectedThreadView
-                  ? `Workspace ${selectedWorkspace?.workspace_name ?? selectedThreadView.thread.workspace_id} - Updated ${formatTimestamp(
-                      selectedThreadView.thread.updated_at,
-                    )}`
-                  : isOpeningSelectedThread
-                    ? `Loading ${selectedThreadId}.`
-                    : workspaceId
-                      ? "Ask Codex to start a new thread, or pick a thread from Navigation."
-                      : "Select or create a workspace from Navigation before starting work."}
-              </p>
-              <div className="hero-metrics thread-context-metrics">
-                <span className="metric-chip">
-                  Workspace: {selectedWorkspace?.workspace_name ?? workspaceId}
-                </span>
-                <span className="metric-chip">
-                  Stream:{" "}
-                  {connectionState === "live"
-                    ? "live"
-                    : connectionState === "reconnecting"
-                      ? "reacquiring"
-                      : "idle"}
-                </span>
-                <span className="metric-chip">Threads: {threads.length}</span>
-                {workspaceId ? (
-                  <Link
-                    className="secondary-link compact-link"
-                    href={threadChatHref(workspaceId, selectedThreadId ?? undefined)}
+              <div className="thread-context-row">
+                <div className="thread-context-copy">
+                  <p className="thread-context-label">{threadContextLabel}</p>
+                  <h2 title={threadHeading}>{threadHeading}</h2>
+                </div>
+                <div className="thread-context-actions">
+                  {headerStatusDescriptor ? (
+                    <span
+                      className={
+                        headerStatusDescriptor.badgeTone === "warning"
+                          ? "status-badge warning"
+                          : headerStatusDescriptor.badgeTone === "success"
+                            ? "status-badge success"
+                            : "status-badge"
+                      }
+                    >
+                      {headerStatusDescriptor.title}
+                    </span>
+                  ) : null}
+                  <button
+                    aria-label="Thread details"
+                    className="secondary-link compact-link icon-button"
+                    disabled={!workspaceId}
+                    onClick={() => setDetailSelection({ kind: "thread_details" })}
+                    title="Thread details"
+                    type="button"
                   >
-                    Refresh
-                  </Link>
-                ) : null}
-                <button
-                  className="secondary-link compact-link"
-                  disabled={!workspaceId}
-                  onClick={() => setDetailSelection({ kind: "thread_details" })}
-                  type="button"
-                >
-                  Details
-                </button>
+                    <SecondaryIcon>
+                      <svg fill="none" height="18" viewBox="0 0 24 24" width="18">
+                        <title>Thread details</title>
+                        <path
+                          d="M12 17h.01"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                        />
+                        <path
+                          d="M12 13.5a2.5 2.5 0 1 0-2-4"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                        />
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="9"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.8"
+                        />
+                      </svg>
+                    </SecondaryIcon>
+                  </button>
+                </div>
               </div>
             </header>
           </div>
@@ -826,15 +999,20 @@ export function ChatView({
                   </button>
                 </div>
               ) : null}
-              {selectedThreadView?.pending_request ? (
-                <div className="request-detail-card pending-request-card">
+              {fallbackPendingRequestSummary ? (
+                <div className="request-detail-card pending-request-card pending-request-card-fallback">
                   <div className="workspace-meta-row">
-                    <strong>Pending request</strong>
-                    <span className={requestBadgeClass(selectedRequestDetail)}>
-                      {formatMachineLabel(selectedThreadView.pending_request.risk_category)}
+                    <strong>Request summary</strong>
+                    <span
+                      className={requestSummaryBadgeClass(
+                        "pending",
+                        selectedRequestDetail?.decision ?? null,
+                      )}
+                    >
+                      Pending request
                     </span>
                   </div>
-                  <p>{selectedThreadView.pending_request.summary}</p>
+                  <p>{fallbackPendingRequestSummary.summary}</p>
                   {selectedRequestDetail ? (
                     <p className="workspace-meta">{selectedRequestDetail.reason}</p>
                   ) : null}
@@ -847,7 +1025,7 @@ export function ChatView({
                     </p>
                   ) : null}
                   <p className="workspace-meta">
-                    Requested {formatTimestamp(selectedThreadView.pending_request.requested_at)}
+                    Requested {formatTimestamp(fallbackPendingRequestSummary.requested_at)}
                   </p>
                   <div className="workspace-actions">
                     <button
@@ -881,32 +1059,41 @@ export function ChatView({
                     ) : null}
                   </div>
                 </div>
-              ) : selectedThreadView?.latest_resolved_request ? (
-                <div className="request-detail-card resolved-request-card">
+              ) : fallbackResolvedRequestSummary ? (
+                <div className="request-detail-card pending-request-card pending-request-card-fallback">
                   <div className="workspace-meta-row">
-                    <strong>Latest resolved request</strong>
-                    <span className={requestBadgeClass(selectedRequestDetail)}>
-                      {selectedThreadView.latest_resolved_request.decision}
+                    <strong>Request summary</strong>
+                    <span
+                      className={requestSummaryBadgeClass(
+                        "resolved",
+                        fallbackResolvedRequestSummary.decision,
+                      )}
+                    >
+                      {`Resolved: ${formatMachineLabel(fallbackResolvedRequestSummary.decision)}`}
                     </span>
                   </div>
-                  <p>Decision: {selectedThreadView.latest_resolved_request.decision}</p>
+                  <p>
+                    Latest resolved request in this thread was{" "}
+                    {formatMachineLabel(fallbackResolvedRequestSummary.decision)}.
+                  </p>
                   <p className="workspace-meta">
-                    Responded{" "}
-                    {formatTimestamp(selectedThreadView.latest_resolved_request.responded_at)}
+                    Responded {formatTimestamp(fallbackResolvedRequestSummary.responded_at)}
                   </p>
                   {selectedRequestDetail ? (
-                    <button
-                      className="secondary-link action-button inline-detail-button"
-                      onClick={() => setDetailSelection({ kind: "request_detail" })}
-                      type="button"
-                    >
-                      Reopen request detail
-                    </button>
+                    <div className="workspace-actions">
+                      <button
+                        className="secondary-link action-button compact-button"
+                        onClick={() => setDetailSelection({ kind: "request_detail" })}
+                        type="button"
+                      >
+                        Request detail
+                      </button>
+                    </div>
                   ) : null}
                 </div>
               ) : null}
 
-              {threadFeedback.isVisible ? (
+              {showInlineThreadFeedback ? (
                 <div className="thread-feedback-card thread-feedback-card-inline">
                   <div className="workspace-meta-row">
                     <span className={threadFeedbackBadgeClass(threadFeedback)}>
@@ -927,14 +1114,19 @@ export function ChatView({
                 formatTimestamp={formatTimestamp}
                 groups={timelineModel.groups}
                 hasLoadedThreadView={selectedThreadView !== null}
+                isRespondingToRequest={isRespondingToRequest}
                 isLoadingThread={isLoadingThread}
+                onApproveRequest={onApproveRequest}
+                onDenyRequest={onDenyRequest}
                 onOpenDetail={(timelineItemId) =>
                   setDetailSelection({
                     kind: "timeline_item_detail",
                     timelineItemId,
                   })
                 }
+                onOpenRequestDetail={() => setDetailSelection({ kind: "request_detail" })}
                 onToggleRowExpansion={toggleTimelineRowExpansion}
+                requestRowContexts={requestRowContexts}
                 selectedThreadId={selectedThreadId}
               />
             </div>
@@ -966,10 +1158,9 @@ export function ChatView({
             <ChatViewComposer
               composerDraft={composerDraft}
               composerGuidance={composerGuidance}
-              composerLabel={composerLabel}
+              composerInputLabel={composerInputLabel}
               composerPlaceholder={composerPlaceholder}
               composerSubmitLabel={composerSubmitLabel}
-              defaultGuidance={composerDefaultGuidance}
               isComposerDisabled={isComposerDisabled}
               isStartingThread={isStartingThread}
               isTextareaDisabled={isComposerTextareaDisabled}
@@ -983,7 +1174,6 @@ export function ChatView({
         {detailSelection ? (
           <ChatViewDetails
             composerGuidance={composerGuidance}
-            connectionState={connectionState}
             formatMachineLabel={formatMachineLabel}
             formatTimestamp={formatTimestamp}
             isOpeningSelectedThread={isOpeningSelectedThread}
@@ -1009,7 +1199,10 @@ export function ChatView({
             selection={detailSelection}
             threadActivitySummary={threadActivitySummary}
             threadFeedback={threadFeedback}
+            threadCount={threads.length}
             timelineGroups={timelineModel.groups}
+            refreshHref={refreshHref}
+            streamStateLabel={connectionStateLabel}
             workspaceId={workspaceId}
           />
         ) : null}

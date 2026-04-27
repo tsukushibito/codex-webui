@@ -1,5 +1,13 @@
 import type { TimelineDisplayGroup, TimelineDisplayRow } from "./timeline-display-model";
 
+export interface TimelineRequestRowContext {
+  state: "pending" | "resolved";
+  badgeClassName: string;
+  badgeLabel: string;
+  showRequestDetailButton: boolean;
+  showResponseActions: boolean;
+}
+
 export interface ChatViewTimelineProps {
   isLoadingThread: boolean;
   selectedThreadId: string | null;
@@ -9,6 +17,11 @@ export interface ChatViewTimelineProps {
   formatTimestamp: (value: string | null) => string;
   onToggleRowExpansion: (rowId: string) => void;
   onOpenDetail: (timelineItemId: string) => void;
+  requestRowContexts: Partial<Record<string, TimelineRequestRowContext>>;
+  isRespondingToRequest: boolean;
+  onApproveRequest: () => void;
+  onDenyRequest: () => void;
+  onOpenRequestDetail: () => void;
 }
 
 function timelineRowClass(row: TimelineDisplayRow) {
@@ -52,6 +65,11 @@ export function ChatViewTimeline({
   formatTimestamp,
   onToggleRowExpansion,
   onOpenDetail,
+  requestRowContexts,
+  isRespondingToRequest,
+  onApproveRequest,
+  onDenyRequest,
+  onOpenRequestDetail,
 }: ChatViewTimelineProps) {
   return (
     <section aria-label="Timeline" className="timeline-section">
@@ -83,7 +101,13 @@ export function ChatViewTimeline({
               </div>
             ) : null}
             {group.rows.map((row) => {
-              const contentPreview = timelineContentPreview(row.content);
+              const requestContext = requestRowContexts[row.id] ?? null;
+              const contentPreview = row.defaultFoldEligible
+                ? timelineContentPreview(row.content)
+                : {
+                    isFoldable: false,
+                    preview: row.content,
+                  };
               const isExpanded = expandedRowIds.has(row.id);
               const displayedContent =
                 contentPreview.isFoldable && !isExpanded ? contentPreview.preview : row.content;
@@ -102,16 +126,60 @@ export function ChatViewTimeline({
                     </span>
                   </div>
                   <p className="timeline-row-content">{displayedContent}</p>
-                  {contentPreview.isFoldable || row.showDetailButton ? (
+                  {requestContext ? (
+                    <div className="workspace-meta-row timeline-request-row-status">
+                      <span className={requestContext.badgeClassName}>
+                        {requestContext.badgeLabel}
+                      </span>
+                    </div>
+                  ) : null}
+                  {contentPreview.isFoldable ||
+                  row.showDetailButton ||
+                  requestContext?.showRequestDetailButton ||
+                  requestContext?.showResponseActions ? (
                     <div className="timeline-row-actions">
                       {contentPreview.isFoldable ? (
                         <button
+                          aria-label={
+                            isExpanded
+                              ? `Collapse ${row.label} content`
+                              : `Expand ${row.label} content`
+                          }
                           aria-expanded={isExpanded}
                           className="secondary-link action-button inline-detail-button"
                           onClick={() => onToggleRowExpansion(row.id)}
                           type="button"
                         >
                           {isExpanded ? "Show less" : "Show more"}
+                        </button>
+                      ) : null}
+                      {requestContext?.showResponseActions ? (
+                        <>
+                          <button
+                            className="approve-button action-button compact-button"
+                            disabled={isRespondingToRequest}
+                            onClick={onApproveRequest}
+                            type="button"
+                          >
+                            {isRespondingToRequest ? "Submitting..." : "Approve request"}
+                          </button>
+                          <button
+                            className="danger-button action-button compact-button"
+                            disabled={isRespondingToRequest}
+                            onClick={onDenyRequest}
+                            type="button"
+                          >
+                            Deny request
+                          </button>
+                        </>
+                      ) : null}
+                      {requestContext?.showRequestDetailButton ? (
+                        <button
+                          className="secondary-link action-button compact-button"
+                          onClick={onOpenRequestDetail}
+                          type="button"
+                        >
+                          Request detail
                         </button>
                       ) : null}
                       {row.showDetailButton && row.timelineItemId ? (

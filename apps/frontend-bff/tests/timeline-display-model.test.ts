@@ -707,4 +707,146 @@ describe("timeline display model", () => {
       ]),
     );
   });
+
+  it("carries request identity fields on request timeline and stream rows for contextual placement", () => {
+    const model = buildTimelineDisplayModel({
+      timelineItems: [
+        timelineItem({
+          timeline_item_id: "timeline_request_001",
+          turn_id: "turn_001",
+          item_id: "item_approval_001",
+          sequence: 1,
+          kind: "approval.requested",
+          payload: {
+            request_id: "req_001",
+            summary: "Push requires approval",
+          },
+        }),
+      ],
+      streamEvents: [
+        streamEvent({
+          event_id: "stream_resolved_001",
+          sequence: 2,
+          event_type: "approval.resolved",
+          payload: {
+            request_id: "req_001",
+            turn_id: "turn_001",
+            item_id: "item_approval_001",
+            status: "resolved",
+            summary: "Push approved",
+          },
+        }),
+      ],
+      draftAssistantMessages: {},
+    });
+
+    expect(rows(model)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "timeline:timeline_request_001",
+          itemId: "item_approval_001",
+          requestId: "req_001",
+          requestState: "pending",
+        }),
+        expect.objectContaining({
+          id: "stream:stream_resolved_001",
+          itemId: "item_approval_001",
+          requestId: "req_001",
+          requestState: "resolved",
+        }),
+      ]),
+    );
+  });
+
+  it("keeps normal user and assistant rows expanded by default even when long", () => {
+    const longContent = Array.from({ length: 12 }, (_, index) => `paragraph ${index + 1}`).join(
+      "\n\n",
+    );
+    const model = buildTimelineDisplayModel({
+      timelineItems: [
+        timelineItem({
+          timeline_item_id: "timeline_user_long",
+          sequence: 1,
+          kind: "message.user",
+          payload: {
+            content: longContent,
+          },
+        }),
+        timelineItem({
+          timeline_item_id: "timeline_assistant_long",
+          item_id: "item_assistant_001",
+          sequence: 2,
+          kind: "message.assistant.completed",
+          payload: {
+            message_id: "message_001",
+            content: longContent,
+          },
+        }),
+      ],
+      streamEvents: [],
+      draftAssistantMessages: {},
+    });
+
+    expect(rows(model)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: "You",
+          defaultFoldEligible: false,
+          content: longContent,
+        }),
+        expect.objectContaining({
+          label: "Codex",
+          defaultFoldEligible: false,
+          content: longContent,
+        }),
+      ]),
+    );
+  });
+
+  it("allows verbose operational rows to remain fold-eligible without folding request rows", () => {
+    const longJson = JSON.stringify(
+      {
+        command: "npm run build",
+        stdout: Array.from({ length: 40 }, (_, index) => `line-${index + 1}`),
+      },
+      null,
+      2,
+    );
+    const model = buildTimelineDisplayModel({
+      timelineItems: [
+        timelineItem({
+          timeline_item_id: "timeline_request",
+          sequence: 1,
+          kind: "approval.requested",
+          payload: {
+            content: longJson,
+            summary: "Approve publish step",
+          },
+        }),
+        timelineItem({
+          timeline_item_id: "timeline_tool_output",
+          sequence: 2,
+          kind: "tool.output",
+          payload: {
+            content: longJson,
+          },
+        }),
+      ],
+      streamEvents: [],
+      draftAssistantMessages: {},
+    });
+
+    expect(rows(model)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: "Request needs attention",
+          defaultFoldEligible: false,
+        }),
+        expect.objectContaining({
+          label: "Tool activity",
+          defaultFoldEligible: true,
+        }),
+      ]),
+    );
+  });
 });

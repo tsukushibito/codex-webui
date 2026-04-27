@@ -8,6 +8,9 @@ export type TimelineRowRole = "user" | "assistant" | "event";
 export interface TimelineDisplayRow {
   id: string;
   turnId: string | null;
+  itemId: string | null;
+  requestId: string | null;
+  requestState: "pending" | "resolved" | null;
   sequence: number;
   occurredAt: string | null;
   label: string;
@@ -16,6 +19,7 @@ export interface TimelineDisplayRow {
   role: TimelineRowRole;
   timelineItemId: string | null;
   isLive: boolean;
+  defaultFoldEligible: boolean;
   showDetailButton: boolean;
   detailActionLabel: string | null;
 }
@@ -137,6 +141,14 @@ function payloadTurnId(payload: Record<string, unknown>) {
   return asNonEmptyString(payload.turn_id);
 }
 
+function payloadItemId(payload: Record<string, unknown>) {
+  return asNonEmptyString(payload.item_id);
+}
+
+function payloadRequestId(payload: Record<string, unknown>) {
+  return asNonEmptyString(payload.request_id);
+}
+
 function streamAssistantKey(event: PublicThreadStreamEvent) {
   return (
     asNonEmptyString(event.payload.message_id) ??
@@ -217,6 +229,70 @@ function streamRowDetail() {
     showDetailButton: false,
     detailActionLabel: null,
   };
+}
+
+function requestStateFromKind(kind: string, payload: Record<string, unknown>) {
+  const payloadStatus = asNonEmptyString(payload.status);
+
+  if (payloadStatus === "pending" || payloadStatus === "resolved") {
+    return payloadStatus;
+  }
+
+  if (kind.includes("resolved") || kind.includes("responded")) {
+    return "resolved";
+  }
+
+  if (kind.includes("approval") || kind.includes("request")) {
+    return "pending";
+  }
+
+  return null;
+}
+
+function isLikelyStructuredPayload(content: string) {
+  const trimmed = content.trim();
+
+  if (trimmed.length >= 120 && (/^[{[]/.test(trimmed) || /^```/.test(trimmed))) {
+    return true;
+  }
+
+  if (/^\s*at\s.+\(.+\)$/m.test(content) || /^\s*at\s.+$/m.test(content)) {
+    return true;
+  }
+
+  if (/^@@\s/m.test(content) || /^[+-]{3}\s/m.test(content)) {
+    return true;
+  }
+
+  return false;
+}
+
+function isDefaultFoldEligible(kind: string, role: TimelineRowRole, content: string) {
+  if (kind.startsWith("message.user") || kind.startsWith("message.assistant")) {
+    return false;
+  }
+
+  if (kind.includes("approval") || kind.includes("request")) {
+    return false;
+  }
+
+  if (role !== "event") {
+    return false;
+  }
+
+  if (
+    kind.includes("tool") ||
+    kind.includes("command") ||
+    kind.includes("log") ||
+    kind.includes("trace") ||
+    kind.includes("diff") ||
+    kind.includes("patch") ||
+    kind.includes("output")
+  ) {
+    return true;
+  }
+
+  return isLikelyStructuredPayload(content);
 }
 
 export function classifyTimelineDensity(kind: string): TimelineRowDensity {
@@ -408,6 +484,9 @@ export function buildTimelineDisplayModel({
     rows.push({
       id: `timeline:${item.timeline_item_id}`,
       turnId: item.turn_id,
+      itemId: item.item_id ?? payloadItemId(item.payload),
+      requestId: payloadRequestId(item.payload),
+      requestState: requestStateFromKind(item.kind, item.payload),
       sequence: item.sequence,
       occurredAt: item.occurred_at,
       label: timelineDisplayLabel(item.kind),
@@ -416,6 +495,7 @@ export function buildTimelineDisplayModel({
       role,
       timelineItemId: item.timeline_item_id,
       isLive: false,
+      defaultFoldEligible: isDefaultFoldEligible(item.kind, role, content),
       ...timelineRowDetail(item, role),
     });
   }
@@ -509,6 +589,9 @@ export function buildTimelineDisplayModel({
     rows.push({
       id: `assistant:${group.key}`,
       turnId: group.turnId,
+      itemId: group.itemId,
+      requestId: null,
+      requestState: null,
       sequence: group.completedSequence ?? group.firstSequence,
       occurredAt: group.completedAt ?? group.occurredAt,
       label: timelineDisplayLabel("message.assistant.completed", !isCompleted),
@@ -517,6 +600,7 @@ export function buildTimelineDisplayModel({
       role: "assistant",
       timelineItemId: null,
       isLive: !isCompleted,
+      defaultFoldEligible: false,
       showDetailButton: false,
       detailActionLabel: null,
     });
@@ -532,6 +616,9 @@ export function buildTimelineDisplayModel({
     rows.push({
       id: `timeline-assistant:${group.key}`,
       turnId: group.turnId,
+      itemId: null,
+      requestId: null,
+      requestState: null,
       sequence: group.completedSequence ?? group.firstSequence,
       occurredAt: group.completedAt ?? group.occurredAt,
       label: timelineDisplayLabel("message.assistant.completed", !isCompleted),
@@ -540,6 +627,7 @@ export function buildTimelineDisplayModel({
       role: "assistant",
       timelineItemId: group.timelineItemId,
       isLive: !isCompleted,
+      defaultFoldEligible: false,
       showDetailButton: false,
       detailActionLabel: null,
     });
@@ -553,6 +641,9 @@ export function buildTimelineDisplayModel({
     rows.push({
       id: `draft:${messageId}`,
       turnId: null,
+      itemId: null,
+      requestId: null,
+      requestState: null,
       sequence: Number.MAX_SAFE_INTEGER,
       occurredAt: null,
       label: timelineDisplayLabel("message.assistant.delta", true),
@@ -561,6 +652,7 @@ export function buildTimelineDisplayModel({
       role: "assistant",
       timelineItemId: null,
       isLive: true,
+      defaultFoldEligible: false,
       showDetailButton: false,
       detailActionLabel: null,
     });
@@ -587,6 +679,9 @@ export function buildTimelineDisplayModel({
     rows.push({
       id: `stream:${event.event_id}`,
       turnId: payloadTurnId(event.payload),
+      itemId: payloadItemId(event.payload),
+      requestId: payloadRequestId(event.payload),
+      requestState: requestStateFromKind(event.event_type, event.payload),
       sequence: event.sequence,
       occurredAt: event.occurred_at,
       label: timelineDisplayLabel(event.event_type),
@@ -595,6 +690,7 @@ export function buildTimelineDisplayModel({
       role,
       timelineItemId: null,
       isLive: false,
+      defaultFoldEligible: isDefaultFoldEligible(event.event_type, role, content),
       ...streamRowDetail(),
     });
   }

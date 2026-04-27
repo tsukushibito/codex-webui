@@ -171,8 +171,7 @@ function buildProps(overrides: Partial<ChatViewDetailsProps> = {}): ChatViewDeta
     selectedTimelineItem: buildTimelineItem(),
     selectedTimelineItemDetail: buildTimelineDetail(),
     isOpeningSelectedThread: false,
-    connectionState: "live",
-    composerGuidance: "Input is paused while this thread waits for your approval response.",
+    composerGuidance: "Input paused for approval.",
     threadActivitySummary: "Codex is paused until you approve or deny the request below.",
     threadFeedback: {
       badgeTone: "warning",
@@ -181,6 +180,7 @@ function buildProps(overrides: Partial<ChatViewDetailsProps> = {}): ChatViewDeta
       summary: "Codex is blocked until you approve or deny the pending request in this thread.",
       actions: [{ kind: "request_detail", label: "Request detail" }],
     },
+    threadCount: 4,
     timelineGroups: [
       {
         id: "group_001",
@@ -189,6 +189,9 @@ function buildProps(overrides: Partial<ChatViewDetailsProps> = {}): ChatViewDeta
           {
             id: "row_approval",
             turnId: "turn_001",
+            itemId: "item_approval_001",
+            requestId: "req_001",
+            requestState: "pending",
             sequence: 7,
             occurredAt: "2026-03-27T06:25:00Z",
             label: "Approval context",
@@ -197,6 +200,7 @@ function buildProps(overrides: Partial<ChatViewDetailsProps> = {}): ChatViewDeta
             role: "event",
             timelineItemId: "timeline_approval_001",
             isLive: false,
+            defaultFoldEligible: false,
             showDetailButton: true,
             detailActionLabel: "Inspect request",
           },
@@ -204,6 +208,8 @@ function buildProps(overrides: Partial<ChatViewDetailsProps> = {}): ChatViewDeta
       },
     ],
     isRespondingToRequest: false,
+    refreshHref: "/chat?workspaceId=ws_001&threadId=thread_001",
+    streamStateLabel: "Live",
     formatTimestamp,
     formatMachineLabel,
     requestBadgeClass,
@@ -250,6 +256,8 @@ describe("ChatViewDetails", () => {
     const markup = renderToStaticMarkup(<ChatViewDetails {...props} />);
     expect(markup).toContain("Thread details");
     expect(markup).toContain("Primary workspace");
+    expect(markup).toContain("Workspace ID");
+    expect(markup).toContain("Refresh thread");
     expect(markup).toContain("Approval context");
     expect(markup).toContain("Debug: raw thread view JSON");
     expect(markup).toContain("&quot;thread_id&quot;: &quot;thread_001&quot;");
