@@ -385,6 +385,347 @@ describe("ChatView", () => {
     expect(inlineFeedbackBadge?.className).not.toContain("success");
   });
 
+  it("keeps normal running progress inside the live assistant row instead of the thread feedback card", async () => {
+    await act(async () => {
+      root.render(
+        <ChatView
+          backgroundPriorityNotice={null}
+          connectionState="live"
+          draftAssistantMessages={{}}
+          errorMessage={null}
+          isCreatingThread={false}
+          isCreatingWorkspace={false}
+          isInterruptingThread={false}
+          isLoadingThread={false}
+          isLoadingThreads={false}
+          isLoadingWorkspaces={false}
+          isRespondingToRequest={false}
+          isSendingMessage={false}
+          composerDraft=""
+          onApproveRequest={() => {}}
+          onSubmitComposer={() => {}}
+          onCreateWorkspace={() => {}}
+          onDenyRequest={() => {}}
+          onInterruptThread={() => {}}
+          onOpenBackgroundPriorityThread={() => {}}
+          onAskCodex={() => {}}
+          onComposerDraftChange={() => {}}
+          onSelectThread={() => {}}
+          onSelectWorkspace={() => {}}
+          onWorkspaceNameChange={() => {}}
+          selectedRequestDetail={null}
+          selectedThreadId="thread_001"
+          selectedThreadView={{
+            thread: {
+              thread_id: "thread_001",
+              title: "Running thread",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "running",
+                active_flags: [],
+                latest_turn_status: "running",
+              },
+              updated_at: "2026-03-27T05:22:00Z",
+            },
+            current_activity: {
+              kind: "running",
+              label: "Codex is running",
+            },
+            pending_request: null,
+            latest_resolved_request: null,
+            composer: {
+              accepting_user_input: false,
+              interrupt_available: true,
+              blocked_by_request: false,
+              input_unavailable_reason: null,
+            },
+            timeline: {
+              items: [
+                {
+                  timeline_item_id: "evt_live_001",
+                  thread_id: "thread_001",
+                  turn_id: "turn_001",
+                  item_id: "item_live_001",
+                  sequence: 1,
+                  occurred_at: "2026-03-27T05:20:00Z",
+                  kind: "message.assistant.delta",
+                  payload: {
+                    message_id: "message_001",
+                    delta: "Streaming answer",
+                  },
+                },
+              ],
+              next_cursor: null,
+              has_more: false,
+            },
+          }}
+          statusMessage={null}
+          streamEvents={[]}
+          threads={[
+            {
+              thread_id: "thread_001",
+              title: "Running thread",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "running",
+                active_flags: [],
+                latest_turn_status: "running",
+              },
+              updated_at: "2026-03-27T05:22:00Z",
+              current_activity: {
+                kind: "running",
+                label: "Codex is running",
+              },
+              badge: null,
+              blocked_cue: null,
+              resume_cue: null,
+            },
+          ]}
+          workspaceId="ws_alpha"
+          workspaceName=""
+          workspaces={[
+            {
+              workspace_id: "ws_alpha",
+              workspace_name: "alpha",
+              created_at: "2026-03-27T05:00:00Z",
+              updated_at: "2026-03-27T05:22:00Z",
+              active_session_summary: null,
+              pending_approval_count: 0,
+            },
+          ]}
+        />,
+      );
+    });
+
+    expect(container.querySelector(".thread-feedback-card-inline")).toBeNull();
+    expect(container.textContent).toContain("Streaming");
+    expect(container.textContent).not.toContain("Codex is running");
+    expect(container.querySelector(".timeline-row-live-status")).not.toBeNull();
+  });
+
+  it("keeps reconnecting feedback visible when a live assistant row is present", async () => {
+    await act(async () => {
+      root.render(
+        <ChatView
+          backgroundPriorityNotice={null}
+          connectionState="reconnecting"
+          draftAssistantMessages={{}}
+          errorMessage={null}
+          isCreatingThread={false}
+          isCreatingWorkspace={false}
+          isInterruptingThread={false}
+          isLoadingThread={false}
+          isLoadingThreads={false}
+          isLoadingWorkspaces={false}
+          isRespondingToRequest={false}
+          isSendingMessage={false}
+          composerDraft=""
+          onApproveRequest={() => {}}
+          onSubmitComposer={() => {}}
+          onCreateWorkspace={() => {}}
+          onDenyRequest={() => {}}
+          onInterruptThread={() => {}}
+          onOpenBackgroundPriorityThread={() => {}}
+          onAskCodex={() => {}}
+          onComposerDraftChange={() => {}}
+          onSelectThread={() => {}}
+          onSelectWorkspace={() => {}}
+          onWorkspaceNameChange={() => {}}
+          selectedRequestDetail={null}
+          selectedThreadId="thread_001"
+          selectedThreadView={{
+            thread: {
+              thread_id: "thread_001",
+              title: "Running thread",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "running",
+                active_flags: [],
+                latest_turn_status: "running",
+              },
+              updated_at: "2026-03-27T05:22:00Z",
+            },
+            current_activity: {
+              kind: "running",
+              label: "Codex is running",
+            },
+            pending_request: null,
+            latest_resolved_request: null,
+            composer: {
+              accepting_user_input: false,
+              interrupt_available: true,
+              blocked_by_request: false,
+              input_unavailable_reason: null,
+            },
+            timeline: {
+              items: [
+                {
+                  timeline_item_id: "evt_live_001",
+                  thread_id: "thread_001",
+                  turn_id: "turn_001",
+                  item_id: "item_live_001",
+                  sequence: 1,
+                  occurred_at: "2026-03-27T05:20:00Z",
+                  kind: "message.assistant.delta",
+                  payload: {
+                    message_id: "message_001",
+                    delta: "Streaming answer",
+                  },
+                },
+              ],
+              next_cursor: null,
+              has_more: false,
+            },
+          }}
+          statusMessage={null}
+          streamEvents={[]}
+          threads={[
+            {
+              thread_id: "thread_001",
+              title: "Running thread",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "running",
+                active_flags: [],
+                latest_turn_status: "running",
+              },
+              updated_at: "2026-03-27T05:22:00Z",
+              current_activity: {
+                kind: "running",
+                label: "Codex is running",
+              },
+              badge: null,
+              blocked_cue: null,
+              resume_cue: null,
+            },
+          ]}
+          workspaceId="ws_alpha"
+          workspaceName=""
+          workspaces={[
+            {
+              workspace_id: "ws_alpha",
+              workspace_name: "alpha",
+              created_at: "2026-03-27T05:00:00Z",
+              updated_at: "2026-03-27T05:22:00Z",
+              active_session_summary: null,
+              pending_approval_count: 0,
+            },
+          ]}
+        />,
+      );
+    });
+
+    expect(container.querySelector(".thread-feedback-card-inline")).not.toBeNull();
+    expect(container.textContent).toContain("Reconnecting live updates");
+    expect(container.querySelector(".timeline-row-live-status")).not.toBeNull();
+    expect(container.textContent).toContain("Streaming");
+  });
+
+  it("shows the first running progress in the timeline before assistant content arrives", async () => {
+    await act(async () => {
+      root.render(
+        <ChatView
+          backgroundPriorityNotice={null}
+          connectionState="live"
+          draftAssistantMessages={{}}
+          errorMessage={null}
+          isCreatingThread={false}
+          isCreatingWorkspace={false}
+          isInterruptingThread={false}
+          isLoadingThread={false}
+          isLoadingThreads={false}
+          isLoadingWorkspaces={false}
+          isRespondingToRequest={false}
+          isSendingMessage={false}
+          composerDraft=""
+          onApproveRequest={() => {}}
+          onSubmitComposer={() => {}}
+          onCreateWorkspace={() => {}}
+          onDenyRequest={() => {}}
+          onInterruptThread={() => {}}
+          onOpenBackgroundPriorityThread={() => {}}
+          onAskCodex={() => {}}
+          onComposerDraftChange={() => {}}
+          onSelectThread={() => {}}
+          onSelectWorkspace={() => {}}
+          onWorkspaceNameChange={() => {}}
+          selectedRequestDetail={null}
+          selectedThreadId="thread_001"
+          selectedThreadView={{
+            thread: {
+              thread_id: "thread_001",
+              title: "Running thread",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "running",
+                active_flags: [],
+                latest_turn_status: "running",
+              },
+              updated_at: "2026-03-27T05:22:00Z",
+            },
+            current_activity: {
+              kind: "running",
+              label: "Codex is running",
+            },
+            pending_request: null,
+            latest_resolved_request: null,
+            composer: {
+              accepting_user_input: false,
+              interrupt_available: true,
+              blocked_by_request: false,
+              input_unavailable_reason: null,
+            },
+            timeline: {
+              items: [],
+              next_cursor: null,
+              has_more: false,
+            },
+          }}
+          statusMessage={null}
+          streamEvents={[]}
+          threads={[
+            {
+              thread_id: "thread_001",
+              title: "Running thread",
+              workspace_id: "ws_alpha",
+              native_status: {
+                thread_status: "running",
+                active_flags: [],
+                latest_turn_status: "running",
+              },
+              updated_at: "2026-03-27T05:22:00Z",
+              current_activity: {
+                kind: "running",
+                label: "Codex is running",
+              },
+              badge: null,
+              blocked_cue: null,
+              resume_cue: null,
+            },
+          ]}
+          workspaceId="ws_alpha"
+          workspaceName=""
+          workspaces={[
+            {
+              workspace_id: "ws_alpha",
+              workspace_name: "alpha",
+              created_at: "2026-03-27T05:00:00Z",
+              updated_at: "2026-03-27T05:22:00Z",
+              active_session_summary: null,
+              pending_approval_count: 0,
+            },
+          ]}
+        />,
+      );
+    });
+
+    expect(container.querySelector(".thread-feedback-card-inline")).toBeNull();
+    expect(container.querySelector(".timeline-row-live-placeholder")).not.toBeNull();
+    expect(container.querySelector(".timeline-row-live-status")).not.toBeNull();
+    expect(container.querySelector(".timeline-row-content")?.textContent ?? "").toBe("");
+    expect(container.textContent).toContain("Streaming");
+  });
+
   it("renders transient feedback above the chat panels", () => {
     const markup = renderToStaticMarkup(
       <ChatView

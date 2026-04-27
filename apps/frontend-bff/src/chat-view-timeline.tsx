@@ -36,6 +36,19 @@ function timelineRowClass(row: TimelineDisplayRow) {
 
 const TIMELINE_PREVIEW_LINE_LIMIT = 8;
 const TIMELINE_PREVIEW_CHARACTER_LIMIT = 520;
+const LIVE_ASSISTANT_STATUS_LABEL = "Streaming";
+const LIVE_ASSISTANT_STATUS_A11Y_LABEL = "Codex is streaming progress in this assistant row.";
+
+function liveAssistantRowStatus(row: TimelineDisplayRow) {
+  if (row.isLive && row.role === "assistant") {
+    return {
+      label: LIVE_ASSISTANT_STATUS_LABEL,
+      a11yLabel: LIVE_ASSISTANT_STATUS_A11Y_LABEL,
+    };
+  }
+
+  return null;
+}
 
 function timelineContentPreview(content: string) {
   const lines = content.split(/\r?\n/);
@@ -115,20 +128,37 @@ export function ChatViewTimeline({
                     preview: row.content,
                   };
               const isExpanded = expandedRowIds.has(row.id);
+              const liveAssistantStatus = liveAssistantRowStatus(row);
               const displayedContent =
                 contentPreview.isFoldable && !isExpanded ? contentPreview.preview : row.content;
+              const isLiveAssistantPlaceholder =
+                row.isLive && row.role === "assistant" && displayedContent.length === 0;
 
               return (
                 <article
                   className={`${timelineRowClass(row)}${
                     contentPreview.isFoldable && !isExpanded ? " timeline-row-folded" : ""
-                  }`}
+                  }${isLiveAssistantPlaceholder ? " timeline-row-live-placeholder" : ""}`}
                   key={row.id}
                 >
                   <div className="workspace-meta-row timeline-row-meta">
                     <strong>{row.label}</strong>
-                    <span className="workspace-meta">
-                      {row.isLive ? "Live" : formatTimestamp(row.occurredAt)}
+                    <span
+                      className={
+                        liveAssistantStatus
+                          ? "workspace-meta timeline-row-live-status"
+                          : "workspace-meta"
+                      }
+                    >
+                      {liveAssistantStatus ? (
+                        <>
+                          <span aria-hidden="true" className="timeline-row-live-dot" />
+                          <span>{liveAssistantStatus.label}</span>
+                          <span className="sr-only">{liveAssistantStatus.a11yLabel}</span>
+                        </>
+                      ) : (
+                        formatTimestamp(row.occurredAt)
+                      )}
                     </span>
                   </div>
                   <p className="timeline-row-content">{displayedContent}</p>
