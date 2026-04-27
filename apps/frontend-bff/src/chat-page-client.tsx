@@ -543,7 +543,6 @@ export function ChatPageClient() {
         thread_id: result.thread.thread_id,
       });
       setComposerDraft("");
-      setStatusMessage(`Started thread ${result.thread.thread_id}.`);
       updateSelectedThreadId(result.thread.thread_id, "create_thread_success");
       await refreshThreads(result.thread.thread_id);
       void convergeStartedThreadSendability(result.thread.thread_id);

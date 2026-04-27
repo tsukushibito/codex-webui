@@ -613,16 +613,7 @@ export function ChatView({
     threadFeedback.isVisible &&
     !selectedThreadView?.pending_request &&
     !selectedThreadView?.latest_resolved_request;
-  const headerStatusDescriptor = threadFeedback.isVisible
-    ? threadFeedback
-    : selectedThreadView &&
-        (selectedThreadView.current_activity.kind === "system_error" ||
-          selectedThreadView.current_activity.kind === "latest_turn_failed")
-      ? {
-          badgeTone: "warning" as const,
-          title: selectedThreadView.current_activity.label,
-        }
-      : null;
+  const showThreadContextLabel = !selectedThreadView || isOpeningSelectedThread;
   const threadHeading = selectedThreadView?.thread.title
     ? selectedThreadView.thread.title
     : isOpeningSelectedThread
@@ -922,23 +913,12 @@ export function ChatView({
             <header>
               <div className="thread-context-row">
                 <div className="thread-context-copy">
-                  <p className="thread-context-label">{threadContextLabel}</p>
+                  {showThreadContextLabel ? (
+                    <p className="thread-context-label">{threadContextLabel}</p>
+                  ) : null}
                   <h2 title={threadHeading}>{threadHeading}</h2>
                 </div>
                 <div className="thread-context-actions">
-                  {headerStatusDescriptor ? (
-                    <span
-                      className={
-                        headerStatusDescriptor.badgeTone === "warning"
-                          ? "status-badge warning"
-                          : headerStatusDescriptor.badgeTone === "success"
-                            ? "status-badge success"
-                            : "status-badge"
-                      }
-                    >
-                      {headerStatusDescriptor.title}
-                    </span>
-                  ) : null}
                   <button
                     aria-label="Thread details"
                     className="secondary-link compact-link icon-button"

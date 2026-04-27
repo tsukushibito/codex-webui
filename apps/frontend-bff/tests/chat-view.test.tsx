@@ -230,7 +230,6 @@ describe("ChatView", () => {
     );
 
     expect(markup).toContain("Approval thread");
-    expect(markup).toContain("Approval required");
     expect(markup).toContain("Approve request");
     expect(markup).toContain("Pending request");
     expect(markup).toContain(">Threads<");
@@ -369,14 +368,11 @@ describe("ChatView", () => {
       );
     });
 
-    const headerBadge = container.querySelector(".thread-view-header-stack header .status-badge");
     const inlineFeedbackBadge = container.querySelector(
       ".thread-feedback-card-inline .status-badge",
     );
 
-    expect(headerBadge?.textContent).toContain("Approval required");
-    expect(headerBadge?.className).toContain("warning");
-    expect(headerBadge?.className).not.toContain("success");
+    expect(container.querySelector(".thread-view-header-stack header .status-badge")).toBeNull();
     expect(inlineFeedbackBadge?.textContent).toContain("Approval required");
     expect(inlineFeedbackBadge?.className).toContain("warning");
     expect(inlineFeedbackBadge?.className).not.toContain("success");
@@ -996,6 +992,8 @@ describe("ChatView", () => {
       'button[aria-label="Thread details"]',
     ) as HTMLButtonElement | null;
     expect(detailsButton).toBeDefined();
+    expect(container.querySelector(".thread-view-header-stack header .status-badge")).toBeNull();
+    expect(container.textContent).not.toContain("Started in");
 
     await act(async () => {
       detailsButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
