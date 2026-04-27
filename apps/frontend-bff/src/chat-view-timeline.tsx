@@ -4,6 +4,9 @@ export interface TimelineRequestRowContext {
   state: "pending" | "resolved";
   badgeClassName: string;
   badgeLabel: string;
+  requestSummary: string;
+  requestReason: string | null;
+  requestOperationSummary: string | null;
   showRequestDetailButton: boolean;
   showResponseActions: boolean;
 }
@@ -131,6 +134,28 @@ export function ChatViewTimeline({
                       <span className={requestContext.badgeClassName}>
                         {requestContext.badgeLabel}
                       </span>
+                    </div>
+                  ) : null}
+                  {requestContext?.state === "pending" ? (
+                    <div className="timeline-request-inline-details">
+                      <div className="timeline-request-inline-summary">
+                        <strong>Request summary</strong>
+                        <p>{requestContext.requestSummary}</p>
+                      </div>
+                      {requestContext.requestReason ? (
+                        <p className="timeline-request-inline-note">
+                          <strong>Reason</strong>
+                          <span>{requestContext.requestReason}</span>
+                        </p>
+                      ) : null}
+                      {requestContext.requestOperationSummary ? (
+                        <p className="timeline-request-inline-note">
+                          <strong>Operation</strong>
+                          <code className="artifact-inline">
+                            {requestContext.requestOperationSummary}
+                          </code>
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
                   {contentPreview.isFoldable ||

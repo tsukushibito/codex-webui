@@ -232,6 +232,12 @@ describe("ChatView", () => {
     expect(markup).toContain("Approval thread");
     expect(markup).toContain("Approve request");
     expect(markup).toContain("Pending request");
+    expect(markup).toContain("Request summary");
+    expect(markup).toContain("Run git push");
+    expect(markup).toContain("Reason");
+    expect(markup).toContain("Codex requests permission to push changes to remote.");
+    expect(markup).toContain("Operation");
+    expect(markup).toContain("git push origin main");
     expect(markup).toContain(">Threads<");
     expect(markup).toContain('aria-label="Thread details"');
     expect(markup).toContain("Input paused for approval.");
@@ -245,6 +251,7 @@ describe("ChatView", () => {
     expect(markup).toContain("Request needs attention");
     expect(markup).toContain("timeline-row-prominent");
     expect(markup).not.toContain("pending-request-card-fallback");
+    expect(markup).toContain("Request detail");
     expect(markup.indexOf("Please explain the diff.")).toBeLessThan(
       markup.indexOf("Approve request"),
     );

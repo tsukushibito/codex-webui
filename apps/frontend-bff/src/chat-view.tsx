@@ -637,6 +637,9 @@ export function ChatView({
       state: "pending" | "resolved";
       badgeClassName: string;
       badgeLabel: string;
+      requestSummary: string;
+      requestReason: string | null;
+      requestOperationSummary: string | null;
       showRequestDetailButton: boolean;
       showResponseActions: boolean;
     }
@@ -647,6 +650,9 @@ export function ChatView({
       state: "pending",
       badgeClassName: requestSummaryBadgeClass("pending"),
       badgeLabel: "Pending request",
+      requestSummary: selectedThreadView.pending_request.summary,
+      requestReason: selectedRequestDetail?.reason ?? null,
+      requestOperationSummary: selectedRequestDetail?.operation_summary ?? null,
       showRequestDetailButton: selectedRequestDetail !== null,
       showResponseActions: true,
     };
@@ -662,6 +668,9 @@ export function ChatView({
       badgeLabel: `Resolved: ${formatMachineLabel(
         selectedThreadView.latest_resolved_request.decision,
       )}`,
+      requestSummary: selectedRequestDetail?.summary ?? "",
+      requestReason: selectedRequestDetail?.reason ?? null,
+      requestOperationSummary: selectedRequestDetail?.operation_summary ?? null,
       showRequestDetailButton: selectedRequestDetail !== null,
       showResponseActions: false,
     };
