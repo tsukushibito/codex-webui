@@ -23,6 +23,8 @@ NGROK_BASIC_AUTH_VALUE="${NGROK_BASIC_AUTH:-}"
 DEBUG_LIVE_CHAT=false
 INTERACTIVE=false
 START_NGROK=false
+NGROK_STARTED_BY_LAUNCHER=false
+NGROK_REUSED_EXISTING=false
 NGROK_PUBLIC_URL=""
 NGROK_EXTRA_ARGS=()
 
@@ -263,6 +265,11 @@ configure_ngrok_interactive() {
     return 0
   fi
 
+  prepare_existing_ngrok
+  if [[ "${NGROK_REUSED_EXISTING}" == "true" ]]; then
+    return 0
+  fi
+
   if [[ -n "${NGROK_AUTHTOKEN_VALUE}" ]]; then
     if ! prompt_yes_no "Use configured ngrok authtoken ($(mask_secret "${NGROK_AUTHTOKEN_VALUE}"))?" "yes"; then
       entered_value="$(prompt_value "Enter ngrok authtoken now, or leave blank to skip:" true)"
@@ -302,6 +309,10 @@ configure_ngrok_interactive() {
 prepare_ngrok() {
   if [[ "${INTERACTIVE}" == "true" ]]; then
     configure_ngrok_interactive
+  fi
+
+  if [[ "${NGROK_REUSED_EXISTING}" == "true" ]]; then
+    return 0
   fi
 
   if [[ "${START_NGROK}" != "true" ]]; then
@@ -381,6 +392,105 @@ process.stdin.on("end", () => {
 '
 }
 
+get_ngrok_public_url_for_port() {
+  local port="$1"
+
+  curl --silent --fail "${NGROK_API_URL}" | node -e '
+const port = process.argv[1];
+let input = "";
+process.stdin.on("data", (chunk) => {
+  input += chunk;
+});
+process.stdin.on("end", () => {
+  try {
+    const payload = JSON.parse(input);
+    const tunnels = Array.isArray(payload.tunnels) ? payload.tunnels : [];
+    const candidates = tunnels.filter((entry) => {
+      if (typeof entry.public_url !== "string") {
+        return false;
+      }
+
+      const address = typeof entry.config?.addr === "string" ? entry.config.addr : "";
+      return address === port || address.endsWith(`:${port}`) || address.includes(`:${port}/`);
+    });
+    const preferred =
+      candidates.find((entry) => entry.public_url.startsWith("https://")) ??
+      candidates.find((entry) => typeof entry.public_url === "string");
+    if (!preferred) {
+      process.exit(1);
+    }
+    process.stdout.write(preferred.public_url);
+  } catch {
+    process.exit(1);
+  }
+});
+' "${port}"
+}
+
+get_configured_ngrok_url() {
+  local index=0
+  local arg=""
+
+  while (( index < ${#NGROK_EXTRA_ARGS[@]} )); do
+    arg="${NGROK_EXTRA_ARGS[${index}]}"
+
+    case "${arg}" in
+      --url=*)
+        printf '%s' "${arg#*=}"
+        return 0
+        ;;
+      --url)
+        index=$((index + 1))
+        if (( index < ${#NGROK_EXTRA_ARGS[@]} )); then
+          printf '%s' "${NGROK_EXTRA_ARGS[${index}]}"
+          return 0
+        fi
+        ;;
+    esac
+
+    index=$((index + 1))
+  done
+
+  return 1
+}
+
+probe_ngrok_url_online() {
+  local url="$1"
+  local status=""
+
+  status="$(curl --silent --output /dev/null --write-out "%{http_code}" --max-time 5 "${url}" || true)"
+  case "${status}" in
+    2*|3*|401|403)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+prepare_existing_ngrok() {
+  local existing_url=""
+  local configured_url=""
+
+  if [[ "${START_NGROK}" != "true" ]]; then
+    return 0
+  fi
+
+  existing_url="$(get_ngrok_public_url_for_port "${NGROK_PORT}" 2>/dev/null || true)"
+  if [[ -n "${existing_url}" ]]; then
+    NGROK_PUBLIC_URL="${existing_url}"
+    NGROK_REUSED_EXISTING=true
+    log "reusing existing local ngrok tunnel for port ${NGROK_PORT}: ${NGROK_PUBLIC_URL}"
+    return 0
+  fi
+
+  configured_url="$(get_configured_ngrok_url || true)"
+  if [[ -n "${configured_url}" ]] && probe_ngrok_url_online "${configured_url}"; then
+    fail "ngrok endpoint is already online: ${configured_url}; stop the existing endpoint first, or add --ngrok-arg=--pooling-enabled when load balancing is intentional"
+  fi
+}
+
 wait_for_ngrok_url() {
   local pid="$1"
   local attempts=0
@@ -452,6 +562,7 @@ start_ngrok() {
     exec "${command[@]}"
   ) > >(sed -u 's/^/[ngrok] /') 2> >(sed -u 's/^/[ngrok] /' >&2) &
   PIDS+=("$!")
+  NGROK_STARTED_BY_LAUNCHER=true
 }
 
 trap cleanup EXIT INT TERM
@@ -466,9 +577,12 @@ require_file "${FRONTEND_DIR}/package.json"
 require_file "${RUNTIME_DIR}/node_modules/.package-lock.json"
 require_file "${FRONTEND_DIR}/node_modules/.package-lock.json"
 require_command curl
+require_command node
 require_command npm
 require_command codex
 prepare_ngrok
+
+prepare_existing_ngrok
 
 mkdir -p "${WORKSPACE_ROOT}" "$(dirname "${DATABASE_PATH}")"
 
@@ -479,8 +593,10 @@ start_frontend
 wait_for_http "http://127.0.0.1:${FRONTEND_PORT}/" "frontend-bff" "${PIDS[1]}"
 
 if [[ "${START_NGROK}" == "true" ]]; then
-  start_ngrok
-  wait_for_ngrok_url "${PIDS[2]}"
+  if [[ "${NGROK_REUSED_EXISTING}" != "true" ]]; then
+    start_ngrok
+    wait_for_ngrok_url "${PIDS[2]}"
+  fi
 fi
 
 log "local UI: http://127.0.0.1:${FRONTEND_PORT}/"
@@ -492,6 +608,11 @@ else
 fi
 if [[ "${START_NGROK}" == "true" ]]; then
   log "ngrok browser entrypoint: ${NGROK_PUBLIC_URL}"
+  if [[ "${NGROK_REUSED_EXISTING}" == "true" ]]; then
+    log "ngrok launch: reused existing local tunnel"
+  else
+    log "ngrok launch: started by this launcher"
+  fi
   if [[ -n "${NGROK_BASIC_AUTH_VALUE}" ]]; then
     log "ngrok Basic Auth: enabled ($(mask_secret "${NGROK_BASIC_AUTH_VALUE}"))"
   else
@@ -501,7 +622,7 @@ else
   log 'for remote browser access, run separately: ngrok http 3000 --basic-auth="$NGROK_BASIC_AUTH"'
   log "the launcher did not start ngrok in this run"
 fi
-if [[ "${START_NGROK}" == "true" ]]; then
+if [[ "${NGROK_STARTED_BY_LAUNCHER}" == "true" ]]; then
   log "press Ctrl-C to stop runtime, frontend, and ngrok"
 else
   log "press Ctrl-C to stop runtime and frontend"

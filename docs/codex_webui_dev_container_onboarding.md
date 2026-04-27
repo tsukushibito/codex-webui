@@ -138,6 +138,8 @@ The local browser-facing port remains `3000`, and the runtime stays on `3001`.
 
 If you used `scripts/start-codex-webui.sh --interactive` or `--with-ngrok`, the launcher starts ngrok for you and prints the public URL after the local services are ready.
 
+If an ngrok agent is already running locally for the same frontend port, the launcher reuses that tunnel instead of starting a duplicate. When a fixed ngrok URL is passed through `--ngrok-arg --url --ngrok-arg <url>` or `--ngrok-arg=--url=<url>`, the launcher probes the URL before startup and stops early if the endpoint is already online elsewhere; stop the existing endpoint first, or pass `--ngrok-arg=--pooling-enabled` only when load balancing is intentional.
+
 You can still start ngrok manually when you prefer to keep the launcher local-only:
 
 Inside the container:
@@ -212,11 +214,15 @@ scripts/start-codex-webui.sh --interactive
 
 If the browser still cannot load the UI, confirm the frontend is listening on `127.0.0.1:3000` inside the container.
 
-### 8.4 The runtime fails because the workspace root does not exist
+### 8.4 ngrok endpoint is already online
+
+For fixed ngrok URLs, `ERR_NGROK_334` means another endpoint with the same URL is already online. Stop the existing ngrok process or dashboard endpoint, then rerun the launcher. If the existing process is a local ngrok agent for the same frontend port, the launcher should detect and reuse it automatically.
+
+### 8.5 The runtime fails because the workspace root does not exist
 
 The local startup process creates the default workspace root for you. If you override `CODEX_WEBUI_WORKSPACE_ROOT`, make sure the target path is valid and writable inside the container.
 
-### 8.5 `vulkaninfo` only shows `llvmpipe`
+### 8.6 `vulkaninfo` only shows `llvmpipe`
 
 If `nvidia-smi` works but `vulkaninfo --summary` still falls back to `llvmpipe`, the container runtime is exposing compute/NVML but not the NVIDIA graphics stack or Vulkan ICD.
 
@@ -224,7 +230,7 @@ This repository now ships `scripts/with-vulkan-driver.sh`, which can repair the 
 
 If the helper still cannot surface an NVIDIA Vulkan device, the host runtime is not providing the required graphics libraries. Native Linux Docker Engine with NVIDIA Container Toolkit is the recommended path for containerized Vulkan validation. Docker Desktop on Windows with the WSL2 backend is reliable for GPU compute, but may not expose the full graphics/Vulkan stack needed for Vulkan app development inside containers.
 
-### 8.6 Vulkan SDK download 404s during image build
+### 8.7 Vulkan SDK download 404s during image build
 
 The Dockerfile uses LunarG's automated download API with the generic Linux file name, `vulkan_sdk.tar.xz`, instead of constructing the embedded-version tarball name directly.
 

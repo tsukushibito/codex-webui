@@ -1,6 +1,6 @@
 # Codex WebUI LLM Wiki Log
 
-Last updated: 2026-04-26
+Last updated: 2026-04-27
 
 ## Purpose
 
@@ -28,6 +28,26 @@ After the heading, keep the body concise:
 - short note on what changed or remains deferred
 
 ## Entries
+
+## [2026-04-27] ingest | launcher ngrok duplicate endpoint guard
+
+Source:
+
+- user report of `ERR_NGROK_334` from `scripts/start-codex-webui.sh --interactive`
+- `scripts/start-codex-webui.sh`
+- `docs/codex_webui_dev_container_onboarding.md`
+
+Updated:
+
+- `scripts/start-codex-webui.sh`
+- `docs/codex_webui_dev_container_onboarding.md`
+- `docs/log.md`
+
+Notes:
+
+- added a launcher guard that reuses an existing local ngrok tunnel for the frontend port instead of starting a duplicate
+- added a fixed-URL probe so an already-online ngrok endpoint fails early with a clearer launcher error before local services are started
+- documented the `ERR_NGROK_334` recovery path and the intentional `--pooling-enabled` exception
 
 ## [2026-04-26] ingest | shared contract strategy decision
 
