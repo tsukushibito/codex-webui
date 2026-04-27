@@ -232,21 +232,21 @@ describe("ChatView", () => {
     expect(markup).toContain("Approval thread");
     expect(markup).toContain("Approve request");
     expect(markup).toContain("Pending request");
+    expect(markup).not.toContain("chat-topbar");
     expect(markup).toContain("Request summary");
     expect(markup).toContain("Run git push");
     expect(markup).toContain("Reason");
     expect(markup).toContain("Codex requests permission to push changes to remote.");
     expect(markup).toContain("Operation");
     expect(markup).toContain("git push origin main");
-    expect(markup).toContain(">Threads<");
     expect(markup).toContain('aria-label="Thread details"');
-    expect(markup).toContain("Input paused for approval.");
+    expect(markup).toContain("alpha");
     expect(markup).not.toContain("Workspace:");
     expect(markup).not.toContain("Stream:");
     expect(markup).not.toContain(">Refresh<");
     expect(markup).not.toContain("thread-feedback-card-inline");
     expect(markup).toContain("Please explain the diff.");
-    expect(markup).toContain("Updated apps/frontend-bff/src/chat-view.tsx");
+    expect(markup).not.toContain("Updated apps/frontend-bff/src/chat-view.tsx");
     expect(markup).toContain("Streaming update");
     expect(markup).toContain("Request needs attention");
     expect(markup).toContain("timeline-row-prominent");
@@ -255,9 +255,9 @@ describe("ChatView", () => {
     expect(markup.indexOf("Please explain the diff.")).toBeLessThan(
       markup.indexOf("Approve request"),
     );
-    expect(markup).toContain("Status update");
-    expect(markup).toContain("timeline-row-compact");
-    expect(markup).toContain("Inspect artifacts");
+    expect(markup).not.toContain("Status update");
+    expect(markup).not.toContain("timeline-row-compact");
+    expect(markup).not.toContain("Inspect artifacts");
     expect(markup).not.toContain("Timeline item detail");
     expect(markup).not.toContain("approval.requested");
     expect(markup).not.toContain("session.status_changed");
@@ -375,14 +375,9 @@ describe("ChatView", () => {
       );
     });
 
-    const inlineFeedbackBadge = container.querySelector(
-      ".thread-feedback-card-inline .status-badge",
-    );
-
     expect(container.querySelector(".thread-view-header-stack header .status-badge")).toBeNull();
-    expect(inlineFeedbackBadge?.textContent).toContain("Approval required");
-    expect(inlineFeedbackBadge?.className).toContain("warning");
-    expect(inlineFeedbackBadge?.className).not.toContain("success");
+    expect(container.querySelector(".timeline-request-row-status .status-badge")).toBeNull();
+    expect(container.querySelector(".thread-feedback-card-inline")).toBeNull();
   });
 
   it("keeps normal running progress inside the live assistant row instead of the thread feedback card", async () => {
@@ -503,7 +498,7 @@ describe("ChatView", () => {
     expect(container.querySelector(".timeline-row-live-status")).not.toBeNull();
   });
 
-  it("keeps reconnecting feedback visible when a live assistant row is present", async () => {
+  it("does not add reconnecting feedback cards when a live assistant row is present", async () => {
     await act(async () => {
       root.render(
         <ChatView
@@ -615,8 +610,8 @@ describe("ChatView", () => {
       );
     });
 
-    expect(container.querySelector(".thread-feedback-card-inline")).not.toBeNull();
-    expect(container.textContent).toContain("Reconnecting live updates");
+    expect(container.querySelector(".thread-feedback-card-inline")).toBeNull();
+    expect(container.textContent).not.toContain("Reconnecting live updates");
     expect(container.querySelector(".timeline-row-live-status")).not.toBeNull();
     expect(container.textContent).toContain("Streaming");
   });
@@ -766,7 +761,7 @@ describe("ChatView", () => {
     );
 
     expect(markup).toContain("chat-feedback-stack");
-    expect(markup).toContain("Thread started.");
+    expect(markup).not.toContain("Thread started.");
     expect(markup).toContain("Failed to interrupt the thread.");
     expect(markup.indexOf("chat-feedback-stack")).toBeLessThan(
       markup.indexOf("chat-panel create-card"),
@@ -864,6 +859,15 @@ describe("ChatView", () => {
           workspaces={[]}
         />,
       );
+    });
+
+    const detailsButton = container.querySelector(
+      'button[aria-label="Thread details"]',
+    ) as HTMLButtonElement | null;
+    expect(detailsButton).not.toBeNull();
+
+    await act(async () => {
+      detailsButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
     const inspectButton = Array.from(container.querySelectorAll("button")).find(
@@ -1551,14 +1555,14 @@ describe("ChatView", () => {
       />,
     );
 
-    expect(markup).toContain("Input unavailable: recovery pending.");
+    expect(markup).not.toContain("Input unavailable: recovery pending.");
     expect(markup.match(/<textarea/g) ?? []).toHaveLength(1);
     expect(markup).toContain("disabled");
     expect(markup).not.toContain('id="thread-input"');
     expect(markup).not.toContain('id="message-input"');
   });
 
-  it("folds long timeline rows and expands them in place", async () => {
+  it("filters tool output rows out of the simplified chat timeline", async () => {
     const longOutput = Array.from(
       { length: 12 },
       (_, index) => `diagnostic line ${String(index + 1).padStart(2, "0")}`,
@@ -1646,24 +1650,16 @@ describe("ChatView", () => {
       );
     });
 
-    expect(container.textContent).toContain("diagnostic line 08");
+    expect(container.textContent).not.toContain("diagnostic line 08");
     expect(container.textContent).not.toContain("diagnostic line 12");
-
-    const showMoreButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Show more",
-    );
-    expect(showMoreButton).toBeDefined();
-    expect(showMoreButton?.getAttribute("aria-expanded")).toBe("false");
-
-    await act(async () => {
-      showMoreButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-
-    expect(container.textContent).toContain("diagnostic line 12");
-    expect(container.textContent).toContain("Show less");
+    expect(
+      Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "Show more",
+      ),
+    ).toBeUndefined();
   });
 
-  it("surfaces a latest-activity CTA when auto-scroll is suppressed", async () => {
+  it("does not surface a latest-activity CTA when newer timeline rows arrive", async () => {
     const baseProps = {
       backgroundPriorityNotice: null,
       connectionState: "live" as const,
@@ -1751,27 +1747,6 @@ describe("ChatView", () => {
       );
     });
 
-    const scrollRegion = container.querySelector(".thread-view-scroll-region") as HTMLDivElement;
-    expect(scrollRegion).not.toBeNull();
-    Object.defineProperty(scrollRegion, "clientHeight", {
-      configurable: true,
-      value: 100,
-    });
-    Object.defineProperty(scrollRegion, "scrollHeight", {
-      configurable: true,
-      value: 1000,
-      writable: true,
-    });
-    Object.defineProperty(scrollRegion, "scrollTop", {
-      configurable: true,
-      value: 780,
-      writable: true,
-    });
-
-    await act(async () => {
-      scrollRegion.dispatchEvent(new Event("scroll", { bubbles: true }));
-    });
-
     await act(async () => {
       root.render(
         <ChatView
@@ -1838,21 +1813,12 @@ describe("ChatView", () => {
       );
     });
 
-    expect(container.textContent).toContain("New activity is available below.");
-    const jumpButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Jump to latest activity",
-    );
-    expect(jumpButton).not.toBeUndefined();
-
-    await act(async () => {
-      jumpButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-
-    expect(scrollRegion.scrollTop).toBe(1000);
+    expect(container.textContent).toContain("Second item");
     expect(container.textContent).not.toContain("New activity is available below.");
+    expect(container.textContent).not.toContain("Jump to latest activity");
   });
 
-  it("keeps following latest activity when live assistant content grows on the same row", async () => {
+  it("keeps live assistant updates inside the same streaming row without a CTA", async () => {
     const baseProps = {
       backgroundPriorityNotice: null,
       connectionState: "live" as const,
@@ -1921,33 +1887,10 @@ describe("ChatView", () => {
       root.render(<ChatView {...baseProps} draftAssistantMessages={{ msg_live_001: "Working" }} />);
     });
 
-    const scrollRegion = container.querySelector(".thread-view-scroll-region") as HTMLDivElement;
-    expect(scrollRegion).not.toBeNull();
-    Object.defineProperty(scrollRegion, "clientHeight", {
-      configurable: true,
-      value: 100,
-    });
-    Object.defineProperty(scrollRegion, "scrollHeight", {
-      configurable: true,
-      value: 1000,
-      writable: true,
-    });
-    Object.defineProperty(scrollRegion, "scrollTop", {
-      configurable: true,
-      value: 1000,
-      writable: true,
-    });
-
     await act(async () => {
       root.render(
         <ChatView {...baseProps} draftAssistantMessages={{ msg_live_001: "Working longer now" }} />,
       );
-    });
-
-    Object.defineProperty(scrollRegion, "scrollHeight", {
-      configurable: true,
-      value: 1400,
-      writable: true,
     });
 
     await act(async () => {
@@ -1959,7 +1902,8 @@ describe("ChatView", () => {
       );
     });
 
-    expect(scrollRegion.scrollTop).toBe(1400);
+    expect(container.textContent).toContain("Working longer now with more streamed detail");
+    expect(container.querySelectorAll(".timeline-row-live-status")).toHaveLength(1);
     expect(container.textContent).not.toContain("New activity is available below.");
   });
 });

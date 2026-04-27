@@ -37,6 +37,19 @@ export interface TimelineDisplayModel {
   groups: TimelineDisplayGroup[];
 }
 
+export function isChatTimelineRowVisible(row: TimelineDisplayRow) {
+  return row.role === "user" || row.role === "assistant" || row.tone === "request";
+}
+
+export function filterTimelineDisplayGroupsForChat(groups: TimelineDisplayGroup[]) {
+  return groups
+    .map((group) => ({
+      ...group,
+      rows: group.rows.filter(isChatTimelineRowVisible),
+    }))
+    .filter((group) => group.rows.length > 0);
+}
+
 const ASSISTANT_EVENT_TYPES = new Set(["message.assistant.delta", "message.assistant.completed"]);
 const GENERIC_STATUS_CONTENT = new Set([
   "session.status_changed",

@@ -76,9 +76,6 @@ function timelineContentPreview(content: string) {
 }
 
 export function ChatViewTimeline({
-  isLoadingThread,
-  selectedThreadId,
-  hasLoadedThreadView,
   groups,
   expandedRowIds,
   formatTimestamp,
@@ -92,21 +89,7 @@ export function ChatViewTimeline({
 }: ChatViewTimelineProps) {
   return (
     <section aria-label="Timeline" className="timeline-section">
-      {isLoadingThread ? (
-        <p className="workspace-status">
-          {selectedThreadId
-            ? "Opening this thread and restoring its latest timeline..."
-            : "Preparing thread view..."}
-        </p>
-      ) : null}
-
       <div className="chat-message-list">
-        {!isLoadingThread && hasLoadedThreadView && groups.length === 0 ? (
-          <p className="empty-state">
-            No timeline items yet. Start the thread or send follow-up input to continue.
-          </p>
-        ) : null}
-
         {groups.map((group) => (
           <section
             className={group.turnId ? "timeline-turn-group" : "timeline-ungrouped-item"}

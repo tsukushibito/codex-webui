@@ -23,7 +23,10 @@ import type {
   PublicThreadView,
 } from "./thread-types";
 import type { TimelineDisplayGroup, TimelineDisplayRow } from "./timeline-display-model";
-import { buildTimelineDisplayModel } from "./timeline-display-model";
+import {
+  buildTimelineDisplayModel,
+  filterTimelineDisplayGroupsForChat,
+} from "./timeline-display-model";
 import { getTimelineItemDetail } from "./timeline-item-detail";
 
 export interface ChatViewProps {
@@ -74,17 +77,6 @@ function formatTimestamp(value: string | null) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
-}
-
-function formatConnectionStateLabel(connectionState: "idle" | "live" | "reconnecting") {
-  switch (connectionState) {
-    case "live":
-      return "Live";
-    case "reconnecting":
-      return "Reconnecting";
-    default:
-      return "Idle";
-  }
 }
 
 function threadChatHref(workspaceId: string, threadId?: string) {
@@ -179,18 +171,6 @@ function currentActivitySummary(
     default:
       return formatMachineLabel(threadView.current_activity.kind);
   }
-}
-
-function threadFeedbackBadgeClass(descriptor: ThreadFeedbackDescriptor) {
-  if (descriptor.badgeTone === "success") {
-    return "status-badge success";
-  }
-
-  if (descriptor.badgeTone === "warning") {
-    return "status-badge warning";
-  }
-
-  return "status-badge";
 }
 
 function buildThreadFeedbackDescriptor({
@@ -562,7 +542,6 @@ export function ChatView({
   isRespondingToRequest,
   connectionState,
   errorMessage,
-  statusMessage,
   workspaceName,
   composerDraft,
   onWorkspaceNameChange,
@@ -581,11 +560,7 @@ export function ChatView({
   const [detailSelection, setDetailSelection] = useState<ThreadDetailSelection | null>(null);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>("full");
   const [expandedTimelineRows, setExpandedTimelineRows] = useState<Set<string>>(() => new Set());
-  const [followLatestActivity, setFollowLatestActivity] = useState(true);
-  const [hasSuppressedActivity, setHasSuppressedActivity] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
-  const scrollRegionRef = useRef<HTMLDivElement | null>(null);
-  const latestActivitySignatureRef = useRef<string | null>(null);
   const selectedWorkspace =
     workspaces.find((workspace) => workspace.workspace_id === workspaceId) ?? null;
   const hasSelectedThread = selectedThreadId !== null;
@@ -607,11 +582,6 @@ export function ChatView({
       ? "Describe the task to start a new thread."
       : "Ask a follow-up question or continue the work.";
   const composerSubmitLabel = isStartingThread ? "Start thread" : "Send message";
-  const composerGuidance = !workspaceId
-    ? "Select a workspace to enable input."
-    : isOpeningSelectedThread
-      ? "Opening selected thread."
-      : unavailableReason;
   const isComposerTextareaDisabled =
     !workspaceId || isOpeningSelectedThread || isSubmittingComposer || Boolean(unavailableReason);
   const selectedTimelineItem =
@@ -623,23 +593,21 @@ export function ChatView({
   const selectedTimelineItemDetail = selectedTimelineItem
     ? getTimelineItemDetail(selectedTimelineItem)
     : null;
-  const timelineModel = buildTimelineDisplayModel({
+  const detailTimelineModel = buildTimelineDisplayModel({
     timelineItems: selectedThreadView?.timeline.items ?? [],
     streamEvents,
     draftAssistantMessages,
   });
+  const chatTimelineGroupsBase = filterTimelineDisplayGroupsForChat(detailTimelineModel.groups);
   const placeholderRunningRow =
-    selectedThreadView && !hasLiveAssistantTimelineRow(timelineModel.groups)
+    selectedThreadView && !hasLiveAssistantTimelineRow(chatTimelineGroupsBase)
       ? buildRunningAssistantPlaceholderRow({
-          latestSequence: timelineModel.groups.at(-1)?.rows.at(-1)?.sequence ?? 0,
+          latestSequence: chatTimelineGroupsBase.at(-1)?.rows.at(-1)?.sequence ?? 0,
           selectedThreadView,
         })
       : null;
-  const timelineGroups = appendTimelineRowToGroups(timelineModel.groups, placeholderRunningRow);
-  const hasLiveAssistantRow = hasLiveAssistantTimelineRow(timelineGroups);
+  const timelineGroups = appendTimelineRowToGroups(chatTimelineGroupsBase, placeholderRunningRow);
   const hasRequestDetailAffordance = selectedRequestDetail !== null;
-  const latestTimelineGroup = timelineGroups[timelineGroups.length - 1] ?? null;
-  const latestTimelineRow = latestTimelineGroup?.rows[latestTimelineGroup.rows.length - 1] ?? null;
   const matchedPendingRequestRow = findMatchingRequestRow(
     timelineGroups,
     selectedThreadView?.pending_request
@@ -662,20 +630,6 @@ export function ChatView({
         }
       : null,
   );
-  const latestActivitySignature = selectedThreadId
-    ? JSON.stringify({
-        connectionState,
-        currentActivity: selectedThreadView?.current_activity.kind ?? null,
-        latestResolvedRequest: selectedThreadView?.latest_resolved_request?.request_id ?? null,
-        latestRowContent: latestTimelineRow?.content ?? null,
-        latestRowId: latestTimelineRow?.id ?? null,
-        latestRowIsLive: latestTimelineRow?.isLive ?? null,
-        latestRowSequence: latestTimelineRow?.sequence ?? null,
-        pendingRequest: selectedThreadView?.pending_request?.request_id ?? null,
-        selectedThreadId,
-        statusMessage,
-      })
-    : null;
   const threadFeedback = buildThreadFeedbackDescriptor({
     composerAcceptingInput: isThreadAcceptingInput,
     connectionState,
@@ -692,17 +646,7 @@ export function ChatView({
   const threadActivitySummary = workspaceId
     ? currentActivitySummary(selectedThreadView, isOpeningSelectedThread)
     : "Choose a workspace to enable the composer.";
-  const connectionStateLabel = formatConnectionStateLabel(connectionState);
   const isSidebarMinibar = sidebarMode === "mini" && !isNavigationOpen;
-  const showInlineThreadFeedback =
-    threadFeedback.isVisible &&
-    !selectedThreadView?.pending_request &&
-    !selectedThreadView?.latest_resolved_request &&
-    !(
-      selectedThreadView?.current_activity.kind === "running" &&
-      connectionState === "live" &&
-      hasLiveAssistantRow
-    );
   const showThreadContextLabel = !selectedThreadView || isOpeningSelectedThread;
   const threadHeading = selectedThreadView?.thread.title
     ? selectedThreadView.thread.title
@@ -790,35 +734,6 @@ export function ChatView({
     setExpandedTimelineRows(new Set());
   }, [selectedThreadId]);
 
-  useEffect(() => {
-    latestActivitySignatureRef.current = null;
-    setFollowLatestActivity(true);
-    setHasSuppressedActivity(false);
-  }, [selectedThreadId]);
-
-  useEffect(() => {
-    if (!selectedThreadId || latestActivitySignature === null) {
-      latestActivitySignatureRef.current = latestActivitySignature;
-      return;
-    }
-
-    const previousSignature = latestActivitySignatureRef.current;
-    latestActivitySignatureRef.current = latestActivitySignature;
-
-    if (followLatestActivity) {
-      const scrollRegion = scrollRegionRef.current;
-      if (scrollRegion) {
-        scrollRegion.scrollTop = scrollRegion.scrollHeight;
-      }
-      setHasSuppressedActivity(false);
-      return;
-    }
-
-    if (previousSignature !== null && previousSignature !== latestActivitySignature) {
-      setHasSuppressedActivity(true);
-    }
-  }, [followLatestActivity, latestActivitySignature, selectedThreadId]);
-
   function selectThread(threadId: string) {
     onSelectThread(threadId);
     setIsNavigationOpen(false);
@@ -837,33 +752,8 @@ export function ChatView({
     }
   }
 
-  function handleScrollRegionScroll() {
-    const scrollRegion = scrollRegionRef.current;
-    if (!scrollRegion) {
-      return;
-    }
-
-    const distanceFromBottom =
-      scrollRegion.scrollHeight - scrollRegion.scrollTop - scrollRegion.clientHeight;
-    const isNearBottom = distanceFromBottom <= 48;
-
-    setFollowLatestActivity(isNearBottom);
-    if (isNearBottom) {
-      setHasSuppressedActivity(false);
-    }
-  }
-
   function focusComposer() {
     composerRef.current?.focus();
-  }
-
-  function jumpToLatestActivity() {
-    const scrollRegion = scrollRegionRef.current;
-    if (scrollRegion) {
-      scrollRegion.scrollTop = scrollRegion.scrollHeight;
-    }
-    setFollowLatestActivity(true);
-    setHasSuppressedActivity(false);
   }
 
   function toggleTimelineRowExpansion(rowId: string) {
@@ -955,33 +845,12 @@ export function ChatView({
 
   return (
     <main className="chat-shell">
-      <header className="chat-topbar">
-        <div>
-          <h1>{selectedWorkspace?.workspace_name ?? "Thread workspace"}</h1>
-        </div>
-        <div className="chat-topbar-actions">
-          <button
-            className="secondary-link action-button navigation-toggle"
-            onClick={() => setIsNavigationOpen((currentValue) => !currentValue)}
-            type="button"
-          >
-            {isNavigationOpen ? "Close threads" : "Threads"}
-          </button>
-        </div>
-      </header>
       <div className={isSidebarMinibar ? "chat-layout sidebar-minibar" : "chat-layout"}>
-        {errorMessage || statusMessage ? (
+        {errorMessage ? (
           <div aria-live="polite" className="chat-feedback-stack">
-            {errorMessage ? (
-              <p className="error-banner" role="alert">
-                {errorMessage}
-              </p>
-            ) : null}
-            {statusMessage ? (
-              <p className="status-message" role="status">
-                {statusMessage}
-              </p>
-            ) : null}
+            <p className="error-banner" role="alert">
+              {errorMessage}
+            </p>
           </div>
         ) : null}
         <ChatViewNavigation
@@ -1061,23 +930,7 @@ export function ChatView({
           </div>
 
           <div className="thread-view-body">
-            <div
-              className="thread-view-scroll-region"
-              onScroll={handleScrollRegionScroll}
-              ref={scrollRegionRef}
-            >
-              {hasSuppressedActivity && latestTimelineRow ? (
-                <div className="latest-activity-cta">
-                  <span className="workspace-meta">New activity is available below.</span>
-                  <button
-                    className="secondary-link action-button compact-button"
-                    onClick={jumpToLatestActivity}
-                    type="button"
-                  >
-                    Jump to latest activity
-                  </button>
-                </div>
-              ) : null}
+            <div className="thread-view-scroll-region">
               {fallbackPendingRequestSummary ? (
                 <div className="request-detail-card pending-request-card pending-request-card-fallback">
                   <div className="workspace-meta-row">
@@ -1172,22 +1025,6 @@ export function ChatView({
                 </div>
               ) : null}
 
-              {showInlineThreadFeedback ? (
-                <div className="thread-feedback-card thread-feedback-card-inline">
-                  <div className="workspace-meta-row">
-                    <span className={threadFeedbackBadgeClass(threadFeedback)}>
-                      {threadFeedback.title}
-                    </span>
-                  </div>
-                  <p className="workspace-status">{threadFeedback.summary}</p>
-                  {threadFeedback.actions.length > 0 ? (
-                    <div className="workspace-actions thread-feedback-actions">
-                      {threadFeedback.actions.map((action) => renderThreadFeedbackAction(action))}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-
               <ChatViewTimeline
                 expandedRowIds={expandedTimelineRows}
                 formatTimestamp={formatTimestamp}
@@ -1236,9 +1073,11 @@ export function ChatView({
 
             <ChatViewComposer
               composerDraft={composerDraft}
-              composerGuidance={composerGuidance}
               composerInputLabel={composerInputLabel}
               composerPlaceholder={composerPlaceholder}
+              composerStatusSegments={
+                selectedWorkspace?.workspace_name ? [selectedWorkspace.workspace_name] : []
+              }
               composerSubmitLabel={composerSubmitLabel}
               isComposerDisabled={isComposerDisabled}
               isStartingThread={isStartingThread}
@@ -1252,7 +1091,7 @@ export function ChatView({
 
         {detailSelection ? (
           <ChatViewDetails
-            composerGuidance={composerGuidance}
+            composerGuidance={unavailableReason}
             formatMachineLabel={formatMachineLabel}
             formatTimestamp={formatTimestamp}
             isOpeningSelectedThread={isOpeningSelectedThread}
@@ -1279,9 +1118,15 @@ export function ChatView({
             threadActivitySummary={threadActivitySummary}
             threadFeedback={threadFeedback}
             threadCount={threads.length}
-            timelineGroups={timelineGroups}
+            timelineGroups={detailTimelineModel.groups}
             refreshHref={refreshHref}
-            streamStateLabel={connectionStateLabel}
+            streamStateLabel={
+              connectionState === "live"
+                ? "Live"
+                : connectionState === "reconnecting"
+                  ? "Reconnecting"
+                  : "Idle"
+            }
             workspaceId={workspaceId}
           />
         ) : null}

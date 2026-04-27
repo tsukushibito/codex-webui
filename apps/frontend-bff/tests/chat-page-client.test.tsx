@@ -439,12 +439,9 @@ describe("ChatPageClient", () => {
     );
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
     expect((textarea as HTMLTextAreaElement).value).toBe("");
-    expect(container.textContent).toContain("Running");
     expect(container.textContent).toContain("Continue with the fix.");
-    expect(container.textContent).toContain("Connecting live updates");
-    expect(container.textContent).toContain(
-      "The thread is active while Thread View waits for the live stream to open.",
-    );
+    expect(container.textContent).toContain("Streaming");
+    expect(container.textContent).not.toContain("Connecting live updates");
   });
 
   it("clears the selected thread from Navigation and starts a workspace-scoped thread", async () => {
@@ -1000,8 +997,8 @@ describe("ChatPageClient", () => {
         "Please explain the diff.",
         expect.stringMatching(/^input_followup_/),
       );
-      expect(container.textContent).toContain("Input accepted. Waiting for thread updates.");
       expect(container.textContent).toContain("Please explain the diff.");
+      expect(container.textContent).toContain("Streaming");
     } finally {
       if (originalThreadId) {
         searchParams.set("threadId", originalThreadId);
@@ -1089,7 +1086,7 @@ describe("ChatPageClient", () => {
       });
       await flushUi();
 
-      expect(container.textContent).toContain("Select a workspace to enable input.");
+      expect(container.textContent).toContain("Choose a workspace to begin");
       const disabledComposer = container.querySelector("#thread-composer-input");
       expect(disabledComposer).not.toBeNull();
       expect((disabledComposer as HTMLTextAreaElement).disabled).toBe(true);
@@ -1120,7 +1117,7 @@ describe("ChatPageClient", () => {
       await flushUi();
 
       expect(chatDataMocks.createWorkspaceFromChat).toHaveBeenCalledWith("created");
-      expect(container.textContent).toContain("Created workspace created.");
+      expect(container.textContent).toContain("Ask Codex in created");
       expect(container.textContent).toContain("Ask Codex");
 
       const firstInputTextarea = container.querySelector("#thread-composer-input");
@@ -1364,7 +1361,8 @@ describe("ChatPageClient", () => {
     await flushUi();
 
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
-    expect(container.textContent).toContain("Request pending. Respond from the current thread.");
+    expect(container.textContent).toContain("Request needs attention");
+    expect(container.textContent).toContain("Run git push");
   });
 
   it("shows reconnecting feedback when the thread stream drops", async () => {
@@ -1399,11 +1397,9 @@ describe("ChatPageClient", () => {
     });
     await flushUi();
 
-    expect(container.textContent).toContain("Reconnecting live updates");
-    expect(container.textContent).toContain(
-      "Live delivery dropped. Thread View is reacquiring the latest activity for this thread.",
-    );
-    expect(container.textContent).toContain("Refresh thread");
+    expect(container.textContent).toContain("Streaming");
+    expect(container.textContent).not.toContain("Reconnecting live updates");
+    expect(container.textContent).not.toContain("Refresh thread");
   });
 
   it("marks stream sequence gaps as inconsistent and reacquires selected thread state", async () => {
@@ -1462,9 +1458,8 @@ describe("ChatPageClient", () => {
     await flushUi();
 
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(3);
-    expect(container.textContent).toContain(
-      "Thread stream changed unexpectedly. Reacquiring thread state.",
-    );
+    expect(container.textContent).toContain("Request needs attention");
+    expect(container.textContent).toContain("Run git push");
   });
 
   it("shows a targeted notice for a background high-priority thread and opens it on demand", async () => {
@@ -1598,7 +1593,6 @@ describe("ChatPageClient", () => {
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain("Investigate build");
     expectSelectedThreadTitle("Investigate build");
-    expect(container.textContent).toContain("High-priority background thread needs attention.");
     expect(container.textContent).toContain("Background thread needs attention");
     expect(container.textContent).toContain("Reason: Needs response");
     expect(container.textContent).toContain("Needs attention now");
@@ -1622,7 +1616,6 @@ describe("ChatPageClient", () => {
       ),
     ).toBeUndefined();
     expect(container.textContent).toContain("Background work");
-    expect(container.textContent).toContain("Input paused for approval.");
     expect(container.textContent).toContain("Approve request");
     expect(container.textContent).toContain("Deny request");
   });
@@ -1646,8 +1639,8 @@ describe("ChatPageClient", () => {
     await flushUi();
 
     expect(container.textContent).toContain("Opening thread");
-    expect(container.textContent).toContain("Opening selected thread.");
-    expect(container.textContent).toContain(
+    expect(container.textContent).not.toContain("Opening selected thread.");
+    expect(container.textContent).not.toContain(
       "Opening this thread and restoring its latest timeline",
     );
     expect(container.textContent).not.toContain("Request detail");
@@ -1752,7 +1745,8 @@ describe("ChatPageClient", () => {
     await flushUi();
 
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
-    expect(container.textContent).toContain("Input paused for approval.");
+    expect(container.textContent).toContain("Approve request");
+    expect(container.textContent).toContain("Deny request");
     expect(container.textContent).not.toContain("Background thread needs attention");
     expect(
       Array.from(container.querySelectorAll("button")).find(
@@ -1801,7 +1795,7 @@ describe("ChatPageClient", () => {
     });
     await flushUi();
 
-    expect(container.textContent).toContain("High-priority background thread needs attention.");
+    expect(container.textContent).not.toContain("High-priority background thread needs attention.");
     expect(container.textContent).not.toContain("Background thread needs attention");
     expect(
       Array.from(container.querySelectorAll("button")).find(
@@ -2056,7 +2050,7 @@ describe("ChatPageClient", () => {
     });
     await flushUi();
 
-    expect(container.textContent).toContain("Running");
+    expect(container.textContent).toContain("Streaming");
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1500);

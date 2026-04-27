@@ -2,9 +2,9 @@ import type { RefObject } from "react";
 
 export interface ChatViewComposerProps {
   composerDraft: string;
-  composerGuidance: string | null;
   composerInputLabel: string;
   composerPlaceholder: string;
+  composerStatusSegments: string[];
   composerSubmitLabel: string;
   isComposerDisabled: boolean;
   isStartingThread: boolean;
@@ -16,9 +16,9 @@ export interface ChatViewComposerProps {
 
 export function ChatViewComposer({
   composerDraft,
-  composerGuidance,
   composerInputLabel,
   composerPlaceholder,
+  composerStatusSegments,
   composerSubmitLabel,
   isComposerDisabled,
   isStartingThread,
@@ -81,10 +81,14 @@ export function ChatViewComposer({
           </svg>
         </button>
       </label>
-      {composerGuidance ? (
-        <p className="composer-guidance" role="status">
-          {composerGuidance}
-        </p>
+      {composerStatusSegments.length > 0 ? (
+        <div className="chat-composer-status" role="status">
+          {composerStatusSegments.map((segment) => (
+            <span className="chat-composer-status-segment" key={segment}>
+              {segment}
+            </span>
+          ))}
+        </div>
       ) : null}
     </div>
   );
