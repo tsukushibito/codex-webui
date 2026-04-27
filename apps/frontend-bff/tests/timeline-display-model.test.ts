@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { PublicThreadStreamEvent, PublicTimelineItem } from "../src/thread-types";
-import { buildTimelineDisplayModel, classifyTimelineDensity } from "../src/timeline-display-model";
+import {
+  buildTimelineDisplayModel,
+  classifyTimelineDensity,
+  classifyTimelineTone,
+} from "../src/timeline-display-model";
 import { getTimelineItemDetail } from "../src/timeline-item-detail";
 
 function timelineItem(overrides: Partial<PublicTimelineItem>): PublicTimelineItem {
@@ -362,7 +366,7 @@ describe("timeline display model", () => {
     ]);
   });
 
-  it("classifies primary messages, prominent approval/error/file rows, and compact operational rows", () => {
+  it("classifies primary messages, prominent approval/error/file rows, compact operational rows, and semantic tones", () => {
     expect(classifyTimelineDensity("message.user")).toBe("primary");
     expect(classifyTimelineDensity("message.assistant.completed")).toBe("primary");
     expect(classifyTimelineDensity("approval.requested")).toBe("prominent");
@@ -371,6 +375,20 @@ describe("timeline display model", () => {
     expect(classifyTimelineDensity("session.status_changed")).toBe("compact");
     expect(classifyTimelineDensity("tool.started")).toBe("compact");
     expect(classifyTimelineDensity("command.output")).toBe("compact");
+
+    expect(classifyTimelineTone("message.user", "user", "Start")).toBe("user");
+    expect(classifyTimelineTone("message.assistant.completed", "assistant", "Answer")).toBe(
+      "codex",
+    );
+    expect(classifyTimelineTone("approval.requested", "event", "Approval required")).toBe(
+      "request",
+    );
+    expect(classifyTimelineTone("approval.request_failed", "event", "request failed")).toBe(
+      "error",
+    );
+    expect(classifyTimelineTone("tool.output", "event", "stdout")).toBe("tool");
+    expect(classifyTimelineTone("turn.failed", "event", "failed")).toBe("error");
+    expect(classifyTimelineTone("session.status_changed", "event", "running")).toBe("muted");
   });
 
   it("hides generic status transitions from the rendered timeline", () => {
@@ -416,6 +434,7 @@ describe("timeline display model", () => {
         content: "failed",
         density: "compact",
         role: "event",
+        tone: "error",
         showDetailButton: false,
       }),
     ]);
@@ -445,6 +464,7 @@ describe("timeline display model", () => {
         content: "recovery pending",
         density: "compact",
         role: "event",
+        tone: "muted",
         showDetailButton: false,
       }),
     ]);
@@ -474,6 +494,7 @@ describe("timeline display model", () => {
         content: "failed",
         density: "compact",
         role: "event",
+        tone: "error",
         showDetailButton: false,
       }),
     ]);
@@ -503,6 +524,7 @@ describe("timeline display model", () => {
         content: "recovery pending",
         density: "compact",
         role: "event",
+        tone: "muted",
         showDetailButton: false,
       }),
     ]);
@@ -573,17 +595,20 @@ describe("timeline display model", () => {
       expect.objectContaining({
         id: "timeline:user_001",
         label: "You",
+        tone: "user",
         showDetailButton: false,
       }),
       expect.objectContaining({
         id: "timeline:file_001",
         label: "File update",
+        tone: "tool",
         showDetailButton: true,
         detailActionLabel: "Inspect artifacts",
       }),
       expect.objectContaining({
         id: "timeline:note_001",
         label: "Thread update",
+        tone: "muted",
         showDetailButton: false,
         detailActionLabel: null,
       }),
@@ -592,6 +617,7 @@ describe("timeline display model", () => {
         label: "Status update",
         content: "Running tool",
         density: "compact",
+        tone: "muted",
         showDetailButton: false,
       }),
     ]);
@@ -747,12 +773,14 @@ describe("timeline display model", () => {
           itemId: "item_approval_001",
           requestId: "req_001",
           requestState: "pending",
+          tone: "request",
         }),
         expect.objectContaining({
           id: "stream:stream_resolved_001",
           itemId: "item_approval_001",
           requestId: "req_001",
           requestState: "resolved",
+          tone: "request",
         }),
       ]),
     );
