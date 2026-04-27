@@ -4,6 +4,7 @@ import {
   buildTimelineDisplayModel,
   classifyTimelineDensity,
   classifyTimelineTone,
+  filterTimelineDisplayGroupsForChat,
 } from "../src/timeline-display-model";
 import { getTimelineItemDetail } from "../src/timeline-item-detail";
 
@@ -784,6 +785,113 @@ describe("timeline display model", () => {
         }),
       ]),
     );
+  });
+
+  it("keeps only user assistant and actual request rows in the chat timeline filter", () => {
+    const model = buildTimelineDisplayModel({
+      timelineItems: [
+        timelineItem({
+          timeline_item_id: "user_001",
+          kind: "message.user",
+          payload: {
+            content: "Run the checks.",
+          },
+        }),
+        timelineItem({
+          timeline_item_id: "request_001",
+          sequence: 2,
+          kind: "approval.requested",
+          payload: {
+            summary: "Approve git push",
+            status: "pending",
+          },
+        }),
+        timelineItem({
+          timeline_item_id: "tool_pending_001",
+          sequence: 3,
+          kind: "tool.started",
+          payload: {
+            summary: "Tool says pending",
+            status: "pending",
+          },
+        }),
+        timelineItem({
+          timeline_item_id: "status_resolved_001",
+          sequence: 4,
+          kind: "session.status_changed",
+          payload: {
+            summary: "resolved",
+            status: "resolved",
+          },
+        }),
+      ],
+      streamEvents: [
+        {
+          event_id: "file_resolved_001",
+          thread_id: "thread_001",
+          event_type: "file.changed" as PublicThreadStreamEvent["event_type"],
+          sequence: 5,
+          occurred_at: "2026-03-27T05:20:01Z",
+          payload: {
+            summary: "Updated src/app.ts",
+            status: "resolved",
+          },
+        },
+      ],
+      draftAssistantMessages: {
+        msg_live_001: "Streaming answer",
+      },
+    });
+
+    const chatRows = filterTimelineDisplayGroupsForChat(model.groups).flatMap(
+      (group) => group.rows,
+    );
+
+    expect(chatRows.map((row) => row.id)).toEqual([
+      "timeline:user_001",
+      "timeline:request_001",
+      "draft:msg_live_001",
+    ]);
+  });
+
+  it("keeps non-request rows with generic pending or resolved payload status hidden from chat timeline", () => {
+    const model = buildTimelineDisplayModel({
+      timelineItems: [
+        timelineItem({
+          timeline_item_id: "command_pending_001",
+          kind: "command.started",
+          payload: {
+            summary: "Command queued",
+            status: "pending",
+          },
+        }),
+        timelineItem({
+          timeline_item_id: "error_resolved_001",
+          sequence: 2,
+          kind: "error.raised",
+          payload: {
+            summary: "Recovered",
+            status: "resolved",
+          },
+        }),
+      ],
+      streamEvents: [
+        {
+          event_id: "tool_pending_001",
+          thread_id: "thread_001",
+          event_type: "tool.started" as PublicThreadStreamEvent["event_type"],
+          sequence: 3,
+          occurred_at: "2026-03-27T05:20:01Z",
+          payload: {
+            summary: "Tool active",
+            status: "pending",
+          },
+        },
+      ],
+      draftAssistantMessages: {},
+    });
+
+    expect(filterTimelineDisplayGroupsForChat(model.groups)).toEqual([]);
   });
 
   it("keeps normal user and assistant rows expanded by default even when long", () => {

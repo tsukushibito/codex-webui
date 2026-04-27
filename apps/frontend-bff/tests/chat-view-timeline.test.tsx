@@ -129,6 +129,17 @@ describe("ChatViewTimeline", () => {
     expect(container.textContent).not.toContain("Turn");
   });
 
+  it("renders no loading or empty-state text when the simplified timeline has no visible rows", () => {
+    const markup = renderToStaticMarkup(
+      <ChatViewTimeline {...buildTimelineProps({ groups: [] })} />,
+    );
+
+    expect(markup).not.toContain("Preparing thread view");
+    expect(markup).not.toContain("Opening this thread and restoring its latest timeline");
+    expect(markup).not.toContain("No timeline items yet");
+    expect(markup).not.toContain("empty-state");
+  });
+
   it("renders live assistant rows with inline streaming status and leaves completed assistant rows timestamped", async () => {
     const groups: TimelineDisplayGroup[] = [
       {
