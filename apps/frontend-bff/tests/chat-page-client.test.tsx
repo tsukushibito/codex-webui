@@ -963,7 +963,7 @@ describe("ChatPageClient", () => {
       });
       await flushUi();
 
-      expect(container.textContent).toContain("Started thread thread_new.");
+      expect(container.textContent).not.toContain("Started thread thread_new.");
       expect(container.textContent).not.toContain("Ready for your next input.");
 
       const followUpTextarea = container.querySelector("#thread-composer-input");
@@ -1622,7 +1622,7 @@ describe("ChatPageClient", () => {
       ),
     ).toBeUndefined();
     expect(container.textContent).toContain("Background work");
-    expect(container.textContent).toContain("Approval required");
+    expect(container.textContent).toContain("Input paused for approval.");
     expect(container.textContent).toContain("Approve request");
     expect(container.textContent).toContain("Deny request");
   });
@@ -1752,7 +1752,7 @@ describe("ChatPageClient", () => {
     await flushUi();
 
     expect(chatDataMocks.loadChatThreadBundle).toHaveBeenCalledTimes(2);
-    expect(container.textContent).toContain("Approval required");
+    expect(container.textContent).toContain("Input paused for approval.");
     expect(container.textContent).not.toContain("Background thread needs attention");
     expect(
       Array.from(container.querySelectorAll("button")).find(
