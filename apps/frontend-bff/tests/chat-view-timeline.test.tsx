@@ -54,7 +54,7 @@ describe("ChatViewTimeline", () => {
     container.remove();
   });
 
-  it("renders grouped timeline rows with preserved labels, classes, timestamps, and detail action", () => {
+  it("renders grouped timeline rows without visible turn labels while preserving internal turn metadata", async () => {
     const groups: TimelineDisplayGroup[] = [
       {
         id: "group-turn-001",
@@ -107,6 +107,7 @@ describe("ChatViewTimeline", () => {
     expect(markup).toContain('aria-label="Timeline"');
     expect(markup).toContain('class="timeline-turn-group"');
     expect(markup).toContain('data-turn-id="turn_001"');
+    expect(markup).not.toContain("timeline-turn-label");
     expect(markup).toContain(
       'class="timeline-row timeline-row-primary timeline-row-assistant timeline-row-tone-codex"',
     );
@@ -117,6 +118,15 @@ describe("ChatViewTimeline", () => {
     expect(markup).toContain("Codex is streaming progress in this assistant row.");
     expect(markup).toContain("formatted:2026-03-27T05:21:00Z");
     expect(markup).toContain("Inspect approval context");
+
+    await act(async () => {
+      root.render(<ChatViewTimeline {...buildTimelineProps({ groups })} />);
+    });
+
+    expect(container.querySelector("[data-turn-id='turn_001']")).not.toBeNull();
+    expect(container.querySelector(".timeline-turn-label")).toBeNull();
+    expect(container.textContent).not.toContain("turn_001");
+    expect(container.textContent).not.toContain("Turn");
   });
 
   it("renders live assistant rows with inline streaming status and leaves completed assistant rows timestamped", async () => {
@@ -215,6 +225,69 @@ describe("ChatViewTimeline", () => {
     expect(markup).toContain("Codex is responding");
     expect(markup).toContain("Streaming");
     expect(markup).toContain("Codex is streaming progress in this assistant row.");
+  });
+
+  it("keeps live and completed assistant groups on the same outer timeline structure", async () => {
+    const liveGroups: TimelineDisplayGroup[] = [
+      {
+        id: "group-turn-live",
+        turnId: "turn_001",
+        rows: [
+          {
+            id: "row-live-assistant",
+            turnId: "turn_001",
+            itemId: null,
+            requestId: null,
+            requestState: null,
+            sequence: 1,
+            occurredAt: "2026-03-27T05:20:00Z",
+            label: "Codex",
+            content: "Streaming answer",
+            density: "primary",
+            role: "assistant",
+            tone: "codex",
+            timelineItemId: null,
+            isLive: true,
+            defaultFoldEligible: false,
+            showDetailButton: false,
+            detailActionLabel: null,
+          },
+        ],
+      },
+    ];
+    const completedGroups: TimelineDisplayGroup[] = [
+      {
+        ...liveGroups[0],
+        rows: [
+          {
+            ...liveGroups[0].rows[0],
+            id: "row-completed-assistant",
+            content: "Final answer",
+            isLive: false,
+          },
+        ],
+      },
+    ];
+
+    await act(async () => {
+      root.render(<ChatViewTimeline {...buildTimelineProps({ groups: liveGroups })} />);
+    });
+
+    const liveGroup = container.querySelector(".timeline-turn-group");
+    const liveRow = container.querySelector(".timeline-row");
+    expect(liveGroup?.children).toHaveLength(1);
+    expect(liveGroup?.firstElementChild).toBe(liveRow);
+    expect(container.querySelector(".timeline-turn-label")).toBeNull();
+
+    await act(async () => {
+      root.render(<ChatViewTimeline {...buildTimelineProps({ groups: completedGroups })} />);
+    });
+
+    const completedGroup = container.querySelector(".timeline-turn-group");
+    const completedRow = container.querySelector(".timeline-row");
+    expect(completedGroup?.children).toHaveLength(1);
+    expect(completedGroup?.firstElementChild).toBe(completedRow);
+    expect(container.querySelector(".timeline-turn-label")).toBeNull();
   });
 
   it("renders muted system rows and error rows with their semantic tone classes", () => {
