@@ -169,6 +169,9 @@ describe("ChatView", () => {
             sequence: 3,
             occurred_at: "2026-03-27T05:18:00Z",
             payload: {
+              request_id: "req_001",
+              turn_id: "turn_001",
+              item_id: "item_001",
               summary: "Run git push",
               content: "Run git push",
             },
@@ -227,24 +230,25 @@ describe("ChatView", () => {
     );
 
     expect(markup).toContain("Approval thread");
-    expect(markup).toContain("Workspace alpha");
     expect(markup).toContain("Approval required");
-    expect(markup).toContain("thread-feedback-card-inline");
-    expect(markup).toContain(
-      "Codex is blocked until you approve or deny the pending request in this thread.",
-    );
     expect(markup).toContain("Approve request");
+    expect(markup).toContain("Pending request");
     expect(markup).toContain(">Threads<");
-    expect(markup).toContain(">Details<");
-    expect(markup).toContain("Input is paused while this thread waits for your approval response.");
-    expect(markup).toContain(
-      'Operation: <code class="artifact-inline">git push origin main</code>',
-    );
+    expect(markup).toContain('aria-label="Thread details"');
+    expect(markup).toContain("Input paused for approval.");
+    expect(markup).not.toContain("Workspace:");
+    expect(markup).not.toContain("Stream:");
+    expect(markup).not.toContain(">Refresh<");
+    expect(markup).not.toContain("thread-feedback-card-inline");
     expect(markup).toContain("Please explain the diff.");
     expect(markup).toContain("Updated apps/frontend-bff/src/chat-view.tsx");
     expect(markup).toContain("Streaming update");
     expect(markup).toContain("Request needs attention");
     expect(markup).toContain("timeline-row-prominent");
+    expect(markup).not.toContain("pending-request-card-fallback");
+    expect(markup.indexOf("Please explain the diff.")).toBeLessThan(
+      markup.indexOf("Approve request"),
+    );
     expect(markup).toContain("Status update");
     expect(markup).toContain("timeline-row-compact");
     expect(markup).toContain("Inspect artifacts");
@@ -253,6 +257,9 @@ describe("ChatView", () => {
     expect(markup).not.toContain("session.status_changed");
     expect(markup.match(/<textarea/g) ?? []).toHaveLength(1);
     expect(markup).toContain('id="thread-composer-input"');
+    expect(markup).toContain('class="composer-input-frame"');
+    expect(markup).toContain('aria-label="Send message"');
+    expect(markup).not.toContain("Send input");
     expect(markup).not.toContain('id="thread-input"');
     expect(markup).not.toContain('id="message-input"');
   });
@@ -625,7 +632,24 @@ describe("ChatView", () => {
             input_unavailable_reason: null,
           },
           timeline: {
-            items: [],
+            items: [
+              {
+                timeline_item_id: "timeline_resolved_001",
+                thread_id: "thread_001",
+                turn_id: "turn_001",
+                item_id: "item_001",
+                sequence: 1,
+                occurred_at: "2026-03-27T05:21:00Z",
+                kind: "approval.resolved",
+                payload: {
+                  request_id: "req_001",
+                  item_id: "item_001",
+                  turn_id: "turn_001",
+                  summary: "Run git push",
+                  status: "resolved",
+                },
+              },
+            ],
             next_cursor: null,
             has_more: false,
           },
@@ -639,11 +663,130 @@ describe("ChatView", () => {
       />,
     );
 
-    expect(markup).toContain("Latest resolved request");
-    expect(markup).toContain("Decision: approved");
-    expect(markup).toContain("Reopen request detail");
+    expect(markup).not.toContain("Latest resolved request");
+    expect(markup).toContain("Resolved: approved");
+    expect(markup).toContain("Request detail");
+    expect(markup).toContain('aria-label="Send message"');
     expect(markup).not.toContain("Approve request");
     expect(markup).not.toContain("Deny request");
+  });
+
+  it("keeps a compact fallback request summary above the timeline when no contextual row matches", () => {
+    const markup = renderToStaticMarkup(
+      <ChatView
+        backgroundPriorityNotice={null}
+        connectionState="live"
+        draftAssistantMessages={{}}
+        errorMessage={null}
+        isCreatingThread={false}
+        isCreatingWorkspace={false}
+        isInterruptingThread={false}
+        isLoadingThread={false}
+        isLoadingThreads={false}
+        isLoadingWorkspaces={false}
+        isRespondingToRequest={false}
+        isSendingMessage={false}
+        composerDraft=""
+        onCreateWorkspace={() => {}}
+        onApproveRequest={() => {}}
+        onSubmitComposer={() => {}}
+        onDenyRequest={() => {}}
+        onInterruptThread={() => {}}
+        onOpenBackgroundPriorityThread={() => {}}
+        onAskCodex={() => {}}
+        onComposerDraftChange={() => {}}
+        onSelectWorkspace={() => {}}
+        onSelectThread={() => {}}
+        onWorkspaceNameChange={() => {}}
+        selectedRequestDetail={{
+          request_id: "req_001",
+          thread_id: "thread_001",
+          turn_id: "turn_001",
+          item_id: "item_001",
+          request_kind: "approval",
+          status: "pending",
+          risk_category: "external_side_effect",
+          summary: "Run git push",
+          reason: "Codex requests permission to push changes to remote.",
+          operation_summary: "git push origin main",
+          requested_at: "2026-03-27T05:20:00Z",
+          responded_at: null,
+          decision: null,
+          decision_options: {
+            policy_scope_supported: false,
+            default_policy_scope: "once",
+          },
+          context: null,
+        }}
+        selectedThreadId="thread_001"
+        selectedThreadView={{
+          thread: {
+            thread_id: "thread_001",
+            title: "Fallback request thread",
+            workspace_id: "ws_alpha",
+            native_status: {
+              thread_status: "running",
+              active_flags: ["waiting_on_request"],
+              latest_turn_status: "running",
+            },
+            updated_at: "2026-03-27T05:22:00Z",
+          },
+          current_activity: {
+            kind: "waiting_on_approval",
+            label: "Approval required",
+          },
+          pending_request: {
+            request_id: "req_001",
+            thread_id: "thread_001",
+            turn_id: "turn_001",
+            item_id: "item_001",
+            request_kind: "approval",
+            status: "pending",
+            risk_category: "external_side_effect",
+            summary: "Run git push",
+            requested_at: "2026-03-27T05:20:00Z",
+          },
+          latest_resolved_request: null,
+          composer: {
+            accepting_user_input: false,
+            interrupt_available: true,
+            blocked_by_request: true,
+            input_unavailable_reason: null,
+          },
+          timeline: {
+            items: [
+              {
+                timeline_item_id: "evt_001",
+                thread_id: "thread_001",
+                turn_id: "turn_001",
+                item_id: "item_user_001",
+                sequence: 1,
+                occurred_at: "2026-03-27T05:14:00Z",
+                kind: "message.user",
+                payload: {
+                  content: "Please explain the diff.",
+                },
+              },
+            ],
+            next_cursor: null,
+            has_more: false,
+          },
+        }}
+        statusMessage={null}
+        streamEvents={[]}
+        threads={[]}
+        workspaceId="ws_alpha"
+        workspaceName=""
+        workspaces={[]}
+      />,
+    );
+
+    expect(markup).toContain("pending-request-card-fallback");
+    expect(markup).toContain("Request summary");
+    expect(markup).toContain("Approve request");
+    expect(markup).toContain("Deny request");
+    expect(markup).toContain("Request detail");
+    expect(markup).not.toContain("Pending request</span></div></article>");
   });
 
   it("renders a targeted background-priority notice with a direct thread action", () => {
@@ -762,7 +905,7 @@ describe("ChatView", () => {
       />,
     );
 
-    expect(markup).not.toContain("Ready for your next input");
+    expect(markup).not.toContain("Ready for your next input.");
     expect(markup).not.toContain(
       "Codex is idle and the composer below is available for the next instruction.",
     );
@@ -849,9 +992,9 @@ describe("ChatView", () => {
       );
     });
 
-    const detailsButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Details",
-    );
+    const detailsButton = container.querySelector(
+      'button[aria-label="Thread details"]',
+    ) as HTMLButtonElement | null;
     expect(detailsButton).toBeDefined();
 
     await act(async () => {
@@ -867,6 +1010,11 @@ describe("ChatView", () => {
     expect(container.textContent).toContain("Ready thread");
     expect(container.textContent).toContain("Waiting for your input");
     expect(container.textContent).toContain("This thread is ready for your next input.");
+    expect(container.textContent).toContain("Thread ID");
+    expect(container.textContent).toContain("Workspace ID");
+    expect(container.textContent).toContain("Stream");
+    expect(container.textContent).toContain("Live");
+    expect(container.textContent).toContain("Refresh thread");
     expect(container.textContent).toContain("No pending or recently resolved request.");
     expect(container.textContent).toContain("Debug: raw thread view JSON");
     const debugDetails = container.querySelector("details.detail-debug");
@@ -961,9 +1109,9 @@ describe("ChatView", () => {
       );
     });
 
-    const detailsButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Details",
-    );
+    const detailsButton = container.querySelector(
+      'button[aria-label="Thread details"]',
+    ) as HTMLButtonElement | null;
     await act(async () => {
       detailsButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });

@@ -1,0 +1,18 @@
+{
+  "createdAt": "2026-04-27T12:07:18.410Z",
+  "baseUrl": "http://127.0.0.1:3010",
+  "captures": [
+    {
+      "file": "desktop-sidebar-normal.png",
+      "state": "desktop-sidebar-normal"
+    },
+    {
+      "file": "desktop-sidebar-minibar.png",
+      "state": "desktop-sidebar-minibar"
+    },
+    {
+      "file": "mobile-thread-view.png",
+      "state": "mobile-thread-view"
+    }
+  ]
+}

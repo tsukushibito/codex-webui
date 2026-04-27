@@ -34,12 +34,14 @@ export interface ChatViewDetailsProps {
   selectedTimelineItem: PublicTimelineItem | null;
   selectedTimelineItemDetail: TimelineItemDetail | null;
   isOpeningSelectedThread: boolean;
-  connectionState: "idle" | "live" | "reconnecting";
   composerGuidance: string | null;
   threadActivitySummary: string;
   threadFeedback: ThreadFeedbackDescriptor;
+  threadCount: number;
   timelineGroups: TimelineDisplayGroup[];
   isRespondingToRequest: boolean;
+  refreshHref: string | null;
+  streamStateLabel: string;
   formatTimestamp: (value: string | null) => string;
   formatMachineLabel: (value: string | null | undefined) => string;
   requestBadgeClass: (request: PublicRequestDetail | null) => string;
@@ -55,7 +57,8 @@ function isCodeLikeFieldLabel(label: string) {
   return (
     label === "Request ID" ||
     label === "Operation" ||
-    label === "Thread" ||
+    label === "Thread ID" ||
+    label === "Workspace ID" ||
     label === "Turn" ||
     label === "Item"
   );
@@ -94,12 +97,14 @@ export function ChatViewDetails({
   selectedTimelineItem,
   selectedTimelineItemDetail,
   isOpeningSelectedThread,
-  connectionState,
   composerGuidance,
   threadActivitySummary,
   threadFeedback,
+  threadCount,
   timelineGroups,
   isRespondingToRequest,
+  refreshHref,
+  streamStateLabel,
   formatTimestamp,
   formatMachineLabel,
   requestBadgeClass,
@@ -150,8 +155,8 @@ export function ChatViewDetails({
                     (workspaceId ? "New workspace input" : "No workspace selected")}
                 </dd>
               </div>
-              <div className={detailFieldClass("Thread")}>
-                <dt>Thread</dt>
+              <div className={detailFieldClass("Thread ID")}>
+                <dt>Thread ID</dt>
                 <dd>
                   {selectedThreadView?.thread.thread_id ? (
                     <code className="artifact-inline">{selectedThreadView.thread.thread_id}</code>
@@ -164,11 +169,32 @@ export function ChatViewDetails({
                 <dt>Workspace</dt>
                 <dd>{selectedWorkspaceName ?? workspaceId ?? "Not selected"}</dd>
               </div>
+              <div className={detailFieldClass("Workspace ID")}>
+                <dt>Workspace ID</dt>
+                <dd>
+                  {workspaceId ? (
+                    <code className="artifact-inline">{workspaceId}</code>
+                  ) : (
+                    "Not selected"
+                  )}
+                </dd>
+              </div>
               <div>
                 <dt>Updated</dt>
                 <dd>{formatTimestamp(selectedThreadView?.thread.updated_at ?? null)}</dd>
               </div>
+              <div>
+                <dt>Threads</dt>
+                <dd>{threadCount}</dd>
+              </div>
             </dl>
+            {refreshHref ? (
+              <div className="workspace-actions thread-feedback-actions">
+                <a className="secondary-link action-button compact-button" href={refreshHref}>
+                  Refresh thread
+                </a>
+              </div>
+            ) : null}
           </section>
 
           <section className="thread-detail-section detail-text-section">
@@ -195,7 +221,7 @@ export function ChatViewDetails({
               </div>
               <div>
                 <dt>Stream</dt>
-                <dd>{connectionState}</dd>
+                <dd>{streamStateLabel}</dd>
               </div>
               <div>
                 <dt>Composer</dt>

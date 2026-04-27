@@ -1,0 +1,12 @@
+{
+  "generated_at": "2026-04-27T11:42:17.841Z",
+  "app_url": "http://127.0.0.1:3003",
+  "route": "/chat?workspaceId=ws_alpha&threadId=thread_001",
+  "mocks": "Playwright route mock with matching request_id, turn_id, and item_id on approval.requested/resolved timeline rows.",
+  "files": [
+    "desktop-chromium-contextual-pending-request.png",
+    "desktop-chromium-contextual-resolved-request.png",
+    "mobile-chromium-contextual-pending-request.png",
+    "mobile-chromium-contextual-resolved-request.png"
+  ]
+}

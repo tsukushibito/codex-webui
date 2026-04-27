@@ -1,0 +1,21 @@
+{
+  "baseUrl": "http://127.0.0.1:3002",
+  "captures": [
+    {
+      "file": "artifacts/visual-inspection/issue-284-timeline-chrome/desktop-chromium-workspace01-latest-thread-wait10s.png",
+      "fullPage": true,
+      "profile": "desktop-chromium",
+      "route": "/chat?workspaceId=ws_17daf81ea5774a298734540e1df3f7b2&threadId=019dcd16-18ae-78f3-b33d-c4ccb69886c9",
+      "url": "http://127.0.0.1:3002/chat?workspaceId=ws_17daf81ea5774a298734540e1df3f7b2&threadId=019dcd16-18ae-78f3-b33d-c4ccb69886c9"
+    },
+    {
+      "file": "artifacts/visual-inspection/issue-284-timeline-chrome/mobile-chromium-workspace01-latest-thread-wait10s.png",
+      "fullPage": true,
+      "profile": "mobile-chromium",
+      "route": "/chat?workspaceId=ws_17daf81ea5774a298734540e1df3f7b2&threadId=019dcd16-18ae-78f3-b33d-c4ccb69886c9",
+      "url": "http://127.0.0.1:3002/chat?workspaceId=ws_17daf81ea5774a298734540e1df3f7b2&threadId=019dcd16-18ae-78f3-b33d-c4ccb69886c9"
+    }
+  ],
+  "createdAt": "2026-04-27T11:18:50.884Z",
+  "waitMs": 10000
+}
