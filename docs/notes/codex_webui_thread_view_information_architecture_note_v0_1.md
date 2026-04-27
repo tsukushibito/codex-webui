@@ -72,10 +72,8 @@ Recommended direction:
 
 - make Timeline begin higher in the initial desktop viewport
 - keep event rows dense enough for scanning without collapsing meaningful content by default
-- keep normal user and assistant message text expanded by default so the conversation can be read without extra clicks
-- fold long command output, logs, and other low-signal verbose payloads behind local expand controls; collapsed rows must keep a meaningful summary visible
+- fold long command output, logs, and verbose assistant text behind local expand controls
 - keep approval/request events inline where they occurred, with action controls only while action is pending
-- anchor approval/request events to the originating turn or message context instead of hoisting them to the top of Timeline
 - preserve latest-event visibility while streaming, but avoid aggressive auto-scroll once the user scrolls away
 - provide an obvious return-to-latest affordance when new activity arrives off-screen
 - keep timestamps and status annotations compact; use tooltips or Details for full metadata
@@ -370,8 +368,6 @@ Recommended improvements:
 - hide zero-count filter badges, or make inactive filters visually lighter
 - treat `Recent` as redundant when the thread list is already ordered by recency unless it will become an explicit filter mode
 - make request event rows use meaningful labels, operation summaries, and risk cues instead of generic `request pending` / `request resolved` content
-- keep approval/request rows visually attached to the prompt, assistant action, or tool operation that caused them so users can understand why the approval appeared
-- avoid default-collapsing normal conversation messages; use collapse controls primarily for long logs, command output, raw JSON, and other secondary payloads
 - render code fences and command output with proper monospace blocks instead of plain text that shows literal backticks in the folded preview
 - preserve scroll position when Details or overflow menus open and close
 - keep keyboard paths for focus composer, send, open overflow, open details, close popover, and jump to latest
@@ -401,9 +397,6 @@ Use these criteria when splitting this note into implementation Issues:
 - Desktop idle Thread View does not place `Waiting for your input` as the topmost main-column object; the state is available in a compact lower status area or Details.
 - Desktop initial viewport gives visibly more space to Timeline than the inspected capture.
 - Timeline begins higher in the main pane after redundant labels, status cards, and large header scaffolding are removed.
-- Approval/request Timeline rows remain in chronological context near the originating message, turn, or operation rather than being hoisted above unrelated earlier Timeline content.
-- Normal user and assistant messages are readable by default; collapse affordances do not hide ordinary conversation content before the user has a chance to inspect it.
-- Long command output, logs, raw JSON, and other secondary verbose payloads may collapse by default only when their collapsed state preserves an actionable summary and an obvious expand control.
 - Composer appears as one compact integrated input frame rather than a large form card with redundant caption and full-width text submit button.
 - Composer primary send control is icon-first with tooltip and accessible label.
 - Header metadata and low-frequency utilities are available through Details or a top-right overflow menu without blocking normal Timeline reading.
@@ -426,7 +419,5 @@ Use these criteria when splitting this note into implementation Issues:
 - Which states deserve an inline alert above Timeline rather than only a status icon plus Details entry?
 - Should Navigation filters remain text labels, move to icons, or become a menu when the thread count is small?
 - Which Timeline row types should support local expansion in the first implementation slice?
-- What length or row-type threshold should trigger default collapse for secondary payloads while keeping ordinary conversation expanded?
-- How should approval/request rows visually indicate the originating message, turn, or operation without adding heavy connector UI?
 - Should the lower status-bar be visually attached to the composer frame, or sit as a separate compact footer line?
 - Which header actions deserve direct icon buttons versus placement in the overflow menu?
