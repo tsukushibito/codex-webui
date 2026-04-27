@@ -247,7 +247,7 @@ describe("ChatView", () => {
     expect(markup).not.toContain("thread-feedback-card-inline");
     expect(markup).toContain("Please explain the diff.");
     expect(markup).toContain("Updated apps/frontend-bff/src/chat-view.tsx");
-    expect(markup).not.toContain("Streaming update");
+    expect(markup).toContain("Streaming update");
     expect(markup).toContain("Request needs attention");
     expect(markup).toContain("timeline-row-prominent");
     expect(markup).not.toContain("pending-request-card-fallback");
@@ -385,7 +385,7 @@ describe("ChatView", () => {
     expect(inlineFeedbackBadge?.className).not.toContain("success");
   });
 
-  it("keeps normal running progress out of the timeline while assistant content is streaming", async () => {
+  it("keeps normal running progress inside the live assistant row instead of the thread feedback card", async () => {
     await act(async () => {
       root.render(
         <ChatView
@@ -497,14 +497,13 @@ describe("ChatView", () => {
       );
     });
 
-    expect(container.querySelector(".thread-feedback-card-inline")).not.toBeNull();
-    expect(container.textContent).toContain("Codex is running");
-    expect(container.textContent).not.toContain("Streaming answer");
-    expect(container.textContent).not.toContain("Streaming");
-    expect(container.querySelector(".timeline-row-live-status")).toBeNull();
+    expect(container.querySelector(".thread-feedback-card-inline")).toBeNull();
+    expect(container.textContent).toContain("Streaming");
+    expect(container.textContent).not.toContain("Codex is running");
+    expect(container.querySelector(".timeline-row-live-status")).not.toBeNull();
   });
 
-  it("keeps reconnecting feedback visible without rendering live assistant deltas", async () => {
+  it("keeps reconnecting feedback visible when a live assistant row is present", async () => {
     await act(async () => {
       root.render(
         <ChatView
@@ -618,11 +617,11 @@ describe("ChatView", () => {
 
     expect(container.querySelector(".thread-feedback-card-inline")).not.toBeNull();
     expect(container.textContent).toContain("Reconnecting live updates");
-    expect(container.querySelector(".timeline-row-live-status")).toBeNull();
-    expect(container.textContent).not.toContain("Streaming answer");
+    expect(container.querySelector(".timeline-row-live-status")).not.toBeNull();
+    expect(container.textContent).toContain("Streaming");
   });
 
-  it("does not add a timeline placeholder before assistant content arrives", async () => {
+  it("shows the first running progress in the timeline before assistant content arrives", async () => {
     await act(async () => {
       root.render(
         <ChatView
@@ -720,11 +719,11 @@ describe("ChatView", () => {
       );
     });
 
-    expect(container.querySelector(".thread-feedback-card-inline")).not.toBeNull();
-    expect(container.querySelector(".timeline-row-live-placeholder")).toBeNull();
-    expect(container.querySelector(".timeline-row-live-status")).toBeNull();
-    expect(container.textContent).toContain("Codex is running");
-    expect(container.textContent).not.toContain("Streaming");
+    expect(container.querySelector(".thread-feedback-card-inline")).toBeNull();
+    expect(container.querySelector(".timeline-row-live-placeholder")).not.toBeNull();
+    expect(container.querySelector(".timeline-row-live-status")).not.toBeNull();
+    expect(container.querySelector(".timeline-row-content")?.textContent ?? "").toBe("");
+    expect(container.textContent).toContain("Streaming");
   });
 
   it("renders transient feedback above the chat panels", () => {
@@ -1853,7 +1852,7 @@ describe("ChatView", () => {
     expect(container.textContent).not.toContain("New activity is available below.");
   });
 
-  it("does not scroll the timeline for hidden draft assistant content growth", async () => {
+  it("keeps following latest activity when live assistant content grows on the same row", async () => {
     const baseProps = {
       backgroundPriorityNotice: null,
       connectionState: "live" as const,
@@ -1960,7 +1959,7 @@ describe("ChatView", () => {
       );
     });
 
-    expect(scrollRegion.scrollTop).toBe(1000);
+    expect(scrollRegion.scrollTop).toBe(1400);
     expect(container.textContent).not.toContain("New activity is available below.");
   });
 });

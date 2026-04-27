@@ -466,6 +466,82 @@ function findMatchingRequestRow(
   return bestMatch?.row ?? null;
 }
 
+function hasLiveAssistantTimelineRow(groups: TimelineDisplayGroup[]) {
+  return groups.some((group) => group.rows.some((row) => row.role === "assistant" && row.isLive));
+}
+
+function latestTurnIdFromThreadView(threadView: PublicThreadView | null) {
+  if (!threadView) {
+    return null;
+  }
+
+  for (let index = threadView.timeline.items.length - 1; index >= 0; index -= 1) {
+    const turnId = threadView.timeline.items[index]?.turn_id;
+    if (turnId) {
+      return turnId;
+    }
+  }
+
+  return null;
+}
+
+function buildRunningAssistantPlaceholderRow({
+  latestSequence,
+  selectedThreadView,
+}: {
+  latestSequence: number;
+  selectedThreadView: PublicThreadView;
+}): TimelineDisplayRow | null {
+  if (selectedThreadView.current_activity.kind !== "running") {
+    return null;
+  }
+
+  return {
+    id: `timeline:running-placeholder:${selectedThreadView.thread.thread_id}`,
+    turnId: latestTurnIdFromThreadView(selectedThreadView),
+    itemId: null,
+    requestId: null,
+    requestState: null,
+    sequence: latestSequence + 1,
+    occurredAt: null,
+    label: "Codex is responding",
+    content: "",
+    density: "primary",
+    role: "assistant",
+    tone: "codex",
+    timelineItemId: null,
+    isLive: true,
+    defaultFoldEligible: false,
+    showDetailButton: false,
+    detailActionLabel: null,
+  };
+}
+
+function appendTimelineRowToGroups(groups: TimelineDisplayGroup[], row: TimelineDisplayRow | null) {
+  if (!row) {
+    return groups;
+  }
+
+  const nextGroups = groups.map((group) => ({
+    ...group,
+    rows: [...group.rows],
+  }));
+
+  const lastGroup = nextGroups.at(-1) ?? null;
+  if (lastGroup && lastGroup.turnId === row.turnId) {
+    lastGroup.rows.push(row);
+    return nextGroups;
+  }
+
+  nextGroups.push({
+    id: row.turnId ? `turn:${row.turnId}:${row.id}` : `item:${row.id}`,
+    turnId: lastGroup?.turnId === row.turnId ? row.turnId : null,
+    rows: [row],
+  });
+
+  return nextGroups;
+}
+
 export function ChatView({
   workspaceId,
   workspaces,
@@ -552,7 +628,15 @@ export function ChatView({
     streamEvents,
     draftAssistantMessages,
   });
-  const timelineGroups = timelineModel.groups;
+  const placeholderRunningRow =
+    selectedThreadView && !hasLiveAssistantTimelineRow(timelineModel.groups)
+      ? buildRunningAssistantPlaceholderRow({
+          latestSequence: timelineModel.groups.at(-1)?.rows.at(-1)?.sequence ?? 0,
+          selectedThreadView,
+        })
+      : null;
+  const timelineGroups = appendTimelineRowToGroups(timelineModel.groups, placeholderRunningRow);
+  const hasLiveAssistantRow = hasLiveAssistantTimelineRow(timelineGroups);
   const hasRequestDetailAffordance = selectedRequestDetail !== null;
   const latestTimelineGroup = timelineGroups[timelineGroups.length - 1] ?? null;
   const latestTimelineRow = latestTimelineGroup?.rows[latestTimelineGroup.rows.length - 1] ?? null;
@@ -613,7 +697,12 @@ export function ChatView({
   const showInlineThreadFeedback =
     threadFeedback.isVisible &&
     !selectedThreadView?.pending_request &&
-    !selectedThreadView?.latest_resolved_request;
+    !selectedThreadView?.latest_resolved_request &&
+    !(
+      selectedThreadView?.current_activity.kind === "running" &&
+      connectionState === "live" &&
+      hasLiveAssistantRow
+    );
   const showThreadContextLabel = !selectedThreadView || isOpeningSelectedThread;
   const threadHeading = selectedThreadView?.thread.title
     ? selectedThreadView.thread.title

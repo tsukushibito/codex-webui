@@ -43,7 +43,7 @@ function rows(model: ReturnType<typeof buildTimelineDisplayModel>) {
 }
 
 describe("timeline display model", () => {
-  it("suppresses assistant deltas until completion", () => {
+  it("merges assistant deltas for the same assistant key into one live item in sequence order", () => {
     const model = buildTimelineDisplayModel({
       timelineItems: [],
       streamEvents: [
@@ -67,7 +67,15 @@ describe("timeline display model", () => {
       draftAssistantMessages: {},
     });
 
-    expect(rows(model)).toEqual([]);
+    const modelRows = rows(model);
+    expect(modelRows).toHaveLength(1);
+    expect(modelRows[0]).toMatchObject({
+      label: "Codex is responding",
+      content: "Hi there...",
+      density: "primary",
+      role: "assistant",
+      isLive: true,
+    });
   });
 
   it("replaces a live assistant draft on completion and dedupes after REST convergence", () => {
@@ -170,7 +178,7 @@ describe("timeline display model", () => {
     ]);
   });
 
-  it("suppresses stored and streamed assistant deltas until completion", () => {
+  it("suppresses matching live stream deltas when REST assistant deltas already exist", () => {
     const model = buildTimelineDisplayModel({
       timelineItems: [
         timelineItem({
@@ -199,7 +207,14 @@ describe("timeline display model", () => {
       draftAssistantMessages: {},
     });
 
-    expect(rows(model)).toEqual([]);
+    expect(rows(model)).toEqual([
+      expect.objectContaining({
+        id: "timeline-assistant:message_001",
+        content: "Partial...",
+        isLive: true,
+        showDetailButton: false,
+      }),
+    ]);
   });
 
   it("collapses stored assistant deltas and completion into one logical assistant row", () => {
