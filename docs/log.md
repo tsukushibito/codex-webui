@@ -694,3 +694,43 @@ Notes:
 - added Timeline-specific design requirements so reclaimed viewport space becomes a stronger primary work surface
 - clarified thread title behavior across normal sidebar, minibar, mobile, and direct URL entry contexts
 - expanded Thread Details behavior, Navigation minibar expectations, implementation order, and follow-up acceptance criteria
+
+## [2026-04-27] query | Timeline contextual request and compact composer chrome note
+
+Source:
+
+- user review of `artifacts/visual-inspection/workspace01-latest-thread-2026-04-27`
+- `artifacts/visual-inspection/workspace01-latest-thread-2026-04-27/desktop-chromium-workspace01-latest-thread.png`
+- `artifacts/visual-inspection/workspace01-latest-thread-2026-04-27/desktop-chromium-workspace01-latest-thread-timeline-top.png`
+- `artifacts/visual-inspection/workspace01-latest-thread-2026-04-27/mobile-chromium-workspace01-latest-thread.png`
+
+Updated:
+
+- `docs/notes/codex_webui_timeline_contextual_request_and_expansion_note_v0_1.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- captured that routine top-of-main-column status is too prominent and should move to a compact composer-adjacent status line
+- captured that workspace, stream, thread-count, updated-time, refresh, and details chrome should move behind a compact overflow or details affordance
+- captured that the composer should combine message input and icon-first send action in one shared input frame
+- added acceptance criteria for compact status placement, reduced thread chrome, tooltip-backed icon controls, and accessible operation
+
+## [2026-04-27] query | desktop full-viewport shell placement
+
+Source:
+
+- user follow-up requesting desktop UI use the full screen with Navigation and collapsed minibar anchored to the left viewport edge
+- `docs/notes/codex_webui_timeline_contextual_request_and_expansion_note_v0_1.md`
+
+Updated:
+
+- `docs/notes/codex_webui_timeline_contextual_request_and_expansion_note_v0_1.md`
+- `docs/log.md`
+
+Notes:
+
+- added desktop viewport-use guidance so the shell does not appear as a centered card-like panel
+- specified that both normal Navigation and collapsed minibar stay flush to the physical left edge
+- clarified that readable content constraints should apply inside Timeline regions rather than as large outer margins around the whole desktop app
