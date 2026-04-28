@@ -931,123 +931,125 @@ export function ChatView({
 
           <div className="thread-view-body">
             <div className="thread-view-scroll-region">
-              {fallbackPendingRequestSummary ? (
-                <div className="request-detail-card pending-request-card pending-request-card-fallback">
-                  <div className="workspace-meta-row">
-                    <strong>Request summary</strong>
-                    <span
-                      className={requestSummaryBadgeClass(
-                        "pending",
-                        selectedRequestDetail?.decision ?? null,
-                      )}
-                    >
-                      Pending request
-                    </span>
-                  </div>
-                  <p>{fallbackPendingRequestSummary.summary}</p>
-                  {selectedRequestDetail ? (
-                    <p className="workspace-meta">{selectedRequestDetail.reason}</p>
-                  ) : null}
-                  {selectedRequestDetail?.operation_summary ? (
-                    <p className="workspace-meta">
-                      Operation:{" "}
-                      <code className="artifact-inline">
-                        {selectedRequestDetail.operation_summary}
-                      </code>
-                    </p>
-                  ) : null}
-                  <p className="workspace-meta">
-                    Requested {formatTimestamp(fallbackPendingRequestSummary.requested_at)}
-                  </p>
-                  <div className="workspace-actions">
-                    <button
-                      className="approve-button action-button compact-button"
-                      disabled={
-                        isRespondingToRequest || selectedRequestDetail?.status !== "pending"
-                      }
-                      onClick={onApproveRequest}
-                      type="button"
-                    >
-                      {isRespondingToRequest ? "Submitting..." : "Approve request"}
-                    </button>
-                    <button
-                      className="danger-button action-button compact-button"
-                      disabled={
-                        isRespondingToRequest || selectedRequestDetail?.status !== "pending"
-                      }
-                      onClick={onDenyRequest}
-                      type="button"
-                    >
-                      Deny request
-                    </button>
-                    {selectedRequestDetail ? (
-                      <button
-                        className="secondary-link action-button compact-button"
-                        onClick={() => setDetailSelection({ kind: "request_detail" })}
-                        type="button"
+              <div className="thread-view-readable-column">
+                {fallbackPendingRequestSummary ? (
+                  <div className="request-detail-card pending-request-card pending-request-card-fallback">
+                    <div className="workspace-meta-row">
+                      <strong>Request summary</strong>
+                      <span
+                        className={requestSummaryBadgeClass(
+                          "pending",
+                          selectedRequestDetail?.decision ?? null,
+                        )}
                       >
-                        Request detail
-                      </button>
+                        Pending request
+                      </span>
+                    </div>
+                    <p>{fallbackPendingRequestSummary.summary}</p>
+                    {selectedRequestDetail ? (
+                      <p className="workspace-meta">{selectedRequestDetail.reason}</p>
                     ) : null}
-                  </div>
-                </div>
-              ) : fallbackResolvedRequestSummary ? (
-                <div className="request-detail-card pending-request-card pending-request-card-fallback">
-                  <div className="workspace-meta-row">
-                    <strong>Request summary</strong>
-                    <span
-                      className={requestSummaryBadgeClass(
-                        "resolved",
-                        fallbackResolvedRequestSummary.decision,
-                      )}
-                    >
-                      {`Resolved: ${formatMachineLabel(fallbackResolvedRequestSummary.decision)}`}
-                    </span>
-                  </div>
-                  <p>
-                    Latest resolved request in this thread was{" "}
-                    {formatMachineLabel(fallbackResolvedRequestSummary.decision)}.
-                  </p>
-                  <p className="workspace-meta">
-                    Responded {formatTimestamp(fallbackResolvedRequestSummary.responded_at)}
-                  </p>
-                  {selectedRequestDetail ? (
+                    {selectedRequestDetail?.operation_summary ? (
+                      <p className="workspace-meta">
+                        Operation:{" "}
+                        <code className="artifact-inline">
+                          {selectedRequestDetail.operation_summary}
+                        </code>
+                      </p>
+                    ) : null}
+                    <p className="workspace-meta">
+                      Requested {formatTimestamp(fallbackPendingRequestSummary.requested_at)}
+                    </p>
                     <div className="workspace-actions">
                       <button
-                        className="secondary-link action-button compact-button"
-                        onClick={() => setDetailSelection({ kind: "request_detail" })}
+                        className="approve-button action-button compact-button"
+                        disabled={
+                          isRespondingToRequest || selectedRequestDetail?.status !== "pending"
+                        }
+                        onClick={onApproveRequest}
                         type="button"
                       >
-                        Request detail
+                        {isRespondingToRequest ? "Submitting..." : "Approve request"}
                       </button>
+                      <button
+                        className="danger-button action-button compact-button"
+                        disabled={
+                          isRespondingToRequest || selectedRequestDetail?.status !== "pending"
+                        }
+                        onClick={onDenyRequest}
+                        type="button"
+                      >
+                        Deny request
+                      </button>
+                      {selectedRequestDetail ? (
+                        <button
+                          className="secondary-link action-button compact-button"
+                          onClick={() => setDetailSelection({ kind: "request_detail" })}
+                          type="button"
+                        >
+                          Request detail
+                        </button>
+                      ) : null}
                     </div>
-                  ) : null}
-                </div>
-              ) : null}
+                  </div>
+                ) : fallbackResolvedRequestSummary ? (
+                  <div className="request-detail-card pending-request-card pending-request-card-fallback">
+                    <div className="workspace-meta-row">
+                      <strong>Request summary</strong>
+                      <span
+                        className={requestSummaryBadgeClass(
+                          "resolved",
+                          fallbackResolvedRequestSummary.decision,
+                        )}
+                      >
+                        {`Resolved: ${formatMachineLabel(fallbackResolvedRequestSummary.decision)}`}
+                      </span>
+                    </div>
+                    <p>
+                      Latest resolved request in this thread was{" "}
+                      {formatMachineLabel(fallbackResolvedRequestSummary.decision)}.
+                    </p>
+                    <p className="workspace-meta">
+                      Responded {formatTimestamp(fallbackResolvedRequestSummary.responded_at)}
+                    </p>
+                    {selectedRequestDetail ? (
+                      <div className="workspace-actions">
+                        <button
+                          className="secondary-link action-button compact-button"
+                          onClick={() => setDetailSelection({ kind: "request_detail" })}
+                          type="button"
+                        >
+                          Request detail
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
 
-              <ChatViewTimeline
-                expandedRowIds={expandedTimelineRows}
-                formatTimestamp={formatTimestamp}
-                groups={timelineGroups}
-                hasLoadedThreadView={selectedThreadView !== null}
-                isRespondingToRequest={isRespondingToRequest}
-                isLoadingThread={isLoadingThread}
-                onApproveRequest={onApproveRequest}
-                onDenyRequest={onDenyRequest}
-                onOpenDetail={(timelineItemId) =>
-                  setDetailSelection({
-                    kind: "timeline_item_detail",
-                    timelineItemId,
-                  })
-                }
-                onOpenRequestDetail={() => setDetailSelection({ kind: "request_detail" })}
-                onToggleRowExpansion={toggleTimelineRowExpansion}
-                requestRowContexts={requestRowContexts}
-                selectedThreadId={selectedThreadId}
-              />
+                <ChatViewTimeline
+                  expandedRowIds={expandedTimelineRows}
+                  formatTimestamp={formatTimestamp}
+                  groups={timelineGroups}
+                  hasLoadedThreadView={selectedThreadView !== null}
+                  isRespondingToRequest={isRespondingToRequest}
+                  isLoadingThread={isLoadingThread}
+                  onApproveRequest={onApproveRequest}
+                  onDenyRequest={onDenyRequest}
+                  onOpenDetail={(timelineItemId) =>
+                    setDetailSelection({
+                      kind: "timeline_item_detail",
+                      timelineItemId,
+                    })
+                  }
+                  onOpenRequestDetail={() => setDetailSelection({ kind: "request_detail" })}
+                  onToggleRowExpansion={toggleTimelineRowExpansion}
+                  requestRowContexts={requestRowContexts}
+                  selectedThreadId={selectedThreadId}
+                />
+              </div>
             </div>
 
-            <div className="thread-mobile-footer-actions">
+            <div className="thread-mobile-footer-actions thread-view-readable-column">
               <button
                 className="secondary-link action-button compact-button"
                 onClick={() => setIsNavigationOpen(true)}
@@ -1071,21 +1073,23 @@ export function ChatView({
               </button>
             </div>
 
-            <ChatViewComposer
-              composerDraft={composerDraft}
-              composerInputLabel={composerInputLabel}
-              composerPlaceholder={composerPlaceholder}
-              composerStatusSegments={
-                selectedWorkspace?.workspace_name ? [selectedWorkspace.workspace_name] : []
-              }
-              composerSubmitLabel={composerSubmitLabel}
-              isComposerDisabled={isComposerDisabled}
-              isStartingThread={isStartingThread}
-              isTextareaDisabled={isComposerTextareaDisabled}
-              onComposerDraftChange={onComposerDraftChange}
-              onSubmitComposer={onSubmitComposer}
-              textareaRef={composerRef}
-            />
+            <div className="thread-view-readable-column">
+              <ChatViewComposer
+                composerDraft={composerDraft}
+                composerInputLabel={composerInputLabel}
+                composerPlaceholder={composerPlaceholder}
+                composerStatusSegments={
+                  selectedWorkspace?.workspace_name ? [selectedWorkspace.workspace_name] : []
+                }
+                composerSubmitLabel={composerSubmitLabel}
+                isComposerDisabled={isComposerDisabled}
+                isStartingThread={isStartingThread}
+                isTextareaDisabled={isComposerTextareaDisabled}
+                onComposerDraftChange={onComposerDraftChange}
+                onSubmitComposer={onSubmitComposer}
+                textareaRef={composerRef}
+              />
+            </div>
           </div>
         </section>
 
