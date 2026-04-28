@@ -134,6 +134,41 @@ describe("ChatView", () => {
     };
   }
 
+  function composerTextarea(container: HTMLDivElement) {
+    const textarea = container.querySelector<HTMLTextAreaElement>("#thread-composer-input");
+    expect(textarea).not.toBeNull();
+    return textarea!;
+  }
+
+  function dispatchComposerKeydown(
+    textarea: HTMLTextAreaElement,
+    init: KeyboardEventInit & { isComposing?: boolean; keyCode?: number } = {},
+  ) {
+    const event = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "Enter",
+      ...init,
+    });
+
+    if (typeof init.isComposing === "boolean") {
+      Object.defineProperty(event, "isComposing", {
+        configurable: true,
+        value: init.isComposing,
+      });
+    }
+
+    if (typeof init.keyCode === "number") {
+      Object.defineProperty(event, "keyCode", {
+        configurable: true,
+        value: init.keyCode,
+      });
+    }
+
+    textarea.dispatchEvent(event);
+    return event;
+  }
+
   function installScrollRegionMetrics(element: HTMLElement, options?: { clientHeight?: number }) {
     let clientHeight = options?.clientHeight ?? 240;
     let scrollHeight = 1600;
@@ -2159,5 +2194,204 @@ describe("ChatView", () => {
     expect(metrics.getScrollTop()).toBe(1520);
     expect(container.textContent).toContain("Please continue from here.");
     expect(container.textContent).not.toContain("Jump to latest activity");
+  });
+
+  it("uses chat mode shortcuts by default and persists editor mode after mount", async () => {
+    const storage = {
+      getItem: vi.fn((key: string) =>
+        key === "codex-webui.composer-keybinding-mode" ? "editor" : null,
+      ),
+      setItem: vi.fn(),
+    };
+    const onSubmitComposer = vi.fn();
+
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: storage,
+    });
+
+    await act(async () => {
+      root.render(
+        <ChatView
+          {...buildChatViewBaseProps({
+            composerDraft: "Run the next step",
+            onSubmitComposer,
+            selectedThreadView: {
+              ...buildChatViewBaseProps().selectedThreadView!,
+              current_activity: {
+                kind: "waiting_on_user_input",
+                label: "Waiting for your input",
+              },
+              composer: {
+                accepting_user_input: true,
+                interrupt_available: false,
+                blocked_by_request: false,
+                input_unavailable_reason: null,
+              },
+            },
+          })}
+        />,
+      );
+    });
+
+    const textarea = composerTextarea(container);
+    expect(container.textContent).toContain(
+      "Enter adds a new line. Ctrl+Enter or Meta+Enter sends.",
+    );
+    expect(storage.getItem).toHaveBeenCalledWith("codex-webui.composer-keybinding-mode");
+
+    await act(async () => {
+      dispatchComposerKeydown(textarea);
+      dispatchComposerKeydown(textarea, { ctrlKey: true });
+    });
+
+    expect(onSubmitComposer).toHaveBeenCalledTimes(1);
+
+    const chatModeButton = container.querySelector<HTMLInputElement>(
+      'input[name="composer-keybinding-mode"][value="chat"]',
+    );
+    expect(chatModeButton).not.toBeNull();
+
+    await act(async () => {
+      chatModeButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(storage.setItem).toHaveBeenCalledWith("codex-webui.composer-keybinding-mode", "chat");
+    expect(container.textContent).toContain("Enter sends. Shift+Enter adds a new line.");
+
+    await act(async () => {
+      dispatchComposerKeydown(textarea);
+      dispatchComposerKeydown(textarea, { shiftKey: true });
+    });
+
+    expect(onSubmitComposer).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not keyboard-submit while composing, disabled, unavailable, empty, or prevented", async () => {
+    const onSubmitComposer = vi.fn();
+    const storage = {
+      getItem: vi.fn(() => "chat"),
+      setItem: vi.fn(),
+    };
+
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: storage,
+    });
+
+    const baseThreadView = {
+      ...buildChatViewBaseProps().selectedThreadView!,
+      current_activity: {
+        kind: "waiting_on_user_input",
+        label: "Waiting for your input",
+      },
+      composer: {
+        accepting_user_input: true,
+        interrupt_available: false,
+        blocked_by_request: false,
+        input_unavailable_reason: null,
+      },
+    };
+
+    await act(async () => {
+      root.render(
+        <ChatView
+          {...buildChatViewBaseProps({
+            composerDraft: "Ready",
+            onSubmitComposer,
+            selectedThreadView: baseThreadView,
+          })}
+        />,
+      );
+    });
+
+    const textarea = composerTextarea(container);
+
+    await act(async () => {
+      dispatchComposerKeydown(textarea, { isComposing: true });
+      dispatchComposerKeydown(textarea, { keyCode: 229 });
+      const preventedEvent = new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        key: "Enter",
+      });
+      preventedEvent.preventDefault();
+      textarea.dispatchEvent(preventedEvent);
+    });
+
+    expect(onSubmitComposer).toHaveBeenCalledTimes(0);
+
+    await act(async () => {
+      root.render(
+        <ChatView
+          {...buildChatViewBaseProps({
+            composerDraft: "",
+            onSubmitComposer,
+            selectedThreadView: baseThreadView,
+          })}
+        />,
+      );
+    });
+
+    await act(async () => {
+      dispatchComposerKeydown(composerTextarea(container));
+    });
+
+    await act(async () => {
+      root.render(
+        <ChatView
+          {...buildChatViewBaseProps({
+            composerDraft: "Ready",
+            isSendingMessage: true,
+            onSubmitComposer,
+            selectedThreadView: baseThreadView,
+          })}
+        />,
+      );
+    });
+
+    await act(async () => {
+      dispatchComposerKeydown(composerTextarea(container));
+    });
+
+    await act(async () => {
+      root.render(
+        <ChatView
+          {...buildChatViewBaseProps({
+            composerDraft: "Ready",
+            onSubmitComposer,
+            selectedThreadView: {
+              ...baseThreadView,
+              composer: {
+                ...baseThreadView.composer,
+                accepting_user_input: false,
+                input_unavailable_reason: "session_locked",
+              },
+            },
+          })}
+        />,
+      );
+    });
+
+    await act(async () => {
+      dispatchComposerKeydown(composerTextarea(container));
+    });
+
+    expect(onSubmitComposer).toHaveBeenCalledTimes(0);
+  });
+
+  it("falls back to chat mode when localStorage is inaccessible", async () => {
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        throw new Error("storage unavailable");
+      },
+    });
+
+    await act(async () => {
+      root.render(<ChatView {...buildChatViewBaseProps()} />);
+    });
+
+    expect(container.textContent).toContain("Enter sends. Shift+Enter adds a new line.");
   });
 });

@@ -73,6 +73,7 @@ None.
 
 ## Archived Task Packages
 
+- [issue-305-composer-keybindings](./archive/issue-305-composer-keybindings/README.md)
 - [issue-303-auto-scroll](./archive/issue-303-auto-scroll/README.md)
 - [issue-302-scoped-feedback](./archive/issue-302-scoped-feedback/README.md)
 - [issue-304-readable-width](./archive/issue-304-readable-width/README.md)
