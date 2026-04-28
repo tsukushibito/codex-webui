@@ -38,7 +38,10 @@ function serializeErrorSignal(value: unknown) {
 }
 
 function indicatesMissingNativeThread(error: RuntimeError) {
-  if (error.code !== "app_server_request_failed" || error.details?.rpc_method !== "turn/start") {
+  if (
+    error.code !== "app_server_request_failed" ||
+    !["turn/start", "thread/resume"].includes(String(error.details?.rpc_method ?? ""))
+  ) {
     return false;
   }
 
@@ -172,7 +175,7 @@ export class ThreadInputOrchestrator {
           "thread requires recovery before accepting input",
           {
             thread_id: threadId,
-            rpc_method: "turn/start",
+            rpc_method: error.details?.rpc_method ?? "turn/start",
             rpc_error_code: error.details?.rpc_error_code ?? null,
             rpc_error_data: error.details?.rpc_error_data ?? null,
             native_error_message: error.message,

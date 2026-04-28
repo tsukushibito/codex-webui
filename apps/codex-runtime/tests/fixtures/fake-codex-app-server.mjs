@@ -6,6 +6,8 @@ let turnCounter = 1;
 let itemCounter = 1;
 const turnStartMode =
   process.argv.find((arg) => arg.startsWith("--turn-start-mode="))?.split("=")[1] ?? "normal";
+const requireResumeBeforeTurn = process.argv.includes("--require-resume-before-turn");
+const loadedThreadIds = new Set();
 
 function send(message) {
   process.stdout.write(`${JSON.stringify(message)}\n`);
@@ -50,6 +52,22 @@ lineReader.on("line", (line) => {
 
   if (method === "thread/start") {
     const threadId = nextId("thread_live", threadCounter++);
+    loadedThreadIds.add(threadId);
+    send({
+      jsonrpc: "2.0",
+      id: message.id,
+      result: {
+        thread: {
+          id: threadId,
+        },
+      },
+    });
+    return;
+  }
+
+  if (method === "thread/resume") {
+    const threadId = String(message.params?.threadId ?? "");
+    loadedThreadIds.add(threadId);
     send({
       jsonrpc: "2.0",
       id: message.id,
@@ -64,6 +82,18 @@ lineReader.on("line", (line) => {
 
   if (method === "turn/start") {
     const threadId = String(message.params?.threadId ?? "");
+    if (requireResumeBeforeTurn && !loadedThreadIds.has(threadId)) {
+      send({
+        jsonrpc: "2.0",
+        id: message.id,
+        error: {
+          code: "thread_not_found",
+          message: `thread ${threadId} is not loaded`,
+        },
+      });
+      return;
+    }
+
     const turnId = nextId("turn_live", turnCounter++);
     const itemId = nextId("item_live", itemCounter++);
     const prompt = String(message.params?.input?.[0]?.text ?? "");

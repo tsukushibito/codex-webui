@@ -395,6 +395,8 @@ export class ThreadService {
     threadId: string,
     input: { client_request_id: string; content: string },
   ): Promise<{ thread: ThreadSummary; accepted_input: MessageProjection }> {
+    await this.resumeThreadForInput(threadId, { recoverPending: false });
+
     let acceptedInput: MessageProjection;
     try {
       acceptedInput = await this.threadInputOrchestrator.acceptThreadMessage(threadId, {
@@ -412,6 +414,7 @@ export class ThreadService {
   }
 
   async openThread(threadId: string) {
+    await this.resumeThreadForInput(threadId, { recoverPending: true });
     const thread = await this.getThread(threadId);
     return {
       thread_id: thread.thread_id,
@@ -846,5 +849,62 @@ export class ThreadService {
     })();
 
     return this.getThread(threadId);
+  }
+
+  private async resumeThreadForInput(threadId: string, options: { recoverPending: boolean }) {
+    const thread = firstRow(
+      this.database.db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.sessionId, threadId))
+        .limit(1)
+        .all(),
+    );
+
+    if (!thread) {
+      throw new RuntimeError(404, "thread_not_found", "thread was not found", {
+        thread_id: threadId,
+      });
+    }
+
+    if (thread.appSessionOverlayState === "recovery_pending" && !options.recoverPending) {
+      return;
+    }
+
+    if (thread.status !== "waiting_input" && thread.appSessionOverlayState !== "recovery_pending") {
+      return;
+    }
+
+    try {
+      await this.nativeSessionGateway.resumeSession({
+        sessionId: threadId,
+      });
+    } catch (error) {
+      mapThreadInputError(error, threadId);
+    }
+
+    if (thread.appSessionOverlayState === "open") {
+      return;
+    }
+
+    const resumedAt = this.now().toISOString();
+    this.database.sqlite.transaction(() => {
+      this.database.db
+        .update(sessions)
+        .set({
+          updatedAt: resumedAt,
+          appSessionOverlayState: "open",
+        })
+        .where(eq(sessions.sessionId, threadId))
+        .run();
+
+      this.database.db
+        .update(workspaces)
+        .set({
+          updatedAt: resumedAt,
+        })
+        .where(eq(workspaces.workspaceId, thread.workspaceId))
+        .run();
+    })();
   }
 }

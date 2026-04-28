@@ -15,6 +15,7 @@ const cleanupPaths: string[] = [];
 
 class StubNativeSessionGateway implements NativeSessionGateway {
   readonly sendUserMessages: Array<{ sessionId: string; content: string }> = [];
+  readonly resumeSessions: Array<{ sessionId: string }> = [];
 
   constructor(
     private readonly sessionIds: string[] = [],
@@ -34,6 +35,11 @@ class StubNativeSessionGateway implements NativeSessionGateway {
     }
 
     return { sessionId };
+  }
+
+  async resumeSession(input: { sessionId: string }) {
+    this.resumeSessions.push(input);
+    return { sessionId: input.sessionId };
   }
 
   async sendUserMessage(_input: { sessionId: string; content: string }) {
@@ -2164,6 +2170,110 @@ describe("thread routes", () => {
         role: "user",
         content: "Continue the runtime cutover",
       },
+    });
+
+    await app.close();
+  });
+
+  it("resumes a persisted thread before accepting input after app-server restart", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("thread-routes-root");
+    const database = await createTempDatabase("thread-routes-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+    await fs.mkdir(path.join(workspaceRoot, "alpha"), { recursive: true });
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerBridgeEnabled: true,
+        appServerCommand: process.execPath,
+        appServerArgs: [
+          fileURLToPath(new URL("./fixtures/fake-codex-app-server.mjs", import.meta.url)),
+          "--require-resume-before-turn",
+        ],
+      },
+      database,
+    });
+
+    database.db
+      .insert(workspaces)
+      .values({
+        workspaceId: "ws_alpha",
+        workspaceName: "alpha",
+        directoryName: "alpha",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:00:00.000Z",
+      })
+      .run();
+
+    database.db
+      .insert(sessions)
+      .values({
+        sessionId: "thread_persisted_001",
+        workspaceId: "ws_alpha",
+        title: "Persisted thread",
+        status: "waiting_input",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:01:00.000Z",
+        startedAt: "2026-04-09T00:00:00.000Z",
+        lastMessageAt: "2026-04-09T00:00:30.000Z",
+        activeApprovalId: null,
+        currentTurnId: null,
+        pendingAssistantMessageId: null,
+        appSessionOverlayState: "open",
+      })
+      .run();
+
+    const inputResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/threads/thread_persisted_001/inputs",
+      payload: {
+        client_request_id: "req_after_restart_001",
+        content: "Continue after restart",
+      },
+    });
+
+    expect(inputResponse.statusCode).toBe(202);
+    expect(inputResponse.json()).toMatchObject({
+      accepted_input: {
+        session_id: "thread_persisted_001",
+        role: "user",
+        content: "Continue after restart",
+      },
+    });
+
+    await waitForAssertion(async () => {
+      const persistedSession = database.db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.sessionId, "thread_persisted_001"))
+        .limit(1)
+        .all()[0];
+
+      expect(persistedSession).toMatchObject({
+        status: "waiting_input",
+        currentTurnId: null,
+        pendingAssistantMessageId: null,
+        appSessionOverlayState: "open",
+      });
+
+      const storedMessages = database.db
+        .select()
+        .from(messages)
+        .where(eq(messages.sessionId, "thread_persisted_001"))
+        .all();
+      expect(storedMessages).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: "user",
+            content: "Continue after restart",
+          }),
+          expect.objectContaining({
+            role: "assistant",
+            content: "Synthetic assistant response for: Continue after restart",
+          }),
+        ]),
+      );
     });
 
     await app.close();

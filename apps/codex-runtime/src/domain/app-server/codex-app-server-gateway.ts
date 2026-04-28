@@ -114,6 +114,7 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
   private itemPhases = new Map<string, string>();
   private turnStates = new Map<string, TurnState>();
   private pendingTurnStartConvergence = new Map<string, PendingTurnStartConvergence>();
+  private loadedSessionIds = new Set<string>();
   private eventSink: NativeSessionEventSink | null = null;
   private startPromise: Promise<AppServerSnapshot> | null = null;
   private eventChain = Promise.resolve();
@@ -186,26 +187,56 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
       personality: this.config.personality,
     });
 
+    this.loadedSessionIds.add(String(result.thread.id));
+
     return {
       sessionId: String(result.thread.id),
     };
   }
 
+  async resumeSession(input: { sessionId: string }) {
+    if (this.loadedSessionIds.has(input.sessionId)) {
+      return {
+        sessionId: input.sessionId,
+      };
+    }
+
+    const result = await this.sendRequest("thread/resume", {
+      threadId: input.sessionId,
+      personality: this.config.personality,
+    });
+
+    const sessionId = String(result.thread?.id ?? input.sessionId);
+    this.loadedSessionIds.add(sessionId);
+
+    return {
+      sessionId,
+    };
+  }
+
   async sendUserMessage(input: SendNativeSessionMessageInput) {
+    await this.resumeSession({ sessionId: input.sessionId });
+
     this.pendingTurnStartConvergence.set(input.sessionId, {
       turnId: null,
       queuedEvents: [],
     });
 
-    const result = await this.sendRequest("turn/start", {
-      threadId: input.sessionId,
-      input: [
-        {
-          type: "text",
-          text: input.content,
-        },
-      ],
-    });
+    let result: any;
+    try {
+      result = await this.sendRequest("turn/start", {
+        threadId: input.sessionId,
+        input: [
+          {
+            type: "text",
+            text: input.content,
+          },
+        ],
+      });
+    } catch (error) {
+      this.pendingTurnStartConvergence.delete(input.sessionId);
+      throw error;
+    }
 
     const turnId = String(result.turn.id);
     const pending = this.pendingTurnStartConvergence.get(input.sessionId);
@@ -308,6 +339,7 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
         pending.reject(new Error("codex app-server exited before the request completed"));
       }
       this.pendingRequests.clear();
+      this.loadedSessionIds.clear();
     });
 
     try {
@@ -434,6 +466,7 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
 
     if (method === "turn/started") {
       if (sessionId && turnId) {
+        this.loadedSessionIds.add(sessionId);
         this.turnStates.set(turnStateKey(sessionId, turnId), {
           hasFinalAssistantMessage: false,
           waitingForApproval: false,
@@ -448,6 +481,22 @@ export class CodexAppServerGateway implements NativeSessionGateway, AppServerCon
         await this.eventSink.convergeSessionWaitingForInput(sessionId, {
           native_event_name: "thread/status/changed",
         });
+      }
+      return;
+    }
+
+    if (method === "thread/started") {
+      const startedSessionId = String(params.thread?.id ?? params.threadId ?? "");
+      if (startedSessionId) {
+        this.loadedSessionIds.add(startedSessionId);
+      }
+      return;
+    }
+
+    if (method === "thread/closed") {
+      const closedSessionId = String(params.thread?.id ?? params.threadId ?? "");
+      if (closedSessionId) {
+        this.loadedSessionIds.delete(closedSessionId);
       }
       return;
     }

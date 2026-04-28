@@ -37,6 +37,7 @@ The matrix below is based primarily on:
 - `artifacts/app_server_observability/observations/p2-*`
 - `artifacts/app_server_observability/observations/p3-*`
 - `artifacts/app_server_observability/observations/p4-*`
+- OpenAI Codex App Server documentation for `thread/resume` and `thread/read`
 
 Where evidence is incomplete, this document marks the dependency as:
 
@@ -72,6 +73,7 @@ Where evidence is incomplete, this document marks the dependency as:
 | Event identity | stable native event ID | `reserved_do_not_depend` | No reliable cross-stream/history native event identity was observed. Use app-owned event IDs when needed. |
 | Thread ordering | native strict thread ordering key | `reserved_do_not_depend` | Native data did not expose a stable replay-safe ordering key. Runtime must assign thread-scoped `sequence`. |
 | Thread preview recency | native `preview` as latest-turn summary | `reserved_do_not_depend` | Observed to retain stale prompt text in some reload cases. |
+| Thread resume | `thread/resume` by recorded `thread.id` before later `turn/start` | `allowed` | Official App Server documentation defines `thread/resume` as reopening an existing thread so subsequent `turn/start` calls append to it. WebUI may use it to load a persisted thread after runtime or app-server restart. |
 
 ---
 
@@ -80,6 +82,7 @@ Where evidence is incomplete, this document marks the dependency as:
 ### 5.1 Current target rule
 
 The current evidence set does not establish a native history status that can be depended on as a directly observed `notLoaded` thread status in the same way as `idle` or `active`.
+However, the official App Server contract does establish explicit load behavior through `thread/resume`: clients may call it with a previously recorded `thread.id` to reopen a stored thread before starting the next turn.
 
 ### 5.2 Allowed v0.9 dependency
 
@@ -87,6 +90,7 @@ WebUI may still use the `notLoaded` concept in v0.9 only as:
 
 - a runtime-facing dependency slot tied to explicit open/load behavior
 - a facade/runtime operational state derived from persisted thread reachability and loadability
+- an implementation trigger to call `thread/resume` before sending new input to a persisted thread
 
 Public and internal APIs must not pretend that full thread history or request objects remain available merely because a thread can be reopened.
 
