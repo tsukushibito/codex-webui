@@ -29,10 +29,21 @@ import {
 } from "./timeline-display-model";
 import { getTimelineItemDetail } from "./timeline-item-detail";
 
+type ScopedFeedback = {
+  message: string;
+  tone: "info" | "success" | "warning" | "error";
+};
+
 export interface ChatViewProps {
   workspaceId: string | null;
   workspaces: PublicWorkspaceSummary[];
   threads: PublicThreadListItem[];
+  workspaceFeedback?: ScopedFeedback | null;
+  threadListFeedback?: ScopedFeedback | null;
+  notificationFeedback?: ScopedFeedback | null;
+  composerFeedback?: ScopedFeedback | null;
+  threadViewFeedback?: ScopedFeedback | null;
+  requestFeedback?: ScopedFeedback | null;
   backgroundPriorityNotice: {
     threadId: string;
     reason: string;
@@ -51,8 +62,8 @@ export interface ChatViewProps {
   isInterruptingThread: boolean;
   isRespondingToRequest: boolean;
   connectionState: "idle" | "live" | "reconnecting";
-  errorMessage: string | null;
-  statusMessage: string | null;
+  errorMessage?: string | null;
+  statusMessage?: string | null;
   workspaceName: string;
   composerDraft: string;
   onWorkspaceNameChange: (value: string) => void;
@@ -526,6 +537,12 @@ export function ChatView({
   workspaceId,
   workspaces,
   threads,
+  workspaceFeedback = null,
+  threadListFeedback = null,
+  notificationFeedback = null,
+  composerFeedback = null,
+  threadViewFeedback = null,
+  requestFeedback = null,
   backgroundPriorityNotice,
   selectedThreadId,
   selectedThreadView,
@@ -541,7 +558,8 @@ export function ChatView({
   isInterruptingThread,
   isRespondingToRequest,
   connectionState,
-  errorMessage,
+  errorMessage = null,
+  statusMessage = null,
   workspaceName,
   composerDraft,
   onWorkspaceNameChange,
@@ -643,6 +661,37 @@ export function ChatView({
     selectedThreadView,
     workspaceId,
   });
+  const legacyStatusFeedback =
+    statusMessage === null
+      ? null
+      : statusMessage.includes("background thread")
+        ? ({ message: statusMessage, tone: "warning" } satisfies ScopedFeedback)
+        : statusMessage.includes("Request")
+          ? ({
+              message: statusMessage,
+              tone: statusMessage.includes("resolved") ? "success" : "warning",
+            } satisfies ScopedFeedback)
+          : ({ message: statusMessage, tone: "success" } satisfies ScopedFeedback);
+  const effectiveNotificationFeedback =
+    notificationFeedback ??
+    (statusMessage?.includes("background thread") ||
+    statusMessage?.includes("Thread notification received")
+      ? legacyStatusFeedback
+      : null);
+  const effectiveRequestFeedback =
+    requestFeedback ?? (statusMessage?.includes("Request") ? legacyStatusFeedback : null);
+  const effectiveComposerFeedback =
+    composerFeedback ??
+    (statusMessage !== null &&
+    !statusMessage.includes("Request") &&
+    !statusMessage.includes("background thread")
+      ? legacyStatusFeedback
+      : null);
+  const effectiveThreadViewFeedback =
+    threadViewFeedback ??
+    (errorMessage !== null
+      ? ({ message: errorMessage, tone: "error" } satisfies ScopedFeedback)
+      : null);
   const threadActivitySummary = workspaceId
     ? currentActivitySummary(selectedThreadView, isOpeningSelectedThread)
     : "Choose a workspace to enable the composer.";
@@ -756,6 +805,19 @@ export function ChatView({
     composerRef.current?.focus();
   }
 
+  function feedbackToneClass(tone: ScopedFeedback["tone"] | ThreadFeedbackDescriptor["badgeTone"]) {
+    switch (tone) {
+      case "success":
+        return "success";
+      case "warning":
+        return "warning";
+      case "error":
+        return "error";
+      default:
+        return "info";
+    }
+  }
+
   function toggleTimelineRowExpansion(rowId: string) {
     setExpandedTimelineRows((current) => {
       const next = new Set(current);
@@ -846,13 +908,6 @@ export function ChatView({
   return (
     <main className="chat-shell">
       <div className={isSidebarMinibar ? "chat-layout sidebar-minibar" : "chat-layout"}>
-        {errorMessage ? (
-          <div aria-live="polite" className="chat-feedback-stack">
-            <p className="error-banner" role="alert">
-              {errorMessage}
-            </p>
-          </div>
-        ) : null}
         <ChatViewNavigation
           backgroundPriorityNotice={backgroundPriorityNotice}
           formatMachineLabel={formatMachineLabel}
@@ -861,6 +916,7 @@ export function ChatView({
           isLoadingThreads={isLoadingThreads}
           isLoadingWorkspaces={isLoadingWorkspaces}
           isNavigationOpen={isNavigationOpen}
+          notificationFeedback={effectiveNotificationFeedback}
           onAskCodex={askCodex}
           onCreateWorkspace={onCreateWorkspace}
           onOpenBackgroundPriorityThread={onOpenBackgroundPriorityThread}
@@ -870,8 +926,10 @@ export function ChatView({
           onWorkspaceNameChange={onWorkspaceNameChange}
           selectedThreadId={selectedThreadId}
           sidebarMode={sidebarMode}
+          threadListFeedback={threadListFeedback}
           threads={threads}
           workspaceId={workspaceId}
+          workspaceFeedback={workspaceFeedback}
           workspaceName={workspaceName}
           workspaces={workspaces}
         />
@@ -927,6 +985,43 @@ export function ChatView({
                 </div>
               </div>
             </header>
+            <div className="thread-feedback-stack">
+              {threadFeedback.isVisible ? (
+                <section
+                  aria-live="polite"
+                  className={`thread-feedback-card ${feedbackToneClass(threadFeedback.badgeTone)}`}
+                  role="status"
+                >
+                  <div className="thread-feedback-copy">
+                    <strong>{threadFeedback.title}</strong>
+                    <p>{threadFeedback.summary}</p>
+                  </div>
+                  {threadFeedback.actions.length > 0 ? (
+                    <div className="workspace-actions thread-feedback-actions">
+                      {threadFeedback.actions.map((action) => renderThreadFeedbackAction(action))}
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
+              {effectiveThreadViewFeedback ? (
+                <p
+                  aria-live={effectiveThreadViewFeedback.tone === "error" ? "assertive" : "polite"}
+                  className={`feedback-note thread-surface-feedback ${feedbackToneClass(effectiveThreadViewFeedback.tone)}`}
+                  role={effectiveThreadViewFeedback.tone === "error" ? "alert" : "status"}
+                >
+                  {effectiveThreadViewFeedback.message}
+                </p>
+              ) : null}
+              {effectiveRequestFeedback ? (
+                <p
+                  aria-live={effectiveRequestFeedback.tone === "error" ? "assertive" : "polite"}
+                  className={`feedback-note request-surface-feedback ${feedbackToneClass(effectiveRequestFeedback.tone)}`}
+                  role={effectiveRequestFeedback.tone === "error" ? "alert" : "status"}
+                >
+                  {effectiveRequestFeedback.message}
+                </p>
+              ) : null}
+            </div>
           </div>
 
           <div className="thread-view-body">
@@ -1076,6 +1171,7 @@ export function ChatView({
             <div className="thread-view-readable-column">
               <ChatViewComposer
                 composerDraft={composerDraft}
+                composerFeedback={effectiveComposerFeedback}
                 composerInputLabel={composerInputLabel}
                 composerPlaceholder={composerPlaceholder}
                 composerStatusSegments={

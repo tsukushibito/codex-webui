@@ -113,7 +113,6 @@ textarea {
 .workspace-meta,
 .workspace-status,
 .empty-state,
-.error-banner,
 .field-hint,
 .status-message {
   color: var(--text-muted);
@@ -323,11 +322,6 @@ textarea {
   min-width: 0;
 }
 
-.chat-feedback-stack {
-  display: grid;
-  gap: 10px;
-}
-
 .background-priority-notice {
   display: grid;
   gap: 10px;
@@ -340,6 +334,12 @@ textarea {
 
 .background-priority-notice p {
   margin: 0;
+}
+
+.navigation-notice-stack,
+.thread-feedback-stack {
+  display: grid;
+  gap: 10px;
 }
 
 .chat-panel {
@@ -762,6 +762,20 @@ textarea {
   align-items: center;
 }
 
+.chat-composer-status-rail {
+  display: grid;
+  gap: 6px;
+}
+
+.chat-composer-status-empty,
+.chat-composer-feedback-slot {
+  min-height: 1.2rem;
+}
+
+.chat-composer-feedback-slot {
+  display: grid;
+}
+
 .chat-message,
 .chat-event,
 .timeline-row {
@@ -1138,7 +1152,6 @@ textarea {
 /* Utilities */
 .field-hint,
 .status-message,
-.error-banner,
 .empty-state {
   margin: 0;
   font-size: 0.92rem;
@@ -1149,11 +1162,64 @@ textarea {
   color: var(--success);
 }
 
-.error-banner {
+.feedback-note,
+.thread-feedback-card {
+  margin: 0;
+  border: 1px solid rgba(22, 47, 52, 0.12);
+  border-radius: 14px;
+  background: rgba(244, 248, 249, 0.92);
+  color: var(--text-main);
+  font-size: 0.92rem;
+  line-height: 1.45;
   padding: 12px 14px;
-  border-radius: 16px;
+}
+
+.feedback-note.info,
+.thread-feedback-card.info {
+  border-color: rgba(15, 95, 93, 0.16);
+  background: rgba(15, 95, 93, 0.08);
+}
+
+.feedback-note.success,
+.thread-feedback-card.success {
+  border-color: rgba(36, 112, 75, 0.2);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.feedback-note.warning,
+.thread-feedback-card.warning {
+  border-color: rgba(185, 98, 31, 0.22);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.feedback-note.error,
+.thread-feedback-card.error {
+  border-color: rgba(178, 65, 60, 0.22);
   background: var(--danger-soft);
   color: var(--danger);
+}
+
+.navigation-feedback-note,
+.composer-feedback-note,
+.thread-surface-feedback,
+.request-surface-feedback {
+  overflow-wrap: anywhere;
+}
+
+.thread-feedback-card {
+  display: grid;
+  gap: 10px;
+}
+
+.thread-feedback-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.thread-feedback-copy p {
+  margin: 0;
 }
 
 .text-link {
@@ -1618,10 +1684,6 @@ textarea {
 
   .timeline-row.timeline-row-tone-muted {
     background: rgba(244, 247, 247, 0.94);
-  }
-
-  .chat-feedback-stack {
-    grid-column: 1 / -1;
   }
 
   /* Detail Surface */

@@ -102,6 +102,15 @@ function derivePriorityReason(thread: PublicThreadListItem) {
   );
 }
 
+type ScopedFeedback = {
+  message: string;
+  tone: "info" | "success" | "warning" | "error";
+};
+
+function createFeedback(tone: ScopedFeedback["tone"], message: string): ScopedFeedback {
+  return { message, tone };
+}
+
 export function ChatPageClient() {
   const searchParams = useSearchParams();
   const initialWorkspaceId = searchParams.get("workspaceId");
@@ -113,8 +122,12 @@ export function ChatPageClient() {
   const [streamEvents, setStreamEvents] = useState<PublicThreadStreamEvent[]>([]);
   const [draftAssistantMessages, setDraftAssistantMessages] = useState<Record<string, string>>({});
   const [composerDraft, setComposerDraft] = useState("");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [workspaceFeedback, setWorkspaceFeedback] = useState<ScopedFeedback | null>(null);
+  const [threadListFeedback, setThreadListFeedback] = useState<ScopedFeedback | null>(null);
+  const [notificationFeedback, setNotificationFeedback] = useState<ScopedFeedback | null>(null);
+  const [composerFeedback, setComposerFeedback] = useState<ScopedFeedback | null>(null);
+  const [threadViewFeedback, setThreadViewFeedback] = useState<ScopedFeedback | null>(null);
+  const [requestFeedback, setRequestFeedback] = useState<ScopedFeedback | null>(null);
   const [backgroundPriorityNotice, setBackgroundPriorityNotice] = useState<{
     threadId: string;
     reason: string;
@@ -142,10 +155,10 @@ export function ChatPageClient() {
   } = useSelectedThreadBundle({
     selectedThreadId,
     onLoadStart: () => {
-      setErrorMessage(null);
+      setThreadViewFeedback(null);
     },
     onLoadError: (message) => {
-      setErrorMessage(message);
+      setThreadViewFeedback(createFeedback("error", message));
     },
   });
 
@@ -165,10 +178,21 @@ export function ChatPageClient() {
     replaceChatUrl(workspaceId, nextThreadId);
   }
 
+  function clearNavigationFeedback() {
+    setWorkspaceFeedback(null);
+    setThreadListFeedback(null);
+    setNotificationFeedback(null);
+  }
+
+  function clearThreadScopedFeedback() {
+    setThreadViewFeedback(null);
+    setRequestFeedback(null);
+  }
+
   async function refreshWorkspaces(preferredWorkspaceId?: string | null) {
     const nextPreferredWorkspaceId = preferredWorkspaceId ?? workspaceId;
     setIsLoadingWorkspaces(true);
-    setErrorMessage(null);
+    setWorkspaceFeedback(null);
 
     try {
       const response = await listChatWorkspaces();
@@ -183,7 +207,12 @@ export function ChatPageClient() {
       setWorkspaceId(nextWorkspaceId);
       replaceChatUrl(nextWorkspaceId, selectedThreadIdRef.current);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to load workspaces.");
+      setWorkspaceFeedback(
+        createFeedback(
+          "error",
+          error instanceof Error ? error.message : "Failed to load workspaces.",
+        ),
+      );
     } finally {
       setIsLoadingWorkspaces(false);
     }
@@ -232,7 +261,7 @@ export function ChatPageClient() {
     const refreshId = threadListRefreshIdRef.current + 1;
     threadListRefreshIdRef.current = refreshId;
     setIsLoadingThreads(true);
-    setErrorMessage(null);
+    setThreadListFeedback(null);
 
     try {
       const response = await listWorkspaceThreads(workspaceId);
@@ -256,7 +285,12 @@ export function ChatPageClient() {
       return response.items;
     } catch (error) {
       if (threadListRefreshIdRef.current === refreshId) {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load threads.");
+        setThreadListFeedback(
+          createFeedback(
+            "error",
+            error instanceof Error ? error.message : "Failed to load threads.",
+          ),
+        );
       }
       return null;
     } finally {
@@ -286,6 +320,7 @@ export function ChatPageClient() {
     logLiveChatDebug("chat-stream", "selectedThreadId effect fired", {
       thread_id: selectedThreadId,
     });
+    clearThreadScopedFeedback();
     if (!selectedThreadId) {
       setStreamEvents([]);
       streamEventsRef.current = [];
@@ -357,6 +392,7 @@ export function ChatPageClient() {
     setConnectionState("idle");
     stream.onopen = () => {
       setConnectionState("live");
+      setThreadViewFeedback(null);
       logLiveChatDebug("chat-stream", "thread stream opened", {
         thread_id: selectedThreadId,
       });
@@ -376,7 +412,12 @@ export function ChatPageClient() {
       setStreamEvents(nextStreamEvents);
 
       if (sequenceInconsistent) {
-        setStatusMessage("Thread stream changed unexpectedly. Reacquiring thread state.");
+        setThreadViewFeedback(
+          createFeedback(
+            "warning",
+            "Thread stream changed unexpectedly. Reacquiring thread state.",
+          ),
+        );
       }
 
       if (event.event_type === "message.assistant.delta") {
@@ -405,11 +446,13 @@ export function ChatPageClient() {
       }
 
       if (!sequenceInconsistent && event.event_type === "approval.requested") {
-        setStatusMessage("Request pending. Respond from the current thread.");
+        setRequestFeedback(
+          createFeedback("warning", "Request pending. Respond from the current thread."),
+        );
       }
 
       if (!sequenceInconsistent && event.event_type === "approval.resolved") {
-        setStatusMessage("Request resolved. Thread state refreshed.");
+        setRequestFeedback(createFeedback("success", "Request resolved. Thread state refreshed."));
       }
 
       void refreshSelectedThreadAndList(selectedThreadId);
@@ -421,6 +464,12 @@ export function ChatPageClient() {
       });
       stream.close();
       setConnectionState("reconnecting");
+      setThreadViewFeedback(
+        createFeedback(
+          "warning",
+          "Live delivery dropped. Thread View is reacquiring the latest activity for this thread.",
+        ),
+      );
       void refreshSelectedThreadAndList(selectedThreadId).finally(() => {
         if (reconnectTimerRef.current !== null) {
           window.clearTimeout(reconnectTimerRef.current);
@@ -457,9 +506,13 @@ export function ChatPageClient() {
       });
 
       if (event.high_priority) {
-        setStatusMessage("High-priority background thread needs attention.");
+        setNotificationFeedback(
+          createFeedback("warning", "High-priority background thread needs attention."),
+        );
       } else {
-        setStatusMessage("Thread notification received. Refreshing current state.");
+        setNotificationFeedback(
+          createFeedback("info", "Thread notification received. Refreshing current state."),
+        );
       }
 
       const currentThreadId = selectedThreadIdRef.current;
@@ -507,16 +560,19 @@ export function ChatPageClient() {
 
     if (selectedThreadId) {
       setIsSendingMessage(true);
-      setErrorMessage(null);
-      setStatusMessage(null);
+      setComposerFeedback(createFeedback("info", "Sending input to the current thread."));
 
       try {
         await sendThreadInput(selectedThreadId, trimmedDraft, createClientId("input_followup"));
         setComposerDraft("");
-        setStatusMessage("Input accepted. Waiting for thread updates.");
+        setComposerFeedback(
+          createFeedback("success", "Input accepted. Waiting for thread updates."),
+        );
         await refreshSelectedThreadAndList(selectedThreadId);
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Failed to send input.");
+        setComposerFeedback(
+          createFeedback("error", error instanceof Error ? error.message : "Failed to send input."),
+        );
       } finally {
         setIsSendingMessage(false);
       }
@@ -525,13 +581,14 @@ export function ChatPageClient() {
     }
 
     if (!workspaceId) {
-      setErrorMessage("Choose or create a workspace before starting a thread.");
+      setComposerFeedback(
+        createFeedback("warning", "Choose or create a workspace before starting a thread."),
+      );
       return;
     }
 
     setIsCreatingThread(true);
-    setErrorMessage(null);
-    setStatusMessage(null);
+    setComposerFeedback(createFeedback("info", "Submitting first input to open a new thread."));
 
     try {
       const result = await startThreadFromChat(
@@ -543,11 +600,17 @@ export function ChatPageClient() {
         thread_id: result.thread.thread_id,
       });
       setComposerDraft("");
+      setComposerFeedback(createFeedback("success", "First input accepted. Opening thread."));
       updateSelectedThreadId(result.thread.thread_id, "create_thread_success");
       await refreshThreads(result.thread.thread_id);
       void convergeStartedThreadSendability(result.thread.thread_id);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to start a new thread.");
+      setComposerFeedback(
+        createFeedback(
+          "error",
+          error instanceof Error ? error.message : "Failed to start a new thread.",
+        ),
+      );
     } finally {
       setIsCreatingThread(false);
     }
@@ -567,8 +630,9 @@ export function ChatPageClient() {
     streamEventsRef.current = [];
     setDraftAssistantMessages({});
     setBackgroundPriorityNotice(null);
-    setStatusMessage(null);
-    setErrorMessage(null);
+    clearNavigationFeedback();
+    clearThreadScopedFeedback();
+    setComposerFeedback(null);
     replaceChatUrl(nextWorkspaceId, null);
   }
 
@@ -579,13 +643,14 @@ export function ChatPageClient() {
     }
 
     setIsCreatingWorkspace(true);
-    setErrorMessage(null);
-    setStatusMessage(null);
+    setWorkspaceFeedback(createFeedback("info", "Creating workspace."));
 
     try {
       const workspace = await createWorkspaceFromChat(trimmedName);
       setWorkspaceName("");
-      setStatusMessage(`Created workspace ${workspace.workspace_name}.`);
+      setWorkspaceFeedback(
+        createFeedback("success", `Created workspace ${workspace.workspace_name}.`),
+      );
       setWorkspaces((currentWorkspaces) => [
         workspace,
         ...currentWorkspaces.filter((item) => item.workspace_id !== workspace.workspace_id),
@@ -599,7 +664,12 @@ export function ChatPageClient() {
       replaceChatUrl(workspace.workspace_id, null);
       void refreshWorkspaces(workspace.workspace_id);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to create workspace.");
+      setWorkspaceFeedback(
+        createFeedback(
+          "error",
+          error instanceof Error ? error.message : "Failed to create workspace.",
+        ),
+      );
     } finally {
       setIsCreatingWorkspace(false);
     }
@@ -611,15 +681,19 @@ export function ChatPageClient() {
     }
 
     setIsInterruptingThread(true);
-    setErrorMessage(null);
-    setStatusMessage(null);
+    setThreadViewFeedback(createFeedback("info", "Interrupt requested."));
 
     try {
       await interruptThreadFromChat(selectedThreadId);
-      setStatusMessage("Interrupt requested.");
+      setThreadViewFeedback(createFeedback("success", "Interrupt requested."));
       await refreshSelectedThreadAndList(selectedThreadId);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to interrupt the thread.");
+      setThreadViewFeedback(
+        createFeedback(
+          "error",
+          error instanceof Error ? error.message : "Failed to interrupt the thread.",
+        ),
+      );
     } finally {
       setIsInterruptingThread(false);
     }
@@ -631,8 +705,7 @@ export function ChatPageClient() {
     }
 
     setIsRespondingToRequest(true);
-    setErrorMessage(null);
-    setStatusMessage(null);
+    setRequestFeedback(createFeedback("info", "Submitting request response."));
 
     try {
       const result = await respondToPendingRequest(
@@ -640,14 +713,22 @@ export function ChatPageClient() {
         decision,
         createClientId("response"),
       );
-      setStatusMessage(
-        decision === "approved"
-          ? `Approved ${result.request.request_id}.`
-          : `Denied ${result.request.request_id}.`,
+      setRequestFeedback(
+        createFeedback(
+          "success",
+          decision === "approved"
+            ? `Approved ${result.request.request_id}.`
+            : `Denied ${result.request.request_id}.`,
+        ),
       );
       await refreshSelectedThreadAndList(result.thread.thread_id);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to respond to the request.");
+      setRequestFeedback(
+        createFeedback(
+          "error",
+          error instanceof Error ? error.message : "Failed to respond to the request.",
+        ),
+      );
     } finally {
       setIsRespondingToRequest(false);
     }
@@ -657,6 +738,7 @@ export function ChatPageClient() {
     setBackgroundPriorityNotice((currentNotice) =>
       currentNotice?.threadId === threadId ? null : currentNotice,
     );
+    setNotificationFeedback(null);
     updateSelectedThreadId(threadId, reason);
   }
 
@@ -666,8 +748,9 @@ export function ChatPageClient() {
     }
 
     setBackgroundPriorityNotice(null);
-    setStatusMessage(null);
-    setErrorMessage(null);
+    clearNavigationFeedback();
+    clearThreadScopedFeedback();
+    setComposerFeedback(null);
     updateSelectedThreadId(null, "navigation_ask_codex", {
       workspace_id: workspaceId,
     });
@@ -676,9 +759,9 @@ export function ChatPageClient() {
   return (
     <ChatView
       backgroundPriorityNotice={backgroundPriorityNotice}
+      composerFeedback={composerFeedback}
       connectionState={connectionState}
       draftAssistantMessages={draftAssistantMessages}
-      errorMessage={errorMessage}
       isCreatingThread={isCreatingThread}
       isCreatingWorkspace={isCreatingWorkspace}
       isInterruptingThread={isInterruptingThread}
@@ -687,6 +770,7 @@ export function ChatPageClient() {
       isLoadingWorkspaces={isLoadingWorkspaces}
       isRespondingToRequest={isRespondingToRequest}
       isSendingMessage={isSendingMessage}
+      notificationFeedback={notificationFeedback}
       composerDraft={composerDraft}
       onApproveRequest={() => void handleRequestDecision("approved")}
       onComposerDraftChange={setComposerDraft}
@@ -701,13 +785,16 @@ export function ChatPageClient() {
       onSelectThread={(threadId) => handleSelectThread(threadId, "user_select_thread")}
       onSubmitComposer={() => void handleSubmitComposer()}
       onWorkspaceNameChange={setWorkspaceName}
+      requestFeedback={requestFeedback}
       selectedRequestDetail={selectedRequestDetail}
       selectedThreadId={selectedThreadId}
       selectedThreadView={selectedThreadView}
-      statusMessage={statusMessage}
       streamEvents={streamEvents}
+      threadListFeedback={threadListFeedback}
+      threadViewFeedback={threadViewFeedback}
       threads={threads}
       workspaceId={workspaceId}
+      workspaceFeedback={workspaceFeedback}
       workspaceName={workspaceName}
       workspaces={workspaces}
     />

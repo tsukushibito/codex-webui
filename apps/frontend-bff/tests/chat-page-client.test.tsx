@@ -441,7 +441,13 @@ describe("ChatPageClient", () => {
     expect((textarea as HTMLTextAreaElement).value).toBe("");
     expect(container.textContent).toContain("Continue with the fix.");
     expect(container.textContent).toContain("Streaming");
-    expect(container.textContent).not.toContain("Connecting live updates");
+    expect(container.querySelector(".thread-feedback-card")?.textContent).toContain(
+      "Connecting live updates",
+    );
+    expect(container.querySelector(".composer-feedback-note")?.textContent).toContain(
+      "Input accepted. Waiting for thread updates.",
+    );
+    expect(container.querySelector(".chat-feedback-stack")).toBeNull();
   });
 
   it("clears the selected thread from Navigation and starts a workspace-scoped thread", async () => {
@@ -1259,6 +1265,10 @@ describe("ChatPageClient", () => {
       "approved",
       expect.stringMatching(/^response_/),
     );
+    expect(container.querySelector(".request-surface-feedback")?.textContent).toContain(
+      "Approved req_001.",
+    );
+    expect(container.querySelector(".chat-feedback-stack")).toBeNull();
   });
 
   it("reopens latest resolved request detail without response actions", async () => {
@@ -1398,8 +1408,12 @@ describe("ChatPageClient", () => {
     await flushUi();
 
     expect(container.textContent).toContain("Streaming");
-    expect(container.textContent).not.toContain("Reconnecting live updates");
-    expect(container.textContent).not.toContain("Refresh thread");
+    expect(container.querySelector(".thread-feedback-card")?.textContent).toContain(
+      "Reconnecting live updates",
+    );
+    expect(container.querySelector(".thread-feedback-card")?.textContent).toContain(
+      "Refresh thread",
+    );
   });
 
   it("marks stream sequence gaps as inconsistent and reacquires selected thread state", async () => {
@@ -1598,6 +1612,10 @@ describe("ChatPageClient", () => {
     expect(container.textContent).toContain("Needs attention now");
     expect(container.textContent).toContain("Background notice: Needs response");
     expect(container.textContent).not.toContain("Request detail");
+    expect(
+      container.querySelector(".navigation-feedback-note-notification")?.textContent,
+    ).toContain("High-priority background thread needs attention.");
+    expect(container.querySelector(".chat-feedback-stack")).toBeNull();
 
     const openThreadButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Open thread",
@@ -1795,7 +1813,7 @@ describe("ChatPageClient", () => {
     });
     await flushUi();
 
-    expect(container.textContent).not.toContain("High-priority background thread needs attention.");
+    expect(container.textContent).toContain("High-priority background thread needs attention.");
     expect(container.textContent).not.toContain("Background thread needs attention");
     expect(
       Array.from(container.querySelectorAll("button")).find(

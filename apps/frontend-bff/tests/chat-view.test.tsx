@@ -252,9 +252,7 @@ describe("ChatView", () => {
     expect(markup).toContain("timeline-row-prominent");
     expect(markup).not.toContain("pending-request-card-fallback");
     expect(markup).toContain("Request detail");
-    expect(markup.indexOf("Please explain the diff.")).toBeLessThan(
-      markup.indexOf("Approve request"),
-    );
+    expect(markup).toContain("thread-feedback-card");
     expect(markup).not.toContain("Status update");
     expect(markup).not.toContain("timeline-row-compact");
     expect(markup).not.toContain("Inspect artifacts");
@@ -493,8 +491,10 @@ describe("ChatView", () => {
     });
 
     expect(container.querySelector(".thread-feedback-card-inline")).toBeNull();
+    expect(container.querySelector(".thread-feedback-card")?.textContent).toContain(
+      "Codex is running",
+    );
     expect(container.textContent).toContain("Streaming");
-    expect(container.textContent).not.toContain("Codex is running");
     expect(container.querySelector(".timeline-row-live-status")).not.toBeNull();
   });
 
@@ -611,7 +611,9 @@ describe("ChatView", () => {
     });
 
     expect(container.querySelector(".thread-feedback-card-inline")).toBeNull();
-    expect(container.textContent).not.toContain("Reconnecting live updates");
+    expect(container.querySelector(".thread-feedback-card")?.textContent).toContain(
+      "Reconnecting live updates",
+    );
     expect(container.querySelector(".timeline-row-live-status")).not.toBeNull();
     expect(container.textContent).toContain("Streaming");
   });
@@ -721,7 +723,7 @@ describe("ChatView", () => {
     expect(container.textContent).toContain("Streaming");
   });
 
-  it("renders transient feedback above the chat panels", () => {
+  it("routes legacy feedback props into scoped thread and composer surfaces", () => {
     const markup = renderToStaticMarkup(
       <ChatView
         backgroundPriorityNotice={null}
@@ -760,12 +762,12 @@ describe("ChatView", () => {
       />,
     );
 
-    expect(markup).toContain("chat-feedback-stack");
-    expect(markup).not.toContain("Thread started.");
+    expect(markup).toContain("thread-surface-feedback");
+    expect(markup).toContain("chat-composer-feedback-slot");
+    expect(markup).toContain("Thread started.");
     expect(markup).toContain("Failed to interrupt the thread.");
-    expect(markup.indexOf("chat-feedback-stack")).toBeLessThan(
-      markup.indexOf("chat-panel create-card"),
-    );
+    expect(markup).not.toContain("chat-feedback-stack");
+    expect(markup).not.toContain("error-banner");
   });
 
   it("renders structured timeline detail before collapsed debug JSON", async () => {
