@@ -734,3 +734,21 @@ Notes:
 - added desktop viewport-use guidance so the shell does not appear as a centered card-like panel
 - specified that both normal Navigation and collapsed minibar stay flush to the physical left edge
 - clarified that readable content constraints should apply inside Timeline regions rather than as large outer margins around the whole desktop app
+
+## [2026-04-28] query | App Server thread resume contract
+
+Source:
+
+- user report that existing threads could not receive input after WebUI/app-server restart
+- OpenAI Codex App Server documentation for `thread/resume`
+
+Updated:
+
+- `docs/specs/codex_webui_app_server_contract_matrix_v0_9.md`
+- `docs/log.md`
+
+Notes:
+
+- promoted `thread/resume` from an unproven open/load gap into an allowed v0.9 dependency
+- clarified that WebUI may call `thread/resume` with a recorded `thread.id` before later `turn/start`
+- preserved the warning that reopened thread history does not make approval/request helper objects fully recoverable without app-owned retention

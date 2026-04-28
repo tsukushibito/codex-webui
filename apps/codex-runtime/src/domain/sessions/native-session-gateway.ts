@@ -13,6 +13,7 @@ export interface SendNativeSessionMessageInput {
 
 export interface NativeSessionGateway {
   createSession(input: CreateNativeSessionInput): Promise<{ sessionId: string }>;
+  resumeSession(input: { sessionId: string }): Promise<{ sessionId: string }>;
   sendUserMessage(input: SendNativeSessionMessageInput): Promise<{
     turnId: string;
   }>;
@@ -29,6 +30,12 @@ export class SyntheticNativeSessionGateway implements NativeSessionGateway {
   async createSession(_input: CreateNativeSessionInput) {
     return {
       sessionId: `thread_${crypto.randomUUID().replaceAll("-", "")}`,
+    };
+  }
+
+  async resumeSession(input: { sessionId: string }) {
+    return {
+      sessionId: input.sessionId,
     };
   }
 
