@@ -21,6 +21,44 @@ function firstRow<T>(rows: T[]) {
   return rows[0] ?? null;
 }
 
+function serializeErrorSignal(value: unknown) {
+  if (typeof value === "string") {
+    return value.toLowerCase();
+  }
+
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  try {
+    return JSON.stringify(value).toLowerCase();
+  } catch {
+    return String(value).toLowerCase();
+  }
+}
+
+function indicatesMissingNativeThread(error: RuntimeError) {
+  if (error.code !== "app_server_request_failed" || error.details?.rpc_method !== "turn/start") {
+    return false;
+  }
+
+  const messageSignal = error.message.toLowerCase();
+  const codeSignal = serializeErrorSignal(error.details?.rpc_error_code);
+  const dataSignal = serializeErrorSignal(error.details?.rpc_error_data);
+  const signals = [messageSignal, codeSignal, dataSignal];
+
+  return (
+    signals.some((signal) => signal.includes("thread_not_found")) ||
+    (signals.some((signal) => signal.includes("not_found")) &&
+      signals.some((signal) => signal.includes("thread") || signal.includes("session"))) ||
+    signals.some(
+      (signal) =>
+        (signal.includes("thread") || signal.includes("session")) &&
+        (signal.includes("not found") || signal.includes("missing")),
+    )
+  );
+}
+
 export class ThreadInputOrchestrator {
   constructor(
     private readonly database: RuntimeDatabase,
@@ -88,6 +126,19 @@ export class ThreadInputOrchestrator {
       });
     }
 
+    if (session.appSessionOverlayState === "recovery_pending") {
+      throw new RuntimeError(
+        409,
+        "thread_recovery_pending",
+        "thread requires recovery before accepting input",
+        {
+          thread_id: threadId,
+          status: session.status,
+          app_session_overlay_state: session.appSessionOverlayState,
+        },
+      );
+    }
+
     if (session.status !== "waiting_input") {
       throw new RuntimeError(
         409,
@@ -100,10 +151,37 @@ export class ThreadInputOrchestrator {
       );
     }
 
-    const nativeTurn = await this.nativeSessionGateway.sendUserMessage({
-      sessionId: threadId,
-      content: input.content,
-    });
+    let nativeTurn: { turnId: string };
+    try {
+      nativeTurn = await this.nativeSessionGateway.sendUserMessage({
+        sessionId: threadId,
+        content: input.content,
+      });
+    } catch (error) {
+      if (error instanceof RuntimeError && indicatesMissingNativeThread(error)) {
+        const recoveryMarkedAt = this.now().toISOString();
+        this.markThreadRecoveryPendingBeforeNativeTurnPersists(
+          threadId,
+          session.workspaceId,
+          recoveryMarkedAt,
+        );
+
+        throw new RuntimeError(
+          409,
+          "thread_recovery_pending",
+          "thread requires recovery before accepting input",
+          {
+            thread_id: threadId,
+            rpc_method: "turn/start",
+            rpc_error_code: error.details?.rpc_error_code ?? null,
+            rpc_error_data: error.details?.rpc_error_data ?? null,
+            native_error_message: error.message,
+          },
+        );
+      }
+
+      throw error;
+    }
     const userMessageId = generateMessageId();
     const userCreatedAt = this.now().toISOString();
 
@@ -193,6 +271,31 @@ export class ThreadInputOrchestrator {
       sessionId,
       turnId,
     });
+  }
+
+  private markThreadRecoveryPendingBeforeNativeTurnPersists(
+    threadId: string,
+    workspaceId: string,
+    updatedAt: string,
+  ) {
+    this.database.sqlite.transaction(() => {
+      this.database.db
+        .update(sessions)
+        .set({
+          updatedAt,
+          appSessionOverlayState: "recovery_pending",
+        })
+        .where(eq(sessions.sessionId, threadId))
+        .run();
+
+      this.database.db
+        .update(workspaces)
+        .set({
+          updatedAt,
+        })
+        .where(eq(workspaces.workspaceId, workspaceId))
+        .run();
+    })();
   }
 
   private markThreadRecoveryPending(

@@ -73,6 +73,23 @@ class FailingSendNativeSessionGateway extends StubNativeSessionGateway {
   }
 }
 
+class MissingThreadNativeSessionGateway extends StubNativeSessionGateway {
+  override async sendUserMessage(_input: {
+    sessionId: string;
+    content: string;
+  }): Promise<{ turnId: string }> {
+    this.sendUserMessages.push(_input);
+    throw new RuntimeError(502, "app_server_request_failed", "thread not found in app server", {
+      rpc_method: "turn/start",
+      rpc_error_code: "not_found",
+      rpc_error_data: {
+        threadId: _input.sessionId,
+        reason: "persisted thread missing after restart",
+      },
+    });
+  }
+}
+
 afterEach(async () => {
   await Promise.all(
     cleanupPaths.splice(0).map((entryPath) => fs.rm(entryPath, { recursive: true, force: true })),
@@ -1304,6 +1321,166 @@ describe("thread routes", () => {
         },
       },
     });
+
+    await app.close();
+  });
+
+  it("marks a persisted thread recovery_pending when native turn/start reports thread missing", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("thread-routes-root");
+    const database = await createTempDatabase("thread-routes-db");
+    const nativeSessionGateway = new MissingThreadNativeSessionGateway();
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    database.db
+      .insert(workspaces)
+      .values({
+        workspaceId: "ws_alpha",
+        workspaceName: "alpha",
+        directoryName: "alpha",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:00:00.000Z",
+      })
+      .run();
+
+    database.db
+      .insert(sessions)
+      .values({
+        sessionId: "thread_001",
+        workspaceId: "ws_alpha",
+        title: "Recovered thread",
+        status: "waiting_input",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:01:00.000Z",
+        startedAt: "2026-04-09T00:00:00.000Z",
+        lastMessageAt: null,
+        activeApprovalId: null,
+        currentTurnId: null,
+        pendingAssistantMessageId: null,
+        appSessionOverlayState: "open",
+      })
+      .run();
+
+    const firstResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/threads/thread_001/inputs",
+      payload: {
+        client_request_id: "req_followup_missing_001",
+        content: "Continue after runtime restart",
+      },
+    });
+
+    expect(firstResponse.statusCode).toBe(409);
+    expect(firstResponse.json()).toMatchObject({
+      error: {
+        code: "thread_recovery_pending",
+        message: "thread requires recovery before accepting input",
+        details: {
+          thread_id: "thread_001",
+          rpc_method: "turn/start",
+          rpc_error_code: "not_found",
+          rpc_error_data: {
+            threadId: "thread_001",
+          },
+          native_error_message: "thread not found in app server",
+        },
+      },
+    });
+
+    expect(nativeSessionGateway.sendUserMessages).toEqual([
+      {
+        sessionId: "thread_001",
+        content: "Continue after runtime restart",
+      },
+    ]);
+
+    const persistedSession = database.db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.sessionId, "thread_001"))
+      .get();
+    expect(persistedSession).toMatchObject({
+      sessionId: "thread_001",
+      status: "waiting_input",
+      currentTurnId: null,
+      pendingAssistantMessageId: null,
+      appSessionOverlayState: "recovery_pending",
+    });
+
+    const persistedMessages = database.db
+      .select()
+      .from(messages)
+      .where(eq(messages.sessionId, "thread_001"))
+      .all();
+    expect(persistedMessages).toHaveLength(0);
+
+    const persistedEvents = database.db
+      .select()
+      .from(sessionEvents)
+      .where(eq(sessionEvents.sessionId, "thread_001"))
+      .all();
+    expect(persistedEvents).toHaveLength(0);
+
+    const threadResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/threads/thread_001",
+    });
+    expect(threadResponse.statusCode).toBe(200);
+    expect(threadResponse.json()).toMatchObject({
+      thread_id: "thread_001",
+      derived_hints: {
+        accepting_user_input: false,
+        blocked_reason: "thread_recovery_pending",
+      },
+    });
+
+    const viewResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/threads/thread_001/view",
+    });
+    expect(viewResponse.statusCode).toBe(200);
+    expect(viewResponse.json()).toMatchObject({
+      thread: {
+        thread_id: "thread_001",
+        derived_hints: {
+          accepting_user_input: false,
+          blocked_reason: "thread_recovery_pending",
+        },
+      },
+    });
+
+    const retryResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/threads/thread_001/inputs",
+      payload: {
+        client_request_id: "req_followup_missing_002",
+        content: "Retry after runtime restart",
+      },
+    });
+
+    expect(retryResponse.statusCode).toBe(409);
+    expect(retryResponse.json()).toMatchObject({
+      error: {
+        code: "thread_recovery_pending",
+        details: {
+          thread_id: "thread_001",
+        },
+      },
+    });
+    expect(nativeSessionGateway.sendUserMessages).toHaveLength(1);
 
     await app.close();
   });
