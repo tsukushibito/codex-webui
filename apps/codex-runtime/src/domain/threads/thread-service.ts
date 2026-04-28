@@ -36,36 +36,37 @@ import type {
 } from "./types.js";
 
 function toThreadSummary(session: SessionRow): ThreadSummary {
+  const recoveryPending = session.appSessionOverlayState === "recovery_pending";
   const hasPendingRequest = session.status === "waiting_approval";
-  const acceptingUserInput = session.status === "waiting_input";
+  const acceptingUserInput = session.status === "waiting_input" && !recoveryPending;
 
   let threadStatus = "idle";
   let latestTurnStatus: string | null = "completed";
   let activeFlags: string[] = [];
-  let blockedReason: string | null = null;
+  let blockedReason: string | null = recoveryPending ? "thread_recovery_pending" : null;
 
   if (session.status === "created") {
     threadStatus = "created";
     latestTurnStatus = null;
-    blockedReason = "thread_not_started";
+    blockedReason ??= "thread_not_started";
   } else if (session.status === "running") {
     threadStatus = "running";
     latestTurnStatus = "running";
     activeFlags = ["turn_in_progress"];
-    blockedReason = "turn_in_progress";
+    blockedReason ??= "turn_in_progress";
   } else if (session.status === "waiting_approval") {
     threadStatus = "running";
     latestTurnStatus = "running";
     activeFlags = ["waiting_on_request"];
-    blockedReason = "waiting_on_request";
+    blockedReason ??= "waiting_on_request";
   } else if (session.status === "failed") {
     threadStatus = "error";
     latestTurnStatus = "failed";
-    blockedReason = "system_error";
+    blockedReason ??= "system_error";
   } else if (session.status === "stopped") {
     threadStatus = "interrupted";
     latestTurnStatus = "interrupted";
-    blockedReason = "thread_closed";
+    blockedReason ??= "thread_closed";
   }
 
   return {
@@ -191,6 +192,18 @@ function mapThreadInputError(error: unknown, threadId: string): never {
         status: runtimeError.details?.current_status ?? runtimeError.details?.status ?? null,
         workspace_id: runtimeError.details?.workspace_id ?? null,
         active_thread_id: runtimeError.details?.active_session_id ?? null,
+      },
+    );
+  }
+
+  if (runtimeError.code === "thread_recovery_pending") {
+    throw new RuntimeError(
+      409,
+      "thread_recovery_pending",
+      "thread requires recovery before accepting input",
+      {
+        ...runtimeError.details,
+        thread_id: threadId,
       },
     );
   }
