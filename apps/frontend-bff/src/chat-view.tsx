@@ -34,6 +34,9 @@ type ScopedFeedback = {
   tone: "info" | "success" | "warning" | "error";
 };
 
+const SCROLL_FOLLOW_BOTTOM_THRESHOLD_PX = 48;
+const SCROLL_FOLLOW_SUSPEND_DELTA_PX = 24;
+
 export interface ChatViewProps {
   workspaceId: string | null;
   workspaces: PublicWorkspaceSummary[];
@@ -118,6 +121,42 @@ function requestSummaryBadgeClass(state: "pending" | "resolved", decision?: stri
   return decision === "denied" || decision === "canceled"
     ? "status-badge warning"
     : "status-badge success";
+}
+
+function latestTimelineActivitySignature(groups: TimelineDisplayGroup[]) {
+  const latestGroup = groups.at(-1) ?? null;
+  const latestRow = latestGroup?.rows.at(-1) ?? null;
+
+  if (!latestRow) {
+    return "empty";
+  }
+
+  return [
+    groups.length,
+    latestRow.id,
+    latestRow.sequence,
+    latestRow.isLive ? "live" : "settled",
+    latestRow.content,
+  ].join(":");
+}
+
+function scrollDistanceFromBottom(element: HTMLElement) {
+  return element.scrollHeight - element.clientHeight - element.scrollTop;
+}
+
+function isScrollRegionNearBottom(element: HTMLElement) {
+  return scrollDistanceFromBottom(element) <= SCROLL_FOLLOW_BOTTOM_THRESHOLD_PX;
+}
+
+function scrollRegionToLatest(element: HTMLElement) {
+  if (typeof element.scrollTo === "function") {
+    element.scrollTo({
+      top: element.scrollHeight,
+    });
+    return;
+  }
+
+  element.scrollTop = element.scrollHeight;
 }
 
 function formatMachineLabel(value: string | null | undefined) {
@@ -578,7 +617,13 @@ export function ChatView({
   const [detailSelection, setDetailSelection] = useState<ThreadDetailSelection | null>(null);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>("full");
   const [expandedTimelineRows, setExpandedTimelineRows] = useState<Set<string>>(() => new Set());
+  const [isScrollFollowingLatest, setIsScrollFollowingLatest] = useState(true);
+  const [hasNewerActivityBelow, setHasNewerActivityBelow] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const scrollRegionRef = useRef<HTMLDivElement | null>(null);
+  const suppressScrollTrackingRef = useRef(false);
+  const lastKnownScrollTopRef = useRef(0);
+  const lastSeenTimelineActivityRef = useRef("empty");
   const selectedWorkspace =
     workspaces.find((workspace) => workspace.workspace_id === workspaceId) ?? null;
   const hasSelectedThread = selectedThreadId !== null;
@@ -769,6 +814,8 @@ export function ChatView({
     fallbackResolvedRequest && selectedThreadView
       ? selectedThreadView.latest_resolved_request
       : null;
+  const latestActivitySignature = latestTimelineActivitySignature(timelineGroups);
+  const showJumpToLatestActivity = !isScrollFollowingLatest && hasNewerActivityBelow;
 
   useEffect(() => {
     const storedMode = readStoredSidebarMode();
@@ -781,7 +828,54 @@ export function ChatView({
     setIsNavigationOpen(false);
     setDetailSelection(null);
     setExpandedTimelineRows(new Set());
+    setIsScrollFollowingLatest(true);
+    setHasNewerActivityBelow(false);
+    lastKnownScrollTopRef.current = 0;
+    lastSeenTimelineActivityRef.current = "empty";
   }, [selectedThreadId]);
+
+  useEffect(() => {
+    const scrollRegion = scrollRegionRef.current;
+
+    if (!scrollRegion) {
+      lastSeenTimelineActivityRef.current = latestActivitySignature;
+      return;
+    }
+
+    if (isScrollFollowingLatest) {
+      suppressScrollTrackingRef.current = true;
+      const finalizeFollowScroll = () => {
+        scrollRegionToLatest(scrollRegion);
+        lastKnownScrollTopRef.current = scrollRegion.scrollTop;
+        lastSeenTimelineActivityRef.current = latestActivitySignature;
+        setHasNewerActivityBelow(false);
+        suppressScrollTrackingRef.current = false;
+      };
+
+      scrollRegionToLatest(scrollRegion);
+
+      if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+        const frameId = window.requestAnimationFrame(() => {
+          finalizeFollowScroll();
+        });
+
+        return () => {
+          window.cancelAnimationFrame(frameId);
+          suppressScrollTrackingRef.current = false;
+        };
+      }
+
+      queueMicrotask(() => {
+        finalizeFollowScroll();
+      });
+      return;
+    }
+
+    setHasNewerActivityBelow(
+      !isScrollRegionNearBottom(scrollRegion) &&
+        lastSeenTimelineActivityRef.current !== latestActivitySignature,
+    );
+  }, [isScrollFollowingLatest, latestActivitySignature]);
 
   function selectThread(threadId: string) {
     onSelectThread(threadId);
@@ -803,6 +897,56 @@ export function ChatView({
 
   function focusComposer() {
     composerRef.current?.focus();
+  }
+
+  function handleScrollRegionScroll() {
+    const scrollRegion = scrollRegionRef.current;
+
+    if (!scrollRegion) {
+      return;
+    }
+
+    if (suppressScrollTrackingRef.current) {
+      lastKnownScrollTopRef.current = scrollRegion.scrollTop;
+      return;
+    }
+
+    const nextScrollTop = scrollRegion.scrollTop;
+    const previousScrollTop = lastKnownScrollTopRef.current;
+    lastKnownScrollTopRef.current = nextScrollTop;
+
+    if (isScrollRegionNearBottom(scrollRegion)) {
+      if (!isScrollFollowingLatest) {
+        setIsScrollFollowingLatest(true);
+      }
+      lastSeenTimelineActivityRef.current = latestActivitySignature;
+      setHasNewerActivityBelow(false);
+      return;
+    }
+
+    if (
+      isScrollFollowingLatest &&
+      nextScrollTop < previousScrollTop - SCROLL_FOLLOW_SUSPEND_DELTA_PX
+    ) {
+      setIsScrollFollowingLatest(false);
+      setHasNewerActivityBelow(lastSeenTimelineActivityRef.current !== latestActivitySignature);
+      return;
+    }
+
+    if (!isScrollFollowingLatest) {
+      setHasNewerActivityBelow(lastSeenTimelineActivityRef.current !== latestActivitySignature);
+    }
+  }
+
+  function jumpToLatestActivity() {
+    setIsScrollFollowingLatest(true);
+    setHasNewerActivityBelow(false);
+  }
+
+  function submitComposer() {
+    setIsScrollFollowingLatest(true);
+    setHasNewerActivityBelow(false);
+    onSubmitComposer();
   }
 
   function feedbackToneClass(tone: ScopedFeedback["tone"] | ThreadFeedbackDescriptor["badgeTone"]) {
@@ -1025,123 +1169,140 @@ export function ChatView({
           </div>
 
           <div className="thread-view-body">
-            <div className="thread-view-scroll-region">
-              <div className="thread-view-readable-column">
-                {fallbackPendingRequestSummary ? (
-                  <div className="request-detail-card pending-request-card pending-request-card-fallback">
-                    <div className="workspace-meta-row">
-                      <strong>Request summary</strong>
-                      <span
-                        className={requestSummaryBadgeClass(
-                          "pending",
-                          selectedRequestDetail?.decision ?? null,
-                        )}
-                      >
-                        Pending request
-                      </span>
-                    </div>
-                    <p>{fallbackPendingRequestSummary.summary}</p>
-                    {selectedRequestDetail ? (
-                      <p className="workspace-meta">{selectedRequestDetail.reason}</p>
-                    ) : null}
-                    {selectedRequestDetail?.operation_summary ? (
-                      <p className="workspace-meta">
-                        Operation:{" "}
-                        <code className="artifact-inline">
-                          {selectedRequestDetail.operation_summary}
-                        </code>
-                      </p>
-                    ) : null}
-                    <p className="workspace-meta">
-                      Requested {formatTimestamp(fallbackPendingRequestSummary.requested_at)}
-                    </p>
-                    <div className="workspace-actions">
-                      <button
-                        className="approve-button action-button compact-button"
-                        disabled={
-                          isRespondingToRequest || selectedRequestDetail?.status !== "pending"
-                        }
-                        onClick={onApproveRequest}
-                        type="button"
-                      >
-                        {isRespondingToRequest ? "Submitting..." : "Approve request"}
-                      </button>
-                      <button
-                        className="danger-button action-button compact-button"
-                        disabled={
-                          isRespondingToRequest || selectedRequestDetail?.status !== "pending"
-                        }
-                        onClick={onDenyRequest}
-                        type="button"
-                      >
-                        Deny request
-                      </button>
-                      {selectedRequestDetail ? (
-                        <button
-                          className="secondary-link action-button compact-button"
-                          onClick={() => setDetailSelection({ kind: "request_detail" })}
-                          type="button"
+            <div className="thread-view-scroll-stack">
+              <div
+                className="thread-view-scroll-region"
+                onScroll={handleScrollRegionScroll}
+                ref={scrollRegionRef}
+              >
+                <div className="thread-view-readable-column">
+                  {fallbackPendingRequestSummary ? (
+                    <div className="request-detail-card pending-request-card pending-request-card-fallback">
+                      <div className="workspace-meta-row">
+                        <strong>Request summary</strong>
+                        <span
+                          className={requestSummaryBadgeClass(
+                            "pending",
+                            selectedRequestDetail?.decision ?? null,
+                          )}
                         >
-                          Request detail
-                        </button>
+                          Pending request
+                        </span>
+                      </div>
+                      <p>{fallbackPendingRequestSummary.summary}</p>
+                      {selectedRequestDetail ? (
+                        <p className="workspace-meta">{selectedRequestDetail.reason}</p>
                       ) : null}
-                    </div>
-                  </div>
-                ) : fallbackResolvedRequestSummary ? (
-                  <div className="request-detail-card pending-request-card pending-request-card-fallback">
-                    <div className="workspace-meta-row">
-                      <strong>Request summary</strong>
-                      <span
-                        className={requestSummaryBadgeClass(
-                          "resolved",
-                          fallbackResolvedRequestSummary.decision,
-                        )}
-                      >
-                        {`Resolved: ${formatMachineLabel(fallbackResolvedRequestSummary.decision)}`}
-                      </span>
-                    </div>
-                    <p>
-                      Latest resolved request in this thread was{" "}
-                      {formatMachineLabel(fallbackResolvedRequestSummary.decision)}.
-                    </p>
-                    <p className="workspace-meta">
-                      Responded {formatTimestamp(fallbackResolvedRequestSummary.responded_at)}
-                    </p>
-                    {selectedRequestDetail ? (
+                      {selectedRequestDetail?.operation_summary ? (
+                        <p className="workspace-meta">
+                          Operation:{" "}
+                          <code className="artifact-inline">
+                            {selectedRequestDetail.operation_summary}
+                          </code>
+                        </p>
+                      ) : null}
+                      <p className="workspace-meta">
+                        Requested {formatTimestamp(fallbackPendingRequestSummary.requested_at)}
+                      </p>
                       <div className="workspace-actions">
                         <button
-                          className="secondary-link action-button compact-button"
-                          onClick={() => setDetailSelection({ kind: "request_detail" })}
+                          className="approve-button action-button compact-button"
+                          disabled={
+                            isRespondingToRequest || selectedRequestDetail?.status !== "pending"
+                          }
+                          onClick={onApproveRequest}
                           type="button"
                         >
-                          Request detail
+                          {isRespondingToRequest ? "Submitting..." : "Approve request"}
                         </button>
+                        <button
+                          className="danger-button action-button compact-button"
+                          disabled={
+                            isRespondingToRequest || selectedRequestDetail?.status !== "pending"
+                          }
+                          onClick={onDenyRequest}
+                          type="button"
+                        >
+                          Deny request
+                        </button>
+                        {selectedRequestDetail ? (
+                          <button
+                            className="secondary-link action-button compact-button"
+                            onClick={() => setDetailSelection({ kind: "request_detail" })}
+                            type="button"
+                          >
+                            Request detail
+                          </button>
+                        ) : null}
                       </div>
-                    ) : null}
-                  </div>
-                ) : null}
+                    </div>
+                  ) : fallbackResolvedRequestSummary ? (
+                    <div className="request-detail-card pending-request-card pending-request-card-fallback">
+                      <div className="workspace-meta-row">
+                        <strong>Request summary</strong>
+                        <span
+                          className={requestSummaryBadgeClass(
+                            "resolved",
+                            fallbackResolvedRequestSummary.decision,
+                          )}
+                        >
+                          {`Resolved: ${formatMachineLabel(fallbackResolvedRequestSummary.decision)}`}
+                        </span>
+                      </div>
+                      <p>
+                        Latest resolved request in this thread was{" "}
+                        {formatMachineLabel(fallbackResolvedRequestSummary.decision)}.
+                      </p>
+                      <p className="workspace-meta">
+                        Responded {formatTimestamp(fallbackResolvedRequestSummary.responded_at)}
+                      </p>
+                      {selectedRequestDetail ? (
+                        <div className="workspace-actions">
+                          <button
+                            className="secondary-link action-button compact-button"
+                            onClick={() => setDetailSelection({ kind: "request_detail" })}
+                            type="button"
+                          >
+                            Request detail
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
 
-                <ChatViewTimeline
-                  expandedRowIds={expandedTimelineRows}
-                  formatTimestamp={formatTimestamp}
-                  groups={timelineGroups}
-                  hasLoadedThreadView={selectedThreadView !== null}
-                  isRespondingToRequest={isRespondingToRequest}
-                  isLoadingThread={isLoadingThread}
-                  onApproveRequest={onApproveRequest}
-                  onDenyRequest={onDenyRequest}
-                  onOpenDetail={(timelineItemId) =>
-                    setDetailSelection({
-                      kind: "timeline_item_detail",
-                      timelineItemId,
-                    })
-                  }
-                  onOpenRequestDetail={() => setDetailSelection({ kind: "request_detail" })}
-                  onToggleRowExpansion={toggleTimelineRowExpansion}
-                  requestRowContexts={requestRowContexts}
-                  selectedThreadId={selectedThreadId}
-                />
+                  <ChatViewTimeline
+                    expandedRowIds={expandedTimelineRows}
+                    formatTimestamp={formatTimestamp}
+                    groups={timelineGroups}
+                    hasLoadedThreadView={selectedThreadView !== null}
+                    isRespondingToRequest={isRespondingToRequest}
+                    isLoadingThread={isLoadingThread}
+                    onApproveRequest={onApproveRequest}
+                    onDenyRequest={onDenyRequest}
+                    onOpenDetail={(timelineItemId) =>
+                      setDetailSelection({
+                        kind: "timeline_item_detail",
+                        timelineItemId,
+                      })
+                    }
+                    onOpenRequestDetail={() => setDetailSelection({ kind: "request_detail" })}
+                    onToggleRowExpansion={toggleTimelineRowExpansion}
+                    requestRowContexts={requestRowContexts}
+                    selectedThreadId={selectedThreadId}
+                  />
+                </div>
               </div>
+              {showJumpToLatestActivity ? (
+                <div className="thread-view-jump-pill" role="status">
+                  <button
+                    className="secondary-link action-button compact-button"
+                    onClick={jumpToLatestActivity}
+                    type="button"
+                  >
+                    Jump to latest activity
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             <div className="thread-mobile-footer-actions thread-view-readable-column">
@@ -1182,7 +1343,7 @@ export function ChatView({
                 isStartingThread={isStartingThread}
                 isTextareaDisabled={isComposerTextareaDisabled}
                 onComposerDraftChange={onComposerDraftChange}
-                onSubmitComposer={onSubmitComposer}
+                onSubmitComposer={submitComposer}
                 textareaRef={composerRef}
               />
             </div>

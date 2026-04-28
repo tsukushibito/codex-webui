@@ -421,6 +421,12 @@ textarea {
   min-height: 0;
 }
 
+.thread-view-scroll-stack {
+  position: relative;
+  display: grid;
+  min-height: 0;
+}
+
 .compact-link,
 .compact-button,
 .inline-detail-button {
@@ -678,7 +684,25 @@ textarea {
   gap: 12px;
   min-height: 0;
   overflow: auto;
-  padding-bottom: 12px;
+  padding-bottom: 88px;
+  scroll-padding-bottom: 24px;
+}
+
+.thread-view-jump-pill {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 1;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  width: min(100% - 24px, max-content);
+  pointer-events: none;
+}
+
+.thread-view-jump-pill > * {
+  pointer-events: auto;
+  box-shadow: 0 14px 28px rgba(17, 31, 39, 0.16);
 }
 
 /* Timeline */
@@ -1317,7 +1341,9 @@ textarea {
     min-height: 0;
     overflow: auto;
     overscroll-behavior: contain;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
     scroll-padding-top: 112px;
+    scroll-padding-bottom: calc(24px + env(safe-area-inset-bottom));
   }
 
   .workspace-card,
@@ -1446,6 +1472,11 @@ textarea {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 6px;
     flex-shrink: 0;
+  }
+
+  .thread-view-jump-pill {
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    width: calc(100% - 20px);
   }
 
   /* Composer */

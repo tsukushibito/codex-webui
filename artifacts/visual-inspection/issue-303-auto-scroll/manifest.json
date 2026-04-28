@@ -1,0 +1,34 @@
+{
+  "issue": 303,
+  "capturedAt": "2026-04-28T17:13:00Z",
+  "captures": [
+    {
+      "file": "artifacts/visual-inspection/issue-303-auto-scroll/desktop-chromium-long-thread-follow.png",
+      "profile": "desktop-chromium",
+      "state": "long thread after follow-up send with live assistant row",
+      "fullPage": true
+    },
+    {
+      "file": "artifacts/visual-inspection/issue-303-auto-scroll/mobile-chromium-long-thread-follow.png",
+      "profile": "mobile-chromium",
+      "state": "long thread after follow-up send with live assistant row",
+      "fullPage": true
+    },
+    {
+      "file": "artifacts/visual-inspection/issue-303-auto-scroll/desktop-chromium-long-thread-follow-viewport.png",
+      "profile": "desktop-chromium",
+      "state": "long thread after follow-up send with live assistant row",
+      "fullPage": false
+    },
+    {
+      "file": "artifacts/visual-inspection/issue-303-auto-scroll/mobile-chromium-long-thread-follow-viewport.png",
+      "profile": "mobile-chromium",
+      "state": "long thread after follow-up send with live assistant row",
+      "fullPage": false
+    }
+  ],
+  "review": {
+    "desktop": "Latest user row and live assistant row are visible above the composer with no jump affordance shown while follow mode is active.",
+    "mobile": "Latest user row and live assistant row remain readable above the mobile footer and composer in the captured viewport."
+  }
+}

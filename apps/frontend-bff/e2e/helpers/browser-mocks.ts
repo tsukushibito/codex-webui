@@ -312,7 +312,13 @@ export async function expectNoHorizontalScroll(page: Page) {
   return metrics.scrollWidth <= metrics.clientWidth + 1;
 }
 
-export async function mockChatFlow(page: Page) {
+export async function mockChatFlow(
+  page: Page,
+  options: {
+    existingThread?: boolean;
+    longTimeline?: boolean;
+  } = {},
+) {
   const timestamps = {
     created: "2026-04-05T02:30:00Z",
     updated: "2026-04-05T02:31:00Z",
@@ -330,6 +336,8 @@ export async function mockChatFlow(page: Page) {
   let followupCount = 0;
   let threadStatus: "idle" | "running" = "idle";
   let latestTurnStatus: "completed" | "running" | "interrupted" = "completed";
+  const existingThread = options.existingThread ?? false;
+  const longTimeline = options.longTimeline ?? false;
   const timelineItems: Array<{
     timeline_item_id: string;
     thread_id: string;
@@ -353,6 +361,37 @@ export async function mockChatFlow(page: Page) {
   function nextSequence() {
     sequenceCount += 1;
     return sequenceCount;
+  }
+
+  function buildLongTimelineItems() {
+    return Array.from({ length: 18 }, (_, index) => ({
+      timeline_item_id: `evt_long_${index + 2}`,
+      thread_id: "thread_001",
+      turn_id: null,
+      item_id: null,
+      sequence: nextSequence(),
+      occurred_at: timestamps.firstInput,
+      kind:
+        index % 3 === 0
+          ? "message.user"
+          : index % 3 === 1
+            ? "message.assistant.completed"
+            : "session.status_changed",
+      payload:
+        index % 3 === 0
+          ? {
+              summary: `User follow-up ${index + 1}`,
+              content: `Long thread filler item ${index + 1} keeps the timeline tall enough to require in-panel scrolling.`,
+            }
+          : index % 3 === 1
+            ? {
+                summary: `Assistant output ${index + 1}`,
+                content: `Expanded assistant context ${index + 1} keeps the thread body long enough to exercise follow mode in the scroll region.`,
+              }
+            : {
+                summary: `Status update ${index + 1}`,
+              },
+    }));
   }
 
   function currentThreadSummary() {
@@ -429,6 +468,28 @@ export async function mockChatFlow(page: Page) {
     };
   }
 
+  if (existingThread) {
+    workspaceCreated = true;
+    threadExists = true;
+    messageCount = 1;
+    timelineItems.push(
+      {
+        timeline_item_id: "evt_1",
+        thread_id: "thread_001",
+        turn_id: null,
+        item_id: null,
+        sequence: nextSequence(),
+        occurred_at: timestamps.firstInput,
+        kind: "message.user",
+        payload: {
+          summary: "user input accepted",
+          content: "Inspect scroll follow behavior",
+        },
+      },
+      ...(longTimeline ? buildLongTimelineItems() : []),
+    );
+  }
+
   await page.route("**/api/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -474,7 +535,7 @@ export async function mockChatFlow(page: Page) {
       latestTurnStatus = "completed";
       messageCount += 1;
       const sequence = nextSequence();
-      timelineItems.splice(0, timelineItems.length, {
+      const initialUserItem = {
         timeline_item_id: `evt_${messageCount}`,
         thread_id: "thread_001",
         turn_id: null,
@@ -486,7 +547,13 @@ export async function mockChatFlow(page: Page) {
           summary: "user input accepted",
           content: body.content,
         },
-      });
+      };
+      timelineItems.splice(
+        0,
+        timelineItems.length,
+        initialUserItem,
+        ...(longTimeline ? buildLongTimelineItems() : []),
+      );
 
       return json(
         route,

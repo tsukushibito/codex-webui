@@ -73,6 +73,7 @@ None.
 
 ## Archived Task Packages
 
+- [issue-303-auto-scroll](./archive/issue-303-auto-scroll/README.md)
 - [issue-302-scoped-feedback](./archive/issue-302-scoped-feedback/README.md)
 - [issue-304-readable-width](./archive/issue-304-readable-width/README.md)
 - [issue-290-remove-turn-labels](./archive/issue-290-remove-turn-labels/README.md)
