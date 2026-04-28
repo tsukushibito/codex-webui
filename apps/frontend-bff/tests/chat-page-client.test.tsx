@@ -441,12 +441,11 @@ describe("ChatPageClient", () => {
     expect((textarea as HTMLTextAreaElement).value).toBe("");
     expect(container.textContent).toContain("Continue with the fix.");
     expect(container.textContent).toContain("Streaming");
-    expect(container.querySelector(".thread-feedback-card")?.textContent).toContain(
-      "Connecting live updates",
-    );
-    expect(container.querySelector(".composer-feedback-note")?.textContent).toContain(
+    expect(container.querySelector(".thread-inline-status")?.textContent).toContain(
       "Input accepted. Waiting for thread updates.",
     );
+    expect(container.querySelector(".thread-feedback-card")).toBeNull();
+    expect(container.querySelector(".composer-feedback-note")).toBeNull();
     expect(container.querySelector(".chat-feedback-stack")).toBeNull();
   });
 
@@ -532,7 +531,7 @@ describe("ChatPageClient", () => {
       "Continue with the fix.",
       expect.stringMatching(/^input_followup_/),
     );
-    const composerFeedback = container.querySelector(".composer-feedback-note");
+    const composerFeedback = container.querySelector(".thread-inline-status");
     expect(composerFeedback?.textContent).toContain("Sending input to the current thread.");
     expect(composerFeedback?.getAttribute("role")).toBe("status");
     expect(composerFeedback?.getAttribute("aria-live")).toBe("polite");
@@ -1357,7 +1356,7 @@ describe("ChatPageClient", () => {
       "approved",
       expect.stringMatching(/^response_/),
     );
-    expect(container.querySelector(".request-surface-feedback")?.textContent).toContain(
+    expect(container.querySelector(".thread-inline-status")?.textContent).toContain(
       "Approved req_001.",
     );
     expect(container.querySelector(".chat-feedback-stack")).toBeNull();
@@ -1500,12 +1499,13 @@ describe("ChatPageClient", () => {
     await flushUi();
 
     expect(container.textContent).toContain("Streaming");
-    expect(container.querySelector(".thread-feedback-card")?.textContent).toContain(
+    expect(container.querySelector(".thread-inline-status")?.textContent).toContain(
       "Reconnecting live updates",
     );
-    expect(container.querySelector(".thread-feedback-card")?.textContent).toContain(
+    expect(container.querySelector(".thread-inline-status")?.textContent).toContain(
       "Refresh thread",
     );
+    expect(container.querySelector(".thread-feedback-card")).toBeNull();
   });
 
   it("marks stream sequence gaps as inconsistent and reacquires selected thread state", async () => {
