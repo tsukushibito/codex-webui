@@ -1,0 +1,30 @@
+{
+  "issue": 305,
+  "capturedAt": "2026-04-28T17:45:00Z",
+  "captures": [
+    {
+      "file": "artifacts/visual-inspection/issue-305-composer-keybindings/desktop-chromium-chat-mode.png",
+      "profile": "desktop-chromium",
+      "state": "composer chat keybinding mode"
+    },
+    {
+      "file": "artifacts/visual-inspection/issue-305-composer-keybindings/desktop-chromium-editor-mode.png",
+      "profile": "desktop-chromium",
+      "state": "composer editor keybinding mode"
+    },
+    {
+      "file": "artifacts/visual-inspection/issue-305-composer-keybindings/mobile-chromium-chat-mode.png",
+      "profile": "mobile-chromium",
+      "state": "composer chat keybinding mode"
+    },
+    {
+      "file": "artifacts/visual-inspection/issue-305-composer-keybindings/mobile-chromium-editor-mode.png",
+      "profile": "mobile-chromium",
+      "state": "composer editor keybinding mode"
+    }
+  ],
+  "review": {
+    "desktop": "Mode control and shortcut help are visible beside the composer without horizontal overflow.",
+    "mobile": "Mode control stacks above the composer and remains readable and reachable."
+  }
+}

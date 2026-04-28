@@ -36,6 +36,9 @@ type ScopedFeedback = {
 
 const SCROLL_FOLLOW_BOTTOM_THRESHOLD_PX = 48;
 const SCROLL_FOLLOW_SUSPEND_DELTA_PX = 24;
+const COMPOSER_KEYBINDING_MODE_STORAGE_KEY = "codex-webui.composer-keybinding-mode";
+
+export type ComposerKeybindingMode = "chat" | "editor";
 
 export interface ChatViewProps {
   workspaceId: string | null;
@@ -169,6 +172,35 @@ function SecondaryIcon({ children }: { children: ReactNode }) {
       {children}
     </span>
   );
+}
+
+function isComposerKeybindingMode(value: string | null): value is ComposerKeybindingMode {
+  return value === "chat" || value === "editor";
+}
+
+export function readStoredComposerKeybindingMode() {
+  try {
+    const storage = window.localStorage;
+    if (typeof storage.getItem !== "function") {
+      return null;
+    }
+
+    const storedMode = storage.getItem(COMPOSER_KEYBINDING_MODE_STORAGE_KEY);
+    return isComposerKeybindingMode(storedMode) ? storedMode : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeStoredComposerKeybindingMode(nextMode: ComposerKeybindingMode) {
+  try {
+    const storage = window.localStorage;
+    if (typeof storage.setItem === "function") {
+      storage.setItem(COMPOSER_KEYBINDING_MODE_STORAGE_KEY, nextMode);
+    }
+  } catch {
+    // Composer preference should never block chat input.
+  }
 }
 
 function composerUnavailableReason(threadView: PublicThreadView | null) {
@@ -616,6 +648,8 @@ export function ChatView({
   const [isNavigationOpen, setIsNavigationOpen] = useState(false);
   const [detailSelection, setDetailSelection] = useState<ThreadDetailSelection | null>(null);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>("full");
+  const [composerKeybindingMode, setComposerKeybindingMode] =
+    useState<ComposerKeybindingMode>("chat");
   const [expandedTimelineRows, setExpandedTimelineRows] = useState<Set<string>>(() => new Set());
   const [isScrollFollowingLatest, setIsScrollFollowingLatest] = useState(true);
   const [hasNewerActivityBelow, setHasNewerActivityBelow] = useState(false);
@@ -825,6 +859,13 @@ export function ChatView({
   }, []);
 
   useEffect(() => {
+    const storedMode = readStoredComposerKeybindingMode();
+    if (storedMode) {
+      setComposerKeybindingMode(storedMode);
+    }
+  }, []);
+
+  useEffect(() => {
     setIsNavigationOpen(false);
     setDetailSelection(null);
     setExpandedTimelineRows(new Set());
@@ -893,6 +934,11 @@ export function ChatView({
     if (nextMode === "full") {
       setIsNavigationOpen(false);
     }
+  }
+
+  function updateComposerKeybindingMode(nextMode: ComposerKeybindingMode) {
+    setComposerKeybindingMode(nextMode);
+    writeStoredComposerKeybindingMode(nextMode);
   }
 
   function focusComposer() {
@@ -1334,6 +1380,7 @@ export function ChatView({
                 composerDraft={composerDraft}
                 composerFeedback={effectiveComposerFeedback}
                 composerInputLabel={composerInputLabel}
+                composerKeybindingMode={composerKeybindingMode}
                 composerPlaceholder={composerPlaceholder}
                 composerStatusSegments={
                   selectedWorkspace?.workspace_name ? [selectedWorkspace.workspace_name] : []
@@ -1342,6 +1389,7 @@ export function ChatView({
                 isComposerDisabled={isComposerDisabled}
                 isStartingThread={isStartingThread}
                 isTextareaDisabled={isComposerTextareaDisabled}
+                onComposerKeybindingModeChange={updateComposerKeybindingMode}
                 onComposerDraftChange={onComposerDraftChange}
                 onSubmitComposer={submitComposer}
                 textareaRef={composerRef}

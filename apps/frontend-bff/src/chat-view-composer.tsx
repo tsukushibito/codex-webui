@@ -1,4 +1,6 @@
-import type { RefObject } from "react";
+import type { KeyboardEvent, RefObject } from "react";
+
+import type { ComposerKeybindingMode } from "./chat-view";
 
 export interface ChatViewComposerProps {
   composerDraft: string;
@@ -7,12 +9,14 @@ export interface ChatViewComposerProps {
     tone: "info" | "success" | "warning" | "error";
   } | null;
   composerInputLabel: string;
+  composerKeybindingMode: ComposerKeybindingMode;
   composerPlaceholder: string;
   composerStatusSegments: string[];
   composerSubmitLabel: string;
   isComposerDisabled: boolean;
   isStartingThread: boolean;
   isTextareaDisabled: boolean;
+  onComposerKeybindingModeChange: (mode: ComposerKeybindingMode) => void;
   onComposerDraftChange: (value: string) => void;
   onSubmitComposer: () => void;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -22,30 +26,109 @@ export function ChatViewComposer({
   composerDraft,
   composerFeedback,
   composerInputLabel,
+  composerKeybindingMode,
   composerPlaceholder,
   composerStatusSegments,
   composerSubmitLabel,
   isComposerDisabled,
   isStartingThread,
   isTextareaDisabled,
+  onComposerKeybindingModeChange,
   onComposerDraftChange,
   onSubmitComposer,
   textareaRef,
 }: ChatViewComposerProps) {
+  const composerShortcutHintId = "thread-composer-shortcut-hint";
+  const canKeyboardSubmit = !isTextareaDisabled && !isComposerDisabled;
+  const isChatMode = composerKeybindingMode === "chat";
+  const composerShortcutSummary = isChatMode
+    ? "Enter sends. Shift+Enter adds a new line."
+    : "Enter adds a new line. Ctrl+Enter or Meta+Enter sends.";
   const composerSubmitTitle = isComposerDisabled
     ? isStartingThread
       ? "Start thread unavailable"
       : "Send message unavailable"
-    : composerSubmitLabel;
+    : `${composerSubmitLabel} (${isChatMode ? "Enter" : "Ctrl+Enter or Meta+Enter"})`;
+
+  function handleTextareaKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.defaultPrevented || !canKeyboardSubmit) {
+      return;
+    }
+
+    if (event.key !== "Enter" || event.shiftKey) {
+      return;
+    }
+
+    const nativeEvent = event.nativeEvent;
+    if (nativeEvent.isComposing || nativeEvent.keyCode === 229) {
+      return;
+    }
+
+    const shouldSubmit = isChatMode
+      ? !event.ctrlKey && !event.metaKey
+      : event.ctrlKey || event.metaKey;
+
+    if (!shouldSubmit) {
+      return;
+    }
+
+    event.preventDefault();
+    onSubmitComposer();
+  }
 
   return (
     <div className="chat-composer" data-composer-mode={isStartingThread ? "start" : "send"}>
+      <div className="composer-toolbar">
+        <div className="composer-toolbar-copy">
+          <p className="composer-toolbar-label">Keyboard shortcuts</p>
+          <p className="composer-toolbar-hint" id={composerShortcutHintId}>
+            {composerShortcutSummary}
+          </p>
+        </div>
+        <fieldset className="composer-mode-toggle">
+          <legend className="sr-only">Composer keybinding mode</legend>
+          <label
+            className="composer-mode-option"
+            data-active={isChatMode ? "true" : "false"}
+            title="Chat mode: Enter sends and Shift+Enter adds a new line."
+          >
+            <input
+              checked={isChatMode}
+              className="composer-mode-input"
+              name="composer-keybinding-mode"
+              onChange={() => onComposerKeybindingModeChange("chat")}
+              type="radio"
+              value="chat"
+            />
+            <span className="composer-mode-option-label">Chat</span>
+            <span className="composer-mode-option-value">Enter sends</span>
+          </label>
+          <label
+            className="composer-mode-option"
+            data-active={!isChatMode ? "true" : "false"}
+            title="Editor mode: Enter adds a new line and Ctrl+Enter or Meta+Enter sends."
+          >
+            <input
+              checked={!isChatMode}
+              className="composer-mode-input"
+              name="composer-keybinding-mode"
+              onChange={() => onComposerKeybindingModeChange("editor")}
+              type="radio"
+              value="editor"
+            />
+            <span className="composer-mode-option-label">Editor</span>
+            <span className="composer-mode-option-value">Cmd/Ctrl+Enter sends</span>
+          </label>
+        </fieldset>
+      </div>
       <label className="composer-input-frame" htmlFor="thread-composer-input">
         <span className="sr-only">{composerInputLabel}</span>
         <textarea
+          aria-describedby={composerShortcutHintId}
           className="chat-textarea"
           disabled={isTextareaDisabled}
           id="thread-composer-input"
+          onKeyDown={handleTextareaKeyDown}
           name="thread-composer-input"
           onChange={(event) => onComposerDraftChange(event.target.value)}
           placeholder={composerPlaceholder}
