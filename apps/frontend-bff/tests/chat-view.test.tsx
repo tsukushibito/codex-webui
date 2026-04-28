@@ -142,10 +142,27 @@ describe("ChatView", () => {
     return textarea!;
   }
 
-  function themeSwitch(container: HTMLDivElement) {
-    const switchButton = container.querySelector<HTMLButtonElement>('button[role="switch"]');
-    expect(switchButton).not.toBeNull();
-    return switchButton!;
+  function settingsButton(container: HTMLDivElement) {
+    const button = container.querySelector<HTMLButtonElement>('button[aria-label="Settings"]');
+    expect(button).not.toBeNull();
+    return button!;
+  }
+
+  function settingsDialog(container: HTMLDivElement) {
+    const dialog = container.querySelector<HTMLDivElement>('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    return dialog!;
+  }
+
+  function dispatchTabKey(target: EventTarget, init: KeyboardEventInit = {}) {
+    const event = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "Tab",
+      ...init,
+    });
+    target.dispatchEvent(event);
+    return event;
   }
 
   function dispatchComposerKeydown(
@@ -222,7 +239,7 @@ describe("ChatView", () => {
     };
   }
 
-  it("defaults to dark theme, applies it at the document root, and exposes the switch state", async () => {
+  it("defaults to dark theme, applies it at the document root, and exposes settings dialog controls", async () => {
     const storage = {
       getItem: vi.fn(() => null),
       setItem: vi.fn(),
@@ -236,15 +253,27 @@ describe("ChatView", () => {
       root.render(<ChatView {...buildChatViewBaseProps()} />);
     });
 
-    const switchButton = themeSwitch(container);
-    expect(switchButton.getAttribute("aria-checked")).toBe("true");
-    expect(switchButton.textContent).toContain("dark");
+    const button = settingsButton(container);
+    expect(button.getAttribute("aria-expanded")).toBe("false");
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(document.documentElement.style.colorScheme).toBe("dark");
     expect(storage.setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, "dark");
+
+    await act(async () => {
+      button.click();
+    });
+
+    const dialog = settingsDialog(container);
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(dialog.textContent).toContain("Settings");
+    const darkThemeOption = dialog.querySelector<HTMLInputElement>(
+      'input[name="thread-view-theme"][value="dark"]',
+    );
+    expect(darkThemeOption?.checked).toBe(true);
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Close settings");
   });
 
-  it("restores a persisted light theme and toggles without remounting the view", async () => {
+  it("restores a persisted light theme and updates it from the settings dialog without remounting the view", async () => {
     const storage = {
       getItem: vi.fn((key: string) => (key === THEME_STORAGE_KEY ? "light" : null)),
       setItem: vi.fn(),
@@ -258,13 +287,21 @@ describe("ChatView", () => {
       root.render(<ChatView {...buildChatViewBaseProps({ composerDraft: "draft persists" })} />);
     });
 
-    const switchButton = themeSwitch(container);
-    expect(switchButton.getAttribute("aria-checked")).toBe("false");
+    const button = settingsButton(container);
     expect(document.documentElement.dataset.theme).toBe("light");
     expect(composerTextarea(container).value).toBe("draft persists");
 
     await act(async () => {
-      switchButton.click();
+      button.click();
+    });
+
+    const darkThemeOption = settingsDialog(container).querySelector<HTMLInputElement>(
+      'input[name="thread-view-theme"][value="dark"]',
+    );
+    expect(darkThemeOption).not.toBeNull();
+
+    await act(async () => {
+      darkThemeOption?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
     expect(document.documentElement.dataset.theme).toBe("dark");
@@ -309,6 +346,96 @@ describe("ChatView", () => {
 
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(document.documentElement.style.colorScheme).toBe("dark");
+  });
+
+  it("closes settings on escape and returns focus to the settings button", async () => {
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: vi.fn(() => null),
+        setItem: vi.fn(),
+      },
+    });
+
+    await act(async () => {
+      root.render(<ChatView {...buildChatViewBaseProps({ composerDraft: "Keep draft" })} />);
+    });
+
+    const button = settingsButton(container);
+
+    await act(async () => {
+      button.click();
+    });
+
+    expect(settingsDialog(container)).not.toBeNull();
+
+    await act(async () => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key: "Escape",
+        }),
+      );
+    });
+
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(button);
+    expect(composerTextarea(container).value).toBe("Keep draft");
+  });
+
+  it("traps focus inside the settings dialog while it is open", async () => {
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: vi.fn(() => null),
+        setItem: vi.fn(),
+      },
+    });
+
+    await act(async () => {
+      root.render(<ChatView {...buildChatViewBaseProps()} />);
+    });
+
+    const button = settingsButton(container);
+    const textarea = composerTextarea(container);
+
+    await act(async () => {
+      button.click();
+    });
+
+    const dialog = settingsDialog(container);
+    const closeButton = dialog.querySelector<HTMLButtonElement>(
+      'button[aria-label="Close settings"]',
+    );
+    const lastFocusable = dialog.querySelector<HTMLInputElement>(
+      'input[name="composer-keybinding-mode"][value="editor"]',
+    );
+
+    expect(closeButton).not.toBeNull();
+    expect(lastFocusable).not.toBeNull();
+    expect(document.activeElement).toBe(closeButton);
+
+    await act(async () => {
+      lastFocusable?.focus();
+      dispatchTabKey(window);
+    });
+
+    expect(document.activeElement).toBe(closeButton);
+
+    await act(async () => {
+      closeButton?.focus();
+      dispatchTabKey(window, { shiftKey: true });
+    });
+
+    expect(document.activeElement).toBe(lastFocusable);
+
+    await act(async () => {
+      textarea.focus();
+    });
+
+    expect(document.activeElement).not.toBe(textarea);
+    expect(dialog.contains(document.activeElement)).toBe(true);
   });
 
   it("renders thread context, pending request controls, and timeline state", () => {
@@ -2293,7 +2420,7 @@ describe("ChatView", () => {
     expect(container.textContent).not.toContain("Jump to latest activity");
   });
 
-  it("uses chat mode shortcuts by default and persists editor mode after mount", async () => {
+  it("uses dialog keybinding controls to persist mode changes and update keyboard behavior", async () => {
     const storage = {
       getItem: vi.fn((key: string) =>
         key === "codex-webui.composer-keybinding-mode" ? "editor" : null,
@@ -2343,8 +2470,13 @@ describe("ChatView", () => {
     });
 
     expect(onSubmitComposer).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('input[name="composer-keybinding-mode"]')).toBeNull();
 
-    const chatModeButton = container.querySelector<HTMLInputElement>(
+    await act(async () => {
+      settingsButton(container).click();
+    });
+
+    const chatModeButton = settingsDialog(container).querySelector<HTMLInputElement>(
       'input[name="composer-keybinding-mode"][value="chat"]',
     );
     expect(chatModeButton).not.toBeNull();

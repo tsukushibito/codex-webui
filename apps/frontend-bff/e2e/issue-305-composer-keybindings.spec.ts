@@ -192,6 +192,15 @@ async function mockComposerKeybindingSurface(
   });
 }
 
+function settingsButton(page: Page) {
+  return page.getByRole("button", { name: "Settings", exact: true });
+}
+
+async function openSettingsDialog(page: Page) {
+  await settingsButton(page).click();
+  await expect(page.getByRole("dialog", { name: "Settings", exact: true })).toBeVisible();
+}
+
 test("persists composer keybinding mode and respects chat/editor shortcuts without overflow", async ({
   page,
 }) => {
@@ -209,7 +218,6 @@ test("persists composer keybinding mode and respects chat/editor shortcuts witho
   const textarea = page.locator("#thread-composer-input");
 
   await expect(page.getByText("Enter sends. Shift+Enter adds a new line.")).toBeVisible();
-  await expect(page.getByRole("radio", { name: /Chat/i })).toBeChecked();
 
   await textarea.fill("First line");
   await textarea.press("Shift+Enter");
@@ -220,11 +228,15 @@ test("persists composer keybinding mode and respects chat/editor shortcuts witho
   await expect.poll(() => postedInputs.length).toBe(1);
   expect(postedInputs[0]).toContain("First line");
 
-  await page.locator(".composer-mode-option", { hasText: "Editor" }).click();
+  await openSettingsDialog(page);
+  await expect(page.locator('input[name="composer-keybinding-mode"][value="chat"]')).toBeChecked();
+  await page.locator(".settings-dialog .composer-mode-option", { hasText: "Editor" }).click();
   await expect(
     page.getByText("Enter adds a new line. Ctrl+Enter or Meta+Enter sends."),
   ).toBeVisible();
-  await expect(page.getByRole("radio", { name: /Editor/i })).toBeChecked();
+  await expect(
+    page.locator('input[name="composer-keybinding-mode"][value="editor"]'),
+  ).toBeChecked();
   await expect
     .poll(async () =>
       page.evaluate(() => window.localStorage.getItem("codex-webui.composer-keybinding-mode")),
@@ -232,7 +244,11 @@ test("persists composer keybinding mode and respects chat/editor shortcuts witho
     .toBe("editor");
 
   await page.reload();
-  await expect(page.getByRole("radio", { name: /Editor/i })).toBeChecked();
+  await openSettingsDialog(page);
+  await expect(
+    page.locator('input[name="composer-keybinding-mode"][value="editor"]'),
+  ).toBeChecked();
+  await page.getByRole("button", { name: "Close settings", exact: true }).click();
   await expect(
     page.getByText("Enter adds a new line. Ctrl+Enter or Meta+Enter sends."),
   ).toBeVisible();

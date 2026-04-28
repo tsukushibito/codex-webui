@@ -16,7 +16,6 @@ export interface ChatViewComposerProps {
   isComposerDisabled: boolean;
   isStartingThread: boolean;
   isTextareaDisabled: boolean;
-  onComposerKeybindingModeChange: (mode: ComposerKeybindingMode) => void;
   onComposerDraftChange: (value: string) => void;
   onSubmitComposer: () => void;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -33,7 +32,6 @@ export function ChatViewComposer({
   isComposerDisabled,
   isStartingThread,
   isTextareaDisabled,
-  onComposerKeybindingModeChange,
   onComposerDraftChange,
   onSubmitComposer,
   textareaRef,
@@ -85,41 +83,6 @@ export function ChatViewComposer({
             {composerShortcutSummary}
           </p>
         </div>
-        <fieldset className="composer-mode-toggle">
-          <legend className="sr-only">Composer keybinding mode</legend>
-          <label
-            className="composer-mode-option"
-            data-active={isChatMode ? "true" : "false"}
-            title="Chat mode: Enter sends and Shift+Enter adds a new line."
-          >
-            <input
-              checked={isChatMode}
-              className="composer-mode-input"
-              name="composer-keybinding-mode"
-              onChange={() => onComposerKeybindingModeChange("chat")}
-              type="radio"
-              value="chat"
-            />
-            <span className="composer-mode-option-label">Chat</span>
-            <span className="composer-mode-option-value">Enter sends</span>
-          </label>
-          <label
-            className="composer-mode-option"
-            data-active={!isChatMode ? "true" : "false"}
-            title="Editor mode: Enter adds a new line and Ctrl+Enter or Meta+Enter sends."
-          >
-            <input
-              checked={!isChatMode}
-              className="composer-mode-input"
-              name="composer-keybinding-mode"
-              onChange={() => onComposerKeybindingModeChange("editor")}
-              type="radio"
-              value="editor"
-            />
-            <span className="composer-mode-option-label">Editor</span>
-            <span className="composer-mode-option-value">Cmd/Ctrl+Enter sends</span>
-          </label>
-        </fieldset>
       </div>
       <label className="composer-input-frame" htmlFor="thread-composer-input">
         <span className="sr-only">{composerInputLabel}</span>
