@@ -450,6 +450,98 @@ describe("ChatPageClient", () => {
     expect(container.querySelector(".chat-feedback-stack")).toBeNull();
   });
 
+  it("keeps follow-up pending feedback near the composer while sendThreadInput is unresolved", async () => {
+    const pendingSend = createDeferred<PublicThreadInputAcceptedResponse>();
+
+    chatDataMocks.listWorkspaceThreads.mockResolvedValue({
+      items: [
+        buildThreadListItem({
+          native_status: {
+            thread_status: "waiting_input",
+            active_flags: [],
+            latest_turn_status: null,
+          },
+          current_activity: {
+            kind: "waiting_on_user_input",
+            label: "Waiting for your input",
+          },
+        }),
+      ],
+      next_cursor: null,
+      has_more: false,
+    });
+    chatDataMocks.loadChatThreadBundle.mockResolvedValue({
+      view: buildThreadView({
+        thread: {
+          thread_id: "thread_001",
+          workspace_id: "ws_alpha",
+          title: "Investigate build",
+          native_status: {
+            thread_status: "waiting_input",
+            active_flags: [],
+            latest_turn_status: null,
+          },
+          updated_at: "2026-03-27T05:22:00Z",
+        },
+        current_activity: {
+          kind: "waiting_on_user_input",
+          label: "Waiting for your input",
+        },
+        composer: {
+          accepting_user_input: true,
+          interrupt_available: false,
+          blocked_by_request: false,
+          input_unavailable_reason: null,
+        },
+      }),
+      pendingRequestDetail: null,
+    });
+    chatDataMocks.sendThreadInput.mockReturnValue(pendingSend.promise);
+
+    await act(async () => {
+      root.render(<ChatPageClient />);
+    });
+    await flushUi();
+
+    const textarea = container.querySelector("#thread-composer-input");
+    expect(textarea).not.toBeNull();
+
+    await act(async () => {
+      const setTextareaValue = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set;
+
+      setTextareaValue?.call(textarea as HTMLTextAreaElement, "Continue with the fix.");
+      textarea!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await flushUi();
+
+    const sendButton = container.querySelector(
+      'button[aria-label="Send message"]',
+    ) as HTMLButtonElement | null;
+    expect(sendButton).not.toBeNull();
+
+    await act(async () => {
+      sendButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushUi();
+
+    expect(chatDataMocks.sendThreadInput).toHaveBeenCalledWith(
+      "thread_001",
+      "Continue with the fix.",
+      expect.stringMatching(/^input_followup_/),
+    );
+    const composerFeedback = container.querySelector(".composer-feedback-note");
+    expect(composerFeedback?.textContent).toContain("Sending input to the current thread.");
+    expect(composerFeedback?.getAttribute("role")).toBe("status");
+    expect(composerFeedback?.getAttribute("aria-live")).toBe("polite");
+    expect(container.querySelector(".thread-feedback-card")).toBeNull();
+
+    pendingSend.resolve(buildAcceptedInputResponse());
+    await flushUi();
+  });
+
   it("clears the selected thread from Navigation and starts a workspace-scoped thread", async () => {
     chatDataMocks.listWorkspaceThreads.mockResolvedValue({
       items: [buildThreadListItem()],

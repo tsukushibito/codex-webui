@@ -1012,6 +1012,57 @@ describe("ChatView", () => {
     expect(container.textContent).toContain("Streaming");
   });
 
+  it("keeps follow-up submit pending feedback out of the thread feedback card stack", async () => {
+    await act(async () => {
+      root.render(
+        <ChatView
+          {...buildChatViewBaseProps({
+            composerDraft: "Continue with the next step.",
+            isSendingMessage: true,
+            selectedThreadView: {
+              ...buildChatViewBaseProps().selectedThreadView!,
+              current_activity: {
+                kind: "waiting_on_user_input",
+                label: "Waiting for your input",
+              },
+              composer: {
+                accepting_user_input: true,
+                interrupt_available: false,
+                blocked_by_request: false,
+                input_unavailable_reason: null,
+              },
+            },
+          })}
+        />,
+      );
+    });
+
+    expect(container.querySelector(".thread-feedback-card")).toBeNull();
+    expect(container.textContent).not.toContain("Submitting follow-up input");
+  });
+
+  it("keeps the stronger thread feedback card for first-input submission", async () => {
+    await act(async () => {
+      root.render(
+        <ChatView
+          {...buildChatViewBaseProps({
+            composerDraft: "Start a new thread",
+            isCreatingThread: true,
+            selectedThreadId: null,
+            selectedThreadView: null,
+          })}
+        />,
+      );
+    });
+
+    expect(container.querySelector(".thread-feedback-card")?.textContent).toContain(
+      "Submitting first input",
+    );
+    expect(container.querySelector(".thread-feedback-card")?.textContent).toContain(
+      "new thread to open",
+    );
+  });
+
   it("shows the first running progress in the timeline before assistant content arrives", async () => {
     await act(async () => {
       root.render(

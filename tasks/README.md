@@ -73,6 +73,7 @@ None.
 
 ## Archived Task Packages
 
+- [issue-312-submit-feedback](./archive/issue-312-submit-feedback/README.md)
 - [issue-313-settings-dialog](./archive/issue-313-settings-dialog/README.md)
 - [issue-306-theme-switching](./archive/issue-306-theme-switching/README.md)
 - [issue-305-composer-keybindings](./archive/issue-305-composer-keybindings/README.md)
