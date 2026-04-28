@@ -249,10 +249,18 @@ test("returns to a high-priority background thread from the lightweight notifica
   const threadView = page.getByRole("region", { name: "Thread View", exact: true });
   await expect(threadView).toBeVisible();
   await expect(threadView.getByText("Primary thread is idle.")).toBeVisible();
+  const threadViewBoxBefore = await threadView.boundingBox();
+  expect(threadViewBoxBefore).not.toBeNull();
+  await page.screenshot({
+    path: testInfo.outputPath(`issue-302-background-priority-before-${testInfo.project.name}.png`),
+    fullPage: true,
+  });
 
   if (!isDesktop) {
     await expect(
-      page.locator("header.chat-topbar").getByRole("button", { name: "Threads", exact: true }),
+      page
+        .locator(".thread-mobile-footer-actions")
+        .getByRole("button", { name: "Threads", exact: true }),
     ).toBeVisible();
   }
 
@@ -263,13 +271,30 @@ test("returns to a high-priority background thread from the lightweight notifica
     high_priority: true,
   });
 
-  await expect(page.locator(".status-message")).toContainText(
+  await expect(page.locator(".navigation-feedback-note-notification")).toContainText(
     "High-priority background thread needs attention.",
   );
   await expect(page.locator(".background-priority-notice")).toContainText(
     "Background thread needs attention",
   );
   await expect(page.locator(".background-priority-notice")).toContainText("Reason: Needs response");
+  const threadViewBoxAfterNotice = await threadView.boundingBox();
+  expect(threadViewBoxAfterNotice).not.toBeNull();
+  expect(threadViewBoxAfterNotice?.x).toBe(threadViewBoxBefore?.x);
+  expect(threadViewBoxAfterNotice?.y).toBe(threadViewBoxBefore?.y);
+  expect(threadViewBoxAfterNotice?.width).toBe(threadViewBoxBefore?.width);
+  await page.screenshot({
+    path: testInfo.outputPath(`issue-302-background-priority-after-${testInfo.project.name}.png`),
+    fullPage: true,
+  });
+
+  if (!isDesktop) {
+    await page
+      .locator(".thread-mobile-footer-actions")
+      .getByRole("button", { name: "Threads", exact: true })
+      .click();
+    await expect(page.locator(".thread-navigation.open")).toBeVisible();
+  }
 
   await page.getByRole("button", { name: "Open thread", exact: true }).click();
 

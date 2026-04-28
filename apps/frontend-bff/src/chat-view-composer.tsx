@@ -2,6 +2,10 @@ import type { RefObject } from "react";
 
 export interface ChatViewComposerProps {
   composerDraft: string;
+  composerFeedback: {
+    message: string;
+    tone: "info" | "success" | "warning" | "error";
+  } | null;
   composerInputLabel: string;
   composerPlaceholder: string;
   composerStatusSegments: string[];
@@ -16,6 +20,7 @@ export interface ChatViewComposerProps {
 
 export function ChatViewComposer({
   composerDraft,
+  composerFeedback,
   composerInputLabel,
   composerPlaceholder,
   composerStatusSegments,
@@ -81,15 +86,30 @@ export function ChatViewComposer({
           </svg>
         </button>
       </label>
-      {composerStatusSegments.length > 0 ? (
-        <div className="chat-composer-status" role="status">
-          {composerStatusSegments.map((segment) => (
-            <span className="chat-composer-status-segment" key={segment}>
-              {segment}
-            </span>
-          ))}
+      <div className="chat-composer-status-rail">
+        {composerStatusSegments.length > 0 ? (
+          <div className="chat-composer-status" role="status">
+            {composerStatusSegments.map((segment) => (
+              <span className="chat-composer-status-segment" key={segment}>
+                {segment}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div aria-hidden="true" className="chat-composer-status chat-composer-status-empty" />
+        )}
+        <div className="chat-composer-feedback-slot">
+          {composerFeedback ? (
+            <p
+              aria-live={composerFeedback.tone === "error" ? "assertive" : "polite"}
+              className={`feedback-note composer-feedback-note ${composerFeedback.tone}`}
+              role={composerFeedback.tone === "error" ? "alert" : "status"}
+            >
+              {composerFeedback.message}
+            </p>
+          ) : null}
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }
