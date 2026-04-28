@@ -1,6 +1,7 @@
 /* Foundation / Shared Primitives */
 :root {
   color-scheme: light;
+  --thread-readable-max-width: 960px;
   --page-bg: #eef2f1;
   --panel-bg: rgba(251, 253, 252, 0.94);
   --panel-border: rgba(22, 47, 52, 0.12);
@@ -369,6 +370,11 @@ textarea {
 .thread-view-body {
   display: grid;
   gap: 14px;
+  min-width: 0;
+}
+
+.thread-view-readable-column {
+  width: 100%;
   min-width: 0;
 }
 
@@ -1526,6 +1532,11 @@ textarea {
   .thread-view-card {
     height: 100%;
     min-height: 0;
+  }
+
+  .thread-view-readable-column {
+    max-width: var(--thread-readable-max-width);
+    margin-inline: auto;
   }
 
   .thread-context-copy h2 {
