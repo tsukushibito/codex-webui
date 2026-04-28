@@ -424,8 +424,7 @@ textarea {
   margin: 0;
 }
 
-.navigation-notice-stack,
-.thread-feedback-stack {
+.navigation-notice-stack {
   display: grid;
   gap: 10px;
 }
@@ -508,6 +507,11 @@ textarea {
   flex: 1;
   grid-template-rows: minmax(0, 1fr) auto;
   min-height: 0;
+}
+
+.thread-view-boundary-stack {
+  display: grid;
+  gap: 10px;
 }
 
 .thread-view-scroll-stack {
@@ -897,36 +901,6 @@ textarea {
   min-width: 0;
 }
 
-.composer-toolbar {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  min-width: 0;
-}
-
-.composer-toolbar-copy {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.composer-toolbar-label,
-.composer-toolbar-hint {
-  margin: 0;
-}
-
-.composer-toolbar-label {
-  color: var(--text-main);
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.composer-toolbar-hint {
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  line-height: 1.35;
-}
-
 .composer-mode-toggle {
   display: inline-flex;
   flex-wrap: wrap;
@@ -1061,17 +1035,7 @@ textarea {
 }
 
 .chat-composer-status-rail {
-  display: grid;
-  gap: 6px;
-}
-
-.chat-composer-status-empty,
-.chat-composer-feedback-slot {
-  min-height: 1.2rem;
-}
-
-.chat-composer-feedback-slot {
-  display: grid;
+  display: block;
 }
 
 .chat-message,
@@ -1509,6 +1473,74 @@ textarea {
 .thread-feedback-card {
   display: grid;
   gap: 10px;
+}
+
+.thread-inline-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 12px;
+  min-width: 0;
+  padding: 0 2px;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.thread-inline-status.info,
+.thread-inline-status.success {
+  color: var(--text-muted);
+}
+
+.thread-inline-status.warning,
+.thread-inline-status.error {
+  padding: 10px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: var(--surface-muted-bg);
+  color: var(--text-main);
+}
+
+.thread-inline-status.warning {
+  border-color: rgba(185, 98, 31, 0.22);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.thread-inline-status.error {
+  border-color: rgba(178, 65, 60, 0.22);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.thread-inline-status-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+
+.thread-inline-status-title,
+.thread-inline-status-message {
+  margin: 0;
+}
+
+.thread-inline-status-title {
+  font-size: 0.84rem;
+}
+
+.thread-inline-status-message-standalone {
+  color: inherit;
+}
+
+.thread-inline-status-actions {
+  flex: 0 1 auto;
+  justify-content: flex-start;
+}
+
+.thread-inline-status-actions .action-button {
+  max-width: 100%;
 }
 
 .thread-feedback-copy {

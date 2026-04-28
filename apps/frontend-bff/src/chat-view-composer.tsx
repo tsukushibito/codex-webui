@@ -4,10 +4,6 @@ import type { ComposerKeybindingMode } from "./chat-view";
 
 export interface ChatViewComposerProps {
   composerDraft: string;
-  composerFeedback: {
-    message: string;
-    tone: "info" | "success" | "warning" | "error";
-  } | null;
   composerInputLabel: string;
   composerKeybindingMode: ComposerKeybindingMode;
   composerPlaceholder: string;
@@ -23,7 +19,6 @@ export interface ChatViewComposerProps {
 
 export function ChatViewComposer({
   composerDraft,
-  composerFeedback,
   composerInputLabel,
   composerKeybindingMode,
   composerPlaceholder,
@@ -76,14 +71,9 @@ export function ChatViewComposer({
 
   return (
     <div className="chat-composer" data-composer-mode={isStartingThread ? "start" : "send"}>
-      <div className="composer-toolbar">
-        <div className="composer-toolbar-copy">
-          <p className="composer-toolbar-label">Keyboard shortcuts</p>
-          <p className="composer-toolbar-hint" id={composerShortcutHintId}>
-            {composerShortcutSummary}
-          </p>
-        </div>
-      </div>
+      <p className="sr-only" id={composerShortcutHintId}>
+        {composerShortcutSummary}
+      </p>
       <label className="composer-input-frame" htmlFor="thread-composer-input">
         <span className="sr-only">{composerInputLabel}</span>
         <textarea
@@ -101,6 +91,7 @@ export function ChatViewComposer({
         />
         <button
           aria-label={composerSubmitLabel}
+          aria-describedby={composerShortcutHintId}
           className="submit-button composer-submit-button"
           disabled={isComposerDisabled}
           onClick={onSubmitComposer}
@@ -144,17 +135,6 @@ export function ChatViewComposer({
         ) : (
           <div aria-hidden="true" className="chat-composer-status chat-composer-status-empty" />
         )}
-        <div className="chat-composer-feedback-slot">
-          {composerFeedback ? (
-            <p
-              aria-live={composerFeedback.tone === "error" ? "assertive" : "polite"}
-              className={`feedback-note composer-feedback-note ${composerFeedback.tone}`}
-              role={composerFeedback.tone === "error" ? "alert" : "status"}
-            >
-              {composerFeedback.message}
-            </p>
-          ) : null}
-        </div>
       </div>
     </div>
   );

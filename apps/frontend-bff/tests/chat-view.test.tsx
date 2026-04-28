@@ -646,7 +646,8 @@ describe("ChatView", () => {
     expect(markup).toContain("timeline-row-prominent");
     expect(markup).not.toContain("pending-request-card-fallback");
     expect(markup).toContain("Request detail");
-    expect(markup).toContain("thread-feedback-card");
+    expect(markup).toContain("thread-inline-status");
+    expect(markup).not.toContain("thread-feedback-card");
     expect(markup).not.toContain("Status update");
     expect(markup).not.toContain("timeline-row-compact");
     expect(markup).not.toContain("Inspect artifacts");
@@ -657,6 +658,8 @@ describe("ChatView", () => {
     expect(markup).toContain('id="thread-composer-input"');
     expect(markup).toContain('class="composer-input-frame"');
     expect(markup).toContain('aria-label="Send message"');
+    expect(markup).toContain('aria-describedby="thread-composer-shortcut-hint"');
+    expect(markup).not.toContain("Keyboard shortcuts");
     expect(markup).not.toContain("Send input");
     expect(markup).not.toContain('id="thread-input"');
     expect(markup).not.toContain('id="message-input"');
@@ -885,9 +888,10 @@ describe("ChatView", () => {
     });
 
     expect(container.querySelector(".thread-feedback-card-inline")).toBeNull();
-    expect(container.querySelector(".thread-feedback-card")?.textContent).toContain(
+    expect(container.querySelector(".thread-inline-status")?.textContent).toContain(
       "Codex is running",
     );
+    expect(container.querySelector(".thread-feedback-card")).toBeNull();
     expect(container.textContent).toContain("Streaming");
     expect(container.querySelector(".timeline-row-live-status")).not.toBeNull();
   });
@@ -1005,9 +1009,10 @@ describe("ChatView", () => {
     });
 
     expect(container.querySelector(".thread-feedback-card-inline")).toBeNull();
-    expect(container.querySelector(".thread-feedback-card")?.textContent).toContain(
+    expect(container.querySelector(".thread-inline-status")?.textContent).toContain(
       "Reconnecting live updates",
     );
+    expect(container.querySelector(".thread-feedback-card")).toBeNull();
     expect(container.querySelector(".timeline-row-live-status")).not.toBeNull();
     expect(container.textContent).toContain("Streaming");
   });
@@ -1041,7 +1046,74 @@ describe("ChatView", () => {
     expect(container.textContent).not.toContain("Submitting follow-up input");
   });
 
-  it("keeps the stronger thread feedback card for first-input submission", async () => {
+  it("renders inline composer feedback between the timeline stack and composer", async () => {
+    await act(async () => {
+      root.render(
+        <ChatView
+          {...buildChatViewBaseProps({
+            composerFeedback: {
+              message: "Input accepted. Waiting for thread updates.",
+              tone: "success",
+            },
+          })}
+        />,
+      );
+    });
+
+    const scrollStack = container.querySelector(".thread-view-scroll-stack");
+    const inlineStatus = container.querySelector(".thread-inline-status");
+    const composer = container.querySelector(".chat-composer");
+
+    expect(scrollStack).not.toBeNull();
+    expect(inlineStatus?.textContent).toContain("Input accepted. Waiting for thread updates.");
+    expect(composer).not.toBeNull();
+    expect(inlineStatus?.getAttribute("role")).toBe("status");
+    expect(inlineStatus?.getAttribute("aria-live")).toBe("polite");
+    if (!scrollStack || !inlineStatus || !composer) {
+      throw new Error("Expected scroll stack, inline status, and composer to be rendered.");
+    }
+    expect(
+      scrollStack.compareDocumentPosition(inlineStatus) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      inlineStatus.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("keeps send shortcut guidance in the accessible button tooltip and description", async () => {
+    await act(async () => {
+      root.render(
+        <ChatView
+          {...buildChatViewBaseProps({
+            composerDraft: "Ship the follow-up.",
+            selectedThreadView: {
+              ...buildChatViewBaseProps().selectedThreadView!,
+              current_activity: {
+                kind: "waiting_on_user_input",
+                label: "Waiting for your input",
+              },
+              composer: {
+                accepting_user_input: true,
+                interrupt_available: false,
+                blocked_by_request: false,
+                input_unavailable_reason: null,
+              },
+            },
+          })}
+        />,
+      );
+    });
+
+    const submitButton = container.querySelector(
+      'button[aria-label="Send message"]',
+    ) as HTMLButtonElement | null;
+    expect(submitButton).not.toBeNull();
+    expect(submitButton?.getAttribute("title")).toBe("Send message (Enter)");
+    expect(submitButton?.getAttribute("aria-describedby")).toBe("thread-composer-shortcut-hint");
+    expect(container.textContent).not.toContain("Keyboard shortcuts");
+  });
+
+  it("keeps first-input submission feedback inline above the composer", async () => {
     await act(async () => {
       root.render(
         <ChatView
@@ -1055,12 +1127,13 @@ describe("ChatView", () => {
       );
     });
 
-    expect(container.querySelector(".thread-feedback-card")?.textContent).toContain(
+    expect(container.querySelector(".thread-inline-status")?.textContent).toContain(
       "Submitting first input",
     );
-    expect(container.querySelector(".thread-feedback-card")?.textContent).toContain(
+    expect(container.querySelector(".thread-inline-status")?.textContent).toContain(
       "new thread to open",
     );
+    expect(container.querySelector(".thread-feedback-card")).toBeNull();
   });
 
   it("shows the first running progress in the timeline before assistant content arrives", async () => {
@@ -1168,7 +1241,44 @@ describe("ChatView", () => {
     expect(container.textContent).toContain("Streaming");
   });
 
-  it("routes legacy feedback props into scoped thread and composer surfaces", () => {
+  it("keeps recovery and error guidance compact with explicit actions", async () => {
+    const verboseError =
+      "Failed to recover the thread after a long reconnect sequence. Review the latest request and timeline payload for diagnostic context before retrying the action again.";
+
+    await act(async () => {
+      root.render(
+        <ChatView
+          {...buildChatViewBaseProps({
+            errorMessage: verboseError,
+            selectedThreadView: {
+              ...buildChatViewBaseProps().selectedThreadView!,
+              current_activity: {
+                kind: "latest_turn_failed",
+                label: "Latest turn failed",
+              },
+              composer: {
+                accepting_user_input: false,
+                interrupt_available: true,
+                blocked_by_request: false,
+                input_unavailable_reason: "recovery_pending",
+              },
+            },
+          })}
+        />,
+      );
+    });
+
+    const inlineStatus = container.querySelector(".thread-inline-status");
+    expect(inlineStatus?.textContent).toContain("Latest turn failed");
+    expect(inlineStatus?.textContent).toContain("Refresh thread");
+    expect(inlineStatus?.textContent).toContain("Interrupt thread");
+    expect(inlineStatus?.getAttribute("role")).toBe("alert");
+    expect(inlineStatus?.getAttribute("aria-live")).toBe("assertive");
+    expect(inlineStatus?.textContent).not.toContain(verboseError);
+    expect(container.querySelector(".thread-feedback-card")).toBeNull();
+  });
+
+  it("routes legacy error feedback into the compact inline status surface", () => {
     const markup = renderToStaticMarkup(
       <ChatView
         backgroundPriorityNotice={null}
@@ -1207,10 +1317,11 @@ describe("ChatView", () => {
       />,
     );
 
-    expect(markup).toContain("thread-surface-feedback");
-    expect(markup).toContain("chat-composer-feedback-slot");
-    expect(markup).toContain("Thread started.");
+    expect(markup).toContain("thread-inline-status");
     expect(markup).toContain("Failed to interrupt the thread.");
+    expect(markup).not.toContain("Thread started.");
+    expect(markup).not.toContain("thread-feedback-card");
+    expect(markup).not.toContain("chat-composer-feedback-slot");
     expect(markup).not.toContain("chat-feedback-stack");
     expect(markup).not.toContain("error-banner");
   });

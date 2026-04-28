@@ -34,6 +34,14 @@ type ScopedFeedback = {
   tone: "info" | "success" | "warning" | "error";
 };
 
+type InlineStatusDescriptor = {
+  actions: ThreadFeedbackAction[];
+  message: string;
+  role: "alert" | "status";
+  title: string | null;
+  tone: ScopedFeedback["tone"];
+};
+
 const SCROLL_FOLLOW_BOTTOM_THRESHOLD_PX = 48;
 const SCROLL_FOLLOW_SUSPEND_DELTA_PX = 24;
 export const THEME_STORAGE_KEY = "codex-webui.theme";
@@ -533,6 +541,95 @@ function buildThreadFeedbackDescriptor({
   };
 }
 
+function normalizeThreadFeedbackTone(
+  tone: ThreadFeedbackDescriptor["badgeTone"],
+): ScopedFeedback["tone"] {
+  switch (tone) {
+    case "success":
+      return "success";
+    case "warning":
+      return "warning";
+    default:
+      return "info";
+  }
+}
+
+function compactInlineErrorMessage(message: string) {
+  const normalized = message.replaceAll(/\s+/g, " ").trim();
+  if (normalized.length <= 96) {
+    return normalized;
+  }
+
+  return "Thread action failed. Refresh the thread or review detail for more information.";
+}
+
+function buildInlineStatusDescriptor({
+  composerFeedback,
+  requestFeedback,
+  threadFeedback,
+  threadViewFeedback,
+}: {
+  composerFeedback: ScopedFeedback | null;
+  requestFeedback: ScopedFeedback | null;
+  threadFeedback: ThreadFeedbackDescriptor;
+  threadViewFeedback: ScopedFeedback | null;
+}): InlineStatusDescriptor | null {
+  if (threadViewFeedback) {
+    return {
+      actions:
+        threadViewFeedback.tone === "error" && threadFeedback.isVisible
+          ? threadFeedback.actions
+          : [],
+      message:
+        threadViewFeedback.tone === "error" && threadFeedback.isVisible
+          ? threadFeedback.summary
+          : threadViewFeedback.tone === "error"
+            ? compactInlineErrorMessage(threadViewFeedback.message)
+            : threadViewFeedback.message,
+      role: threadViewFeedback.tone === "error" ? "alert" : "status",
+      title:
+        threadViewFeedback.tone === "error"
+          ? threadFeedback.isVisible
+            ? threadFeedback.title
+            : "Error"
+          : null,
+      tone: threadViewFeedback.tone,
+    };
+  }
+
+  if (requestFeedback) {
+    return {
+      actions: [],
+      message: requestFeedback.message,
+      role: requestFeedback.tone === "error" ? "alert" : "status",
+      title: null,
+      tone: requestFeedback.tone,
+    };
+  }
+
+  if (composerFeedback) {
+    return {
+      actions: [],
+      message: composerFeedback.message,
+      role: composerFeedback.tone === "error" ? "alert" : "status",
+      title: null,
+      tone: composerFeedback.tone,
+    };
+  }
+
+  if (!threadFeedback.isVisible) {
+    return null;
+  }
+
+  return {
+    actions: threadFeedback.actions,
+    message: threadFeedback.summary,
+    role: "status",
+    title: threadFeedback.title,
+    tone: normalizeThreadFeedbackTone(threadFeedback.badgeTone),
+  };
+}
+
 type MatchableRequest = {
   state: "pending" | "resolved";
   request_id: string;
@@ -848,6 +945,12 @@ export function ChatView({
     (errorMessage !== null
       ? ({ message: errorMessage, tone: "error" } satisfies ScopedFeedback)
       : null);
+  const inlineStatus = buildInlineStatusDescriptor({
+    composerFeedback: effectiveComposerFeedback,
+    requestFeedback: effectiveRequestFeedback,
+    threadFeedback,
+    threadViewFeedback: effectiveThreadViewFeedback,
+  });
   const threadActivitySummary = workspaceId
     ? currentActivitySummary(selectedThreadView, isOpeningSelectedThread)
     : "Choose a workspace to enable the composer.";
@@ -1494,43 +1597,6 @@ export function ChatView({
                 </div>
               </div>
             ) : null}
-            <div className="thread-feedback-stack">
-              {threadFeedback.isVisible ? (
-                <section
-                  aria-live="polite"
-                  className={`thread-feedback-card ${feedbackToneClass(threadFeedback.badgeTone)}`}
-                  role="status"
-                >
-                  <div className="thread-feedback-copy">
-                    <strong>{threadFeedback.title}</strong>
-                    <p>{threadFeedback.summary}</p>
-                  </div>
-                  {threadFeedback.actions.length > 0 ? (
-                    <div className="workspace-actions thread-feedback-actions">
-                      {threadFeedback.actions.map((action) => renderThreadFeedbackAction(action))}
-                    </div>
-                  ) : null}
-                </section>
-              ) : null}
-              {effectiveThreadViewFeedback ? (
-                <p
-                  aria-live={effectiveThreadViewFeedback.tone === "error" ? "assertive" : "polite"}
-                  className={`feedback-note thread-surface-feedback ${feedbackToneClass(effectiveThreadViewFeedback.tone)}`}
-                  role={effectiveThreadViewFeedback.tone === "error" ? "alert" : "status"}
-                >
-                  {effectiveThreadViewFeedback.message}
-                </p>
-              ) : null}
-              {effectiveRequestFeedback ? (
-                <p
-                  aria-live={effectiveRequestFeedback.tone === "error" ? "assertive" : "polite"}
-                  className={`feedback-note request-surface-feedback ${feedbackToneClass(effectiveRequestFeedback.tone)}`}
-                  role={effectiveRequestFeedback.tone === "error" ? "alert" : "status"}
-                >
-                  {effectiveRequestFeedback.message}
-                </p>
-              ) : null}
-            </div>
           </div>
 
           <div className="thread-view-body">
@@ -1694,10 +1760,36 @@ export function ChatView({
               </button>
             </div>
 
-            <div className="thread-view-readable-column">
+            <div className="thread-view-boundary-stack thread-view-readable-column">
+              {inlineStatus ? (
+                <section
+                  aria-live={inlineStatus.role === "alert" ? "assertive" : "polite"}
+                  className={`thread-inline-status ${feedbackToneClass(inlineStatus.tone)}`}
+                  role={inlineStatus.role}
+                >
+                  <div className="thread-inline-status-copy">
+                    {inlineStatus.title ? (
+                      <strong className="thread-inline-status-title">{inlineStatus.title}</strong>
+                    ) : null}
+                    <p
+                      className={
+                        inlineStatus.title
+                          ? "thread-inline-status-message"
+                          : "thread-inline-status-message thread-inline-status-message-standalone"
+                      }
+                    >
+                      {inlineStatus.message}
+                    </p>
+                  </div>
+                  {inlineStatus.actions.length > 0 ? (
+                    <div className="workspace-actions thread-inline-status-actions">
+                      {inlineStatus.actions.map((action) => renderThreadFeedbackAction(action))}
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
               <ChatViewComposer
                 composerDraft={composerDraft}
-                composerFeedback={effectiveComposerFeedback}
                 composerInputLabel={composerInputLabel}
                 composerKeybindingMode={composerKeybindingMode}
                 composerPlaceholder={composerPlaceholder}
