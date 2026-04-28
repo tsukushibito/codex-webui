@@ -38,6 +38,8 @@ const SCROLL_FOLLOW_BOTTOM_THRESHOLD_PX = 48;
 const SCROLL_FOLLOW_SUSPEND_DELTA_PX = 24;
 export const THEME_STORAGE_KEY = "codex-webui.theme";
 const COMPOSER_KEYBINDING_MODE_STORAGE_KEY = "codex-webui.composer-keybinding-mode";
+const FOCUSABLE_SETTINGS_SELECTOR =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export type ComposerKeybindingMode = "chat" | "editor";
 export type ThemeName = "dark" | "light";
@@ -176,12 +178,47 @@ function SecondaryIcon({ children }: { children: ReactNode }) {
   );
 }
 
+function SettingsGlyph() {
+  return (
+    <svg fill="none" height="18" viewBox="0 0 24 24" width="18">
+      <title>Settings</title>
+      <path
+        d="M12 8.75a3.25 3.25 0 1 0 0 6.5 3.25 3.25 0 0 0 0-6.5Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="m19.2 15.1 1.15 1.99-1.85 3.2-2.34-.46a7.94 7.94 0 0 1-1.73 1l-.61 2.3H10.2l-.61-2.3a7.93 7.93 0 0 1-1.73-1l-2.34.46-1.85-3.2 1.15-1.99a8.74 8.74 0 0 1 0-2.2L3.67 10.9l1.85-3.2 2.34.46c.53-.4 1.11-.74 1.73-1l.61-2.3h3.62l.61 2.3c.62.26 1.2.6 1.73 1l2.34-.46 1.85 3.2-1.15 1.99c.13.72.13 1.48 0 2.2Z"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
 function isComposerKeybindingMode(value: string | null): value is ComposerKeybindingMode {
   return value === "chat" || value === "editor";
 }
 
 function isThemeName(value: string | null): value is ThemeName {
   return value === "dark" || value === "light";
+}
+
+function getFocusableElements(container: HTMLElement | null) {
+  if (!container) {
+    return [];
+  }
+
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SETTINGS_SELECTOR)).filter(
+    (element) =>
+      !element.hasAttribute("disabled") &&
+      element.getAttribute("aria-hidden") !== "true" &&
+      element.tabIndex !== -1,
+  );
 }
 
 export function applyThemeToDocumentRoot(theme: ThemeName) {
@@ -687,14 +724,19 @@ export function ChatView({
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>("full");
   const [composerKeybindingMode, setComposerKeybindingMode] =
     useState<ComposerKeybindingMode>("chat");
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [expandedTimelineRows, setExpandedTimelineRows] = useState<Set<string>>(() => new Set());
   const [isScrollFollowingLatest, setIsScrollFollowingLatest] = useState(true);
   const [hasNewerActivityBelow, setHasNewerActivityBelow] = useState(false);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const settingsCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+  const settingsDialogRef = useRef<HTMLDivElement | null>(null);
   const scrollRegionRef = useRef<HTMLDivElement | null>(null);
   const suppressScrollTrackingRef = useRef(false);
   const lastKnownScrollTopRef = useRef(0);
   const lastSeenTimelineActivityRef = useRef("empty");
+  const previousSettingsDialogOpenRef = useRef(false);
   const selectedWorkspace =
     workspaces.find((workspace) => workspace.workspace_id === workspaceId) ?? null;
   const hasSelectedThread = selectedThreadId !== null;
@@ -913,6 +955,88 @@ export function ChatView({
   }, []);
 
   useEffect(() => {
+    if (!isSettingsDialogOpen) {
+      return;
+    }
+
+    const focusableElements = getFocusableElements(settingsDialogRef.current);
+    focusableElements[0]?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setIsSettingsDialogOpen(false);
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const nextFocusableElements = getFocusableElements(settingsDialogRef.current);
+      const firstFocusableElement = nextFocusableElements[0] ?? null;
+      const lastFocusableElement = nextFocusableElements.at(-1) ?? null;
+
+      if (!firstFocusableElement || !lastFocusableElement) {
+        event.preventDefault();
+        return;
+      }
+
+      const activeElement = document.activeElement;
+      const isFocusInsideDialog =
+        activeElement instanceof HTMLElement &&
+        settingsDialogRef.current?.contains(activeElement) === true;
+
+      if (!isFocusInsideDialog) {
+        event.preventDefault();
+        (event.shiftKey ? lastFocusableElement : firstFocusableElement).focus();
+        return;
+      }
+
+      if (event.shiftKey && activeElement === firstFocusableElement) {
+        event.preventDefault();
+        lastFocusableElement.focus();
+        return;
+      }
+
+      if (!event.shiftKey && activeElement === lastFocusableElement) {
+        event.preventDefault();
+        firstFocusableElement.focus();
+      }
+    }
+
+    function handleFocusIn(event: FocusEvent) {
+      const dialog = settingsDialogRef.current;
+      const focusTarget = event.target;
+
+      if (!(dialog && focusTarget instanceof HTMLElement) || dialog.contains(focusTarget)) {
+        return;
+      }
+
+      const nextFocusableElements = getFocusableElements(dialog);
+      nextFocusableElements[0]?.focus();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("focusin", handleFocusIn);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("focusin", handleFocusIn);
+    };
+  }, [isSettingsDialogOpen]);
+
+  useEffect(() => {
+    const wasOpen = previousSettingsDialogOpenRef.current;
+    previousSettingsDialogOpenRef.current = isSettingsDialogOpen;
+
+    if (!wasOpen || isSettingsDialogOpen) {
+      return;
+    }
+
+    settingsButtonRef.current?.focus();
+  }, [isSettingsDialogOpen]);
+
+  useEffect(() => {
     setIsNavigationOpen(false);
     setDetailSelection(null);
     setExpandedTimelineRows(new Set());
@@ -988,8 +1112,12 @@ export function ChatView({
     writeStoredComposerKeybindingMode(nextMode);
   }
 
-  function toggleTheme() {
-    setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"));
+  function openSettingsDialog() {
+    setIsSettingsDialogOpen(true);
+  }
+
+  function closeSettingsDialog() {
+    setIsSettingsDialogOpen(false);
   }
 
   function focusComposer() {
@@ -1187,18 +1315,18 @@ export function ChatView({
                 </div>
                 <div className="thread-context-actions">
                   <button
-                    aria-checked={theme === "dark"}
-                    aria-label="Dark theme"
-                    className="secondary-link compact-link action-button theme-switch"
-                    onClick={toggleTheme}
-                    role="switch"
-                    title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+                    aria-expanded={isSettingsDialogOpen}
+                    aria-haspopup="dialog"
+                    aria-label="Settings"
+                    className="secondary-link compact-link icon-button settings-button"
+                    onClick={openSettingsDialog}
+                    ref={settingsButtonRef}
+                    title="Settings"
                     type="button"
                   >
-                    <span aria-hidden="true" className="theme-switch-track">
-                      <span className="theme-switch-thumb">{theme === "dark" ? "D" : "L"}</span>
-                    </span>
-                    <span className="theme-switch-label">{theme}</span>
+                    <SecondaryIcon>
+                      <SettingsGlyph />
+                    </SecondaryIcon>
                   </button>
                   <button
                     aria-label="Thread details"
@@ -1240,6 +1368,134 @@ export function ChatView({
                 </div>
               </div>
             </header>
+            {isSettingsDialogOpen ? (
+              <div className="settings-dialog-overlay">
+                <div
+                  aria-labelledby="thread-view-settings-title"
+                  aria-modal="true"
+                  className="settings-dialog"
+                  ref={settingsDialogRef}
+                  role="dialog"
+                >
+                  <div className="settings-dialog-header">
+                    <div className="settings-dialog-copy">
+                      <p className="thread-context-label">Thread View preferences</p>
+                      <h3 id="thread-view-settings-title">Settings</h3>
+                    </div>
+                    <button
+                      aria-label="Close settings"
+                      className="secondary-link compact-link icon-button settings-close-button"
+                      onClick={closeSettingsDialog}
+                      ref={settingsCloseButtonRef}
+                      title="Close settings"
+                      type="button"
+                    >
+                      <SecondaryIcon>
+                        <svg fill="none" height="18" viewBox="0 0 24 24" width="18">
+                          <title>Close settings</title>
+                          <path
+                            d="m6 6 12 12"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.8"
+                          />
+                          <path
+                            d="M18 6 6 18"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.8"
+                          />
+                        </svg>
+                      </SecondaryIcon>
+                    </button>
+                  </div>
+                  <div className="settings-dialog-sections">
+                    <fieldset className="settings-fieldset">
+                      <legend className="settings-legend">Theme</legend>
+                      <p className="settings-description">
+                        Change the Thread View color theme immediately.
+                      </p>
+                      <div className="settings-option-grid">
+                        <label
+                          className="composer-mode-option settings-option"
+                          data-active={theme === "dark" ? "true" : "false"}
+                        >
+                          <input
+                            checked={theme === "dark"}
+                            className="composer-mode-input"
+                            name="thread-view-theme"
+                            onChange={() => setTheme("dark")}
+                            type="radio"
+                            value="dark"
+                          />
+                          <span className="composer-mode-option-label">Dark</span>
+                          <span className="composer-mode-option-value">Default fallback theme</span>
+                        </label>
+                        <label
+                          className="composer-mode-option settings-option"
+                          data-active={theme === "light" ? "true" : "false"}
+                        >
+                          <input
+                            checked={theme === "light"}
+                            className="composer-mode-input"
+                            name="thread-view-theme"
+                            onChange={() => setTheme("light")}
+                            type="radio"
+                            value="light"
+                          />
+                          <span className="composer-mode-option-label">Light</span>
+                          <span className="composer-mode-option-value">
+                            Brighter surface contrast
+                          </span>
+                        </label>
+                      </div>
+                    </fieldset>
+                    <fieldset className="settings-fieldset">
+                      <legend className="settings-legend">Enter to send</legend>
+                      <p className="settings-description">
+                        Choose how Enter behaves in the composer.
+                      </p>
+                      <div className="settings-option-grid">
+                        <label
+                          className="composer-mode-option settings-option"
+                          data-active={composerKeybindingMode === "chat" ? "true" : "false"}
+                          title="Chat mode: Enter sends and Shift+Enter adds a new line."
+                        >
+                          <input
+                            checked={composerKeybindingMode === "chat"}
+                            className="composer-mode-input"
+                            name="composer-keybinding-mode"
+                            onChange={() => updateComposerKeybindingMode("chat")}
+                            type="radio"
+                            value="chat"
+                          />
+                          <span className="composer-mode-option-label">Chat</span>
+                          <span className="composer-mode-option-value">Enter sends</span>
+                        </label>
+                        <label
+                          className="composer-mode-option settings-option"
+                          data-active={composerKeybindingMode === "editor" ? "true" : "false"}
+                          title="Editor mode: Enter adds a new line and Ctrl+Enter or Meta+Enter sends."
+                        >
+                          <input
+                            checked={composerKeybindingMode === "editor"}
+                            className="composer-mode-input"
+                            name="composer-keybinding-mode"
+                            onChange={() => updateComposerKeybindingMode("editor")}
+                            type="radio"
+                            value="editor"
+                          />
+                          <span className="composer-mode-option-label">Editor</span>
+                          <span className="composer-mode-option-value">Cmd/Ctrl+Enter sends</span>
+                        </label>
+                      </div>
+                    </fieldset>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <div className="thread-feedback-stack">
               {threadFeedback.isVisible ? (
                 <section
@@ -1454,7 +1710,6 @@ export function ChatView({
                 isComposerDisabled={isComposerDisabled}
                 isStartingThread={isStartingThread}
                 isTextareaDisabled={isComposerTextareaDisabled}
-                onComposerKeybindingModeChange={updateComposerKeybindingMode}
                 onComposerDraftChange={onComposerDraftChange}
                 onSubmitComposer={submitComposer}
                 textareaRef={composerRef}

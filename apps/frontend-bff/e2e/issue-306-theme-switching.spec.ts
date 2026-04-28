@@ -34,6 +34,20 @@ function primaryDenyButton(page: Page) {
   return page.locator(".danger-button").first();
 }
 
+function settingsButton(page: Page) {
+  return page.getByRole("button", { name: "Settings", exact: true });
+}
+
+async function openSettingsDialog(page: Page) {
+  await settingsButton(page).click();
+  await expect(page.getByRole("dialog", { name: "Settings", exact: true })).toBeVisible();
+}
+
+async function switchToLightTheme(page: Page) {
+  await openSettingsDialog(page);
+  await page.locator(".settings-dialog .composer-mode-option", { hasText: "Light" }).click();
+}
+
 async function mockThemeSurface(page: Page) {
   const workspace = {
     workspace_id: "ws_alpha",
@@ -453,8 +467,7 @@ test("persists theme across reload and preserves thread state while toggling", a
   await expect(page.getByRole("heading", { name: "Theme validation thread" })).toBeVisible();
   await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
 
-  const themeSwitch = page.getByRole("switch", { name: "Dark theme" });
-  await expect(themeSwitch).toHaveAttribute("aria-checked", "true");
+  await expect(settingsButton(page)).toHaveAttribute("aria-expanded", "false");
   await expect
     .poll(() =>
       page.evaluate(() => ({
@@ -474,9 +487,9 @@ test("persists theme across reload and preserves thread state while toggling", a
     return element.scrollTop;
   });
 
-  await themeSwitch.click();
+  await switchToLightTheme(page);
 
-  await expect(themeSwitch).toHaveAttribute("aria-checked", "false");
+  await expect(page.locator('input[name="thread-view-theme"][value="light"]')).toBeChecked();
   await expect(page).toHaveURL(/workspaceId=ws_alpha&threadId=thread_001/);
   await expect(page.getByRole("heading", { name: "Thread details", exact: true })).toBeVisible();
   await expect(composer).toHaveValue("Preserve this draft");
@@ -498,7 +511,8 @@ test("persists theme across reload and preserves thread state while toggling", a
 
   await page.reload();
   await expect(page.getByRole("heading", { name: "Theme validation thread" })).toBeVisible();
-  await expect(themeSwitch).toHaveAttribute("aria-checked", "false");
+  await openSettingsDialog(page);
+  await expect(page.locator('input[name="thread-view-theme"][value="light"]')).toBeChecked();
   await expect
     .poll(() =>
       page.evaluate(() => ({
@@ -523,9 +537,9 @@ test("captures dark and light theme evidence on desktop and mobile", async ({ pa
 
   await captureThemeScreenshot(page, `${viewportLabel}-dark.png`);
 
-  const themeSwitch = page.getByRole("switch", { name: "Dark theme" });
-  await themeSwitch.click();
-  await expect(themeSwitch).toHaveAttribute("aria-checked", "false");
+  await switchToLightTheme(page);
+  await expect(page.locator('input[name="thread-view-theme"][value="light"]')).toBeChecked();
+  await page.getByRole("button", { name: "Close settings", exact: true }).click();
   await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
 
   await captureThemeScreenshot(page, `${viewportLabel}-light.png`);
@@ -550,9 +564,9 @@ test("captures pending request controls and detail surface in dark and light the
   await captureThemeScreenshot(page, `${viewportLabel}-detail-dark.png`);
   await page.getByRole("button", { name: "Close", exact: true }).click();
 
-  const themeSwitch = page.getByRole("switch", { name: "Dark theme" });
-  await themeSwitch.click();
-  await expect(themeSwitch).toHaveAttribute("aria-checked", "false");
+  await switchToLightTheme(page);
+  await expect(page.locator('input[name="thread-view-theme"][value="light"]')).toBeChecked();
+  await page.getByRole("button", { name: "Close settings", exact: true }).click();
   await expect.poll(async () => expectNoHorizontalScroll(page)).toBe(true);
 
   await captureThemeScreenshot(page, `${viewportLabel}-pending-request-light.png`);
@@ -590,9 +604,9 @@ test("captures request feedback states across dark and light themes", async ({
   await errorPage.goto("/chat?workspaceId=ws_alpha&threadId=thread_001");
   await expect(primaryApproveButton(errorPage)).toBeVisible();
 
-  const themeSwitch = errorPage.getByRole("switch", { name: "Dark theme" });
-  await themeSwitch.click();
-  await expect(themeSwitch).toHaveAttribute("aria-checked", "false");
+  await switchToLightTheme(errorPage);
+  await expect(errorPage.locator('input[name="thread-view-theme"][value="light"]')).toBeChecked();
+  await errorPage.getByRole("button", { name: "Close settings", exact: true }).click();
 
   await primaryDenyButton(errorPage).click();
   await expect(errorPage.getByText("Failed to respond to the request.")).toBeVisible();
