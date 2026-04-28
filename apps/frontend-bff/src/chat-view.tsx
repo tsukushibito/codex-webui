@@ -363,14 +363,12 @@ function buildThreadFeedbackDescriptor({
     };
   }
 
-  if (isSendingMessage) {
+  if (isSendingMessage && isStartingThread) {
     return {
       badgeTone: "success",
       isVisible: true,
-      title: isStartingThread ? "Submitting first input" : "Submitting follow-up input",
-      summary: isStartingThread
-        ? "Input is accepted locally while Thread View waits for the new thread to open."
-        : "Input is accepted locally while Thread View waits for the next thread update.",
+      title: "Submitting first input",
+      summary: "Input is accepted locally while Thread View waits for the new thread to open.",
       actions: [],
     };
   }

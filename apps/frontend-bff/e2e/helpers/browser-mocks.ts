@@ -316,6 +316,7 @@ export async function mockChatFlow(
   page: Page,
   options: {
     existingThread?: boolean;
+    followupResponseDelayMs?: number;
     longTimeline?: boolean;
   } = {},
 ) {
@@ -337,6 +338,7 @@ export async function mockChatFlow(
   let threadStatus: "idle" | "running" = "idle";
   let latestTurnStatus: "completed" | "running" | "interrupted" = "completed";
   const existingThread = options.existingThread ?? false;
+  const followupResponseDelayMs = options.followupResponseDelayMs ?? 0;
   const longTimeline = options.longTimeline ?? false;
   const timelineItems: Array<{
     timeline_item_id: string;
@@ -589,6 +591,12 @@ export async function mockChatFlow(
       const body = request.postDataJSON() as {
         content: string;
       };
+
+      if (followupResponseDelayMs > 0) {
+        await new Promise((resolve) => {
+          setTimeout(resolve, followupResponseDelayMs);
+        });
+      }
 
       followupCount += 1;
       threadExists = true;
