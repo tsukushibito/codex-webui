@@ -6,7 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ChatView, type ChatViewProps } from "../src/chat-view";
+import { ChatView, type ChatViewProps, THEME_STORAGE_KEY } from "../src/chat-view";
 
 vi.mock("next/link", () => ({
   default: ({
@@ -42,6 +42,8 @@ describe("ChatView", () => {
       root.unmount();
     });
     container.remove();
+    delete document.documentElement.dataset.theme;
+    document.documentElement.style.colorScheme = "";
   });
 
   function buildThreadViewTimelineItems(count: number) {
@@ -140,6 +142,12 @@ describe("ChatView", () => {
     return textarea!;
   }
 
+  function themeSwitch(container: HTMLDivElement) {
+    const switchButton = container.querySelector<HTMLButtonElement>('button[role="switch"]');
+    expect(switchButton).not.toBeNull();
+    return switchButton!;
+  }
+
   function dispatchComposerKeydown(
     textarea: HTMLTextAreaElement,
     init: KeyboardEventInit & { isComposing?: boolean; keyCode?: number } = {},
@@ -213,6 +221,95 @@ describe("ChatView", () => {
       },
     };
   }
+
+  it("defaults to dark theme, applies it at the document root, and exposes the switch state", async () => {
+    const storage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+    };
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: storage,
+    });
+
+    await act(async () => {
+      root.render(<ChatView {...buildChatViewBaseProps()} />);
+    });
+
+    const switchButton = themeSwitch(container);
+    expect(switchButton.getAttribute("aria-checked")).toBe("true");
+    expect(switchButton.textContent).toContain("dark");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+    expect(storage.setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, "dark");
+  });
+
+  it("restores a persisted light theme and toggles without remounting the view", async () => {
+    const storage = {
+      getItem: vi.fn((key: string) => (key === THEME_STORAGE_KEY ? "light" : null)),
+      setItem: vi.fn(),
+    };
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: storage,
+    });
+
+    await act(async () => {
+      root.render(<ChatView {...buildChatViewBaseProps({ composerDraft: "draft persists" })} />);
+    });
+
+    const switchButton = themeSwitch(container);
+    expect(switchButton.getAttribute("aria-checked")).toBe("false");
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(composerTextarea(container).value).toBe("draft persists");
+
+    await act(async () => {
+      switchButton.click();
+    });
+
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+    expect(storage.setItem).toHaveBeenLastCalledWith(THEME_STORAGE_KEY, "dark");
+    expect(composerTextarea(container).value).toBe("draft persists");
+  });
+
+  it("falls back to dark theme when theme storage is invalid or inaccessible", async () => {
+    const invalidStorage = {
+      getItem: vi.fn(() => "sepia"),
+      setItem: vi.fn(),
+    };
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: invalidStorage,
+    });
+
+    await act(async () => {
+      root.render(<ChatView {...buildChatViewBaseProps()} />);
+    });
+
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+
+    act(() => {
+      root.unmount();
+    });
+
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        throw new Error("storage unavailable");
+      },
+    });
+
+    root = createRoot(container);
+
+    await act(async () => {
+      root.render(<ChatView {...buildChatViewBaseProps()} />);
+    });
+
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+  });
 
   it("renders thread context, pending request controls, and timeline state", () => {
     const markup = renderToStaticMarkup(

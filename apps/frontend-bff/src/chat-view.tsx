@@ -36,9 +36,11 @@ type ScopedFeedback = {
 
 const SCROLL_FOLLOW_BOTTOM_THRESHOLD_PX = 48;
 const SCROLL_FOLLOW_SUSPEND_DELTA_PX = 24;
+export const THEME_STORAGE_KEY = "codex-webui.theme";
 const COMPOSER_KEYBINDING_MODE_STORAGE_KEY = "codex-webui.composer-keybinding-mode";
 
 export type ComposerKeybindingMode = "chat" | "editor";
+export type ThemeName = "dark" | "light";
 
 export interface ChatViewProps {
   workspaceId: string | null;
@@ -176,6 +178,40 @@ function SecondaryIcon({ children }: { children: ReactNode }) {
 
 function isComposerKeybindingMode(value: string | null): value is ComposerKeybindingMode {
   return value === "chat" || value === "editor";
+}
+
+function isThemeName(value: string | null): value is ThemeName {
+  return value === "dark" || value === "light";
+}
+
+export function applyThemeToDocumentRoot(theme: ThemeName) {
+  document.documentElement.dataset.theme = theme;
+  document.documentElement.style.colorScheme = theme;
+}
+
+export function readStoredTheme() {
+  try {
+    const storage = window.localStorage;
+    if (typeof storage.getItem !== "function") {
+      return "dark" satisfies ThemeName;
+    }
+
+    const storedTheme = storage.getItem(THEME_STORAGE_KEY);
+    return isThemeName(storedTheme) ? storedTheme : ("dark" satisfies ThemeName);
+  } catch {
+    return "dark" satisfies ThemeName;
+  }
+}
+
+export function writeStoredTheme(nextTheme: ThemeName) {
+  try {
+    const storage = window.localStorage;
+    if (typeof storage.setItem === "function") {
+      storage.setItem(THEME_STORAGE_KEY, nextTheme);
+    }
+  } catch {
+    // Theme preference should never block Thread View interactions.
+  }
 }
 
 export function readStoredComposerKeybindingMode() {
@@ -645,6 +681,7 @@ export function ChatView({
   onApproveRequest,
   onDenyRequest,
 }: ChatViewProps) {
+  const [theme, setTheme] = useState<ThemeName>("dark");
   const [isNavigationOpen, setIsNavigationOpen] = useState(false);
   const [detailSelection, setDetailSelection] = useState<ThreadDetailSelection | null>(null);
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>("full");
@@ -852,6 +889,16 @@ export function ChatView({
   const showJumpToLatestActivity = !isScrollFollowingLatest && hasNewerActivityBelow;
 
   useEffect(() => {
+    const storedTheme = readStoredTheme();
+    setTheme(storedTheme);
+  }, []);
+
+  useEffect(() => {
+    applyThemeToDocumentRoot(theme);
+    writeStoredTheme(theme);
+  }, [theme]);
+
+  useEffect(() => {
     const storedMode = readStoredSidebarMode();
     if (storedMode) {
       setSidebarMode(storedMode);
@@ -939,6 +986,10 @@ export function ChatView({
   function updateComposerKeybindingMode(nextMode: ComposerKeybindingMode) {
     setComposerKeybindingMode(nextMode);
     writeStoredComposerKeybindingMode(nextMode);
+  }
+
+  function toggleTheme() {
+    setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"));
   }
 
   function focusComposer() {
@@ -1135,6 +1186,20 @@ export function ChatView({
                   <h2 title={threadHeading}>{threadHeading}</h2>
                 </div>
                 <div className="thread-context-actions">
+                  <button
+                    aria-checked={theme === "dark"}
+                    aria-label="Dark theme"
+                    className="secondary-link compact-link action-button theme-switch"
+                    onClick={toggleTheme}
+                    role="switch"
+                    title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+                    type="button"
+                  >
+                    <span aria-hidden="true" className="theme-switch-track">
+                      <span className="theme-switch-thumb">{theme === "dark" ? "D" : "L"}</span>
+                    </span>
+                    <span className="theme-switch-label">{theme}</span>
+                  </button>
                   <button
                     aria-label="Thread details"
                     className="secondary-link compact-link icon-button"

@@ -73,6 +73,7 @@ None.
 
 ## Archived Task Packages
 
+- [issue-306-theme-switching](./archive/issue-306-theme-switching/README.md)
 - [issue-305-composer-keybindings](./archive/issue-305-composer-keybindings/README.md)
 - [issue-303-auto-scroll](./archive/issue-303-auto-scroll/README.md)
 - [issue-302-scoped-feedback](./archive/issue-302-scoped-feedback/README.md)
