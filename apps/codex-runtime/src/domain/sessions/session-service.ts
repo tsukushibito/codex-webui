@@ -574,7 +574,14 @@ export class SessionService {
       sort?: "created_at" | "-created_at";
     } = {},
   ) {
-    await this.getSession(sessionId);
+    const session = await this.getSession(sessionId);
+    if (session.app_session_overlay_state === "recovery_pending") {
+      return {
+        items: [],
+        next_cursor: null,
+        has_more: false,
+      };
+    }
 
     const limit = Math.max(1, Math.min(options.limit ?? 100, 100));
     const sort = options.sort ?? "created_at";
@@ -605,7 +612,14 @@ export class SessionService {
       sort?: "occurred_at" | "-occurred_at";
     } = {},
   ) {
-    await this.getSession(sessionId);
+    const session = await this.getSession(sessionId);
+    if (session.app_session_overlay_state === "recovery_pending") {
+      return {
+        items: [],
+        next_cursor: null,
+        has_more: false,
+      };
+    }
 
     const limit = Math.max(1, Math.min(options.limit ?? 100, 100));
     const sort = options.sort ?? "occurred_at";
