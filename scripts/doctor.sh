@@ -164,7 +164,7 @@ echo "== Tailscale sidecar live checks (user-run, not validated here) =="
 echo "[info] docker compose up -d --build tailscale dev"
 echo "[info] docker compose exec dev bash -lc 'scripts/start-codex-webui.sh'"
 echo "[info] docker compose exec tailscale tailscale status"
-echo "[info] docker compose exec tailscale tailscale serve --bg 3000"
+echo "[info] docker compose exec tailscale ls -l /config/serve.json"
 echo "[info] docker compose exec tailscale tailscale serve status"
 echo "[info] Expected live evidence: Serve targets only http://127.0.0.1:3000 and the MagicDNS / tailnet URL loads frontend-bff from desktop and smartphone."
 

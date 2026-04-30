@@ -29,6 +29,30 @@ After the heading, keep the body concise:
 
 ## Entries
 
+## [2026-04-30] ingest | Tailscale Serve config automation
+
+Source:
+
+- user request to configure Tailscale Serve through `TS_SERVE_CONFIG`
+- `docker-compose.yml`
+- `config/tailscale/serve.json`
+- `scripts/doctor.sh`
+- `docs/codex_webui_dev_container_onboarding.md`
+
+Updated:
+
+- `docker-compose.yml`
+- `config/tailscale/serve.json`
+- `scripts/doctor.sh`
+- `docs/codex_webui_dev_container_onboarding.md`
+- `docs/log.md`
+
+Notes:
+
+- added a repo-tracked Tailscale Serve config that proxies only `https://<node>.<tailnet>.ts.net/` to `http://127.0.0.1:3000`
+- mounted the config directory into the Tailscale sidecar and set `TS_SERVE_CONFIG=/config/serve.json`
+- updated onboarding and doctor guidance so Serve status is verified instead of requiring `tailscale serve --bg 3000` as the normal path
+
 ## [2026-04-30] ingest | Tailscale browser-check compose usage
 
 Source:

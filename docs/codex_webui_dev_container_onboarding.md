@@ -66,7 +66,8 @@ The recommended path is `docker compose`, not a direct `docker run`, because the
 - persistent auth/cache volumes
 - Docker socket access
 - the shared network namespace between `dev` and the Tailscale sidecar
-- the persistent Tailscale state volume used for node state and Serve configuration
+- the persistent Tailscale state volume used for node state
+- the read-only Tailscale Serve configuration mounted from `config/tailscale/serve.json`
 
 The sidecar owns the network namespace. The local browser-facing entrypoint inside that namespace is `http://127.0.0.1:3000/`. Do not publish or expose the private runtime service directly.
 
@@ -138,13 +139,13 @@ If an earlier local WebUI run is still active, stop it before starting again:
 scripts/stop-codex-webui.sh
 ```
 
-### 5.2 Publish only the frontend through Tailscale Serve
+### 5.2 Confirm Tailscale Serve configuration
 
-Run these commands from the host checkout or from any shell that can reach the Docker daemon:
+The sidecar reads `config/tailscale/serve.json` through `TS_SERVE_CONFIG=/config/serve.json` when the `tailscale` service starts. Run these commands from the host checkout or from any shell that can reach the Docker daemon:
 
 ```bash
 docker compose --env-file .env exec tailscale tailscale status
-docker compose --env-file .env exec tailscale tailscale serve --bg 3000
+docker compose --env-file .env exec tailscale ls -l /config/serve.json
 docker compose --env-file .env exec tailscale tailscale serve status
 ```
 
@@ -192,6 +193,7 @@ Expected evidence:
 - `TAILSCALE_HOSTNAME`: optional tailnet hostname override for the sidecar container
 - `TAILSCALE_USERSPACE`: defaults to `false`; set `true` only as a fallback when the host cannot provide `/dev/net/tun`
 - `TAILSCALE_EXTRA_ARGS`: optional extra `tailscale up` flags; the documented default disables Tailscale-managed DNS rewrites
+- `TS_SERVE_CONFIG`: set by `docker-compose.yml` to `/config/serve.json`; do not override it in `.env`
 - `CODEX_WEBUI_FRONTEND_PORT`: defaults to `3000`
 - `CODEX_WEBUI_WORKSPACE_ROOT`: optional override for the runtime workspace root
 - `CODEX_WEBUI_DATABASE_PATH`: optional override for the runtime SQLite path
@@ -225,14 +227,19 @@ If your host cannot provide `/dev/net/tun`, set `TAILSCALE_USERSPACE=true` and r
 
 ### 8.2 Tailscale Serve does not point at the frontend
 
-Reapply the supported Serve command:
+Confirm the mounted configuration exists, then recreate the sidecar so `TS_SERVE_CONFIG` is read again:
 
 ```bash
-docker compose --env-file .env exec tailscale tailscale serve --bg 3000
+docker compose --env-file .env exec tailscale ls -l /config/serve.json
+docker compose --env-file .env up -d --force-recreate tailscale dev
 docker compose --env-file .env exec tailscale tailscale serve status
 ```
 
-The supported Serve target is only `http://127.0.0.1:3000`.
+The supported Serve target is only `http://127.0.0.1:3000`. If you intentionally need to repair it manually, run the command from the sidecar:
+
+```bash
+docker compose --env-file .env exec tailscale tailscale serve --bg 3000
+```
 
 ### 8.3 Port `3000` is already in use inside the shared namespace
 

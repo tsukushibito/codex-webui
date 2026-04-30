@@ -13,12 +13,14 @@ services:
       - /dev/net/tun:/dev/net/tun
     volumes:
       - codex_webui_tailscale_state:${TAILSCALE_STATE_DIR:-/var/lib/tailscale}
+      - ./config/tailscale:/config:ro
     environment:
       TS_AUTHKEY: ${TAILSCALE_AUTHKEY:-}
       TS_HOSTNAME: ${TAILSCALE_HOSTNAME:-codex-webui-dev}
       TS_USERSPACE: ${TAILSCALE_USERSPACE:-false}
       TS_STATE_DIR: ${TAILSCALE_STATE_DIR:-/var/lib/tailscale}
       TS_EXTRA_ARGS: ${TAILSCALE_EXTRA_ARGS:---accept-dns=false}
+      TS_SERVE_CONFIG: /config/serve.json
     restart: unless-stopped
 
   dev:
