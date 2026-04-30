@@ -16,7 +16,6 @@ EXPECTED_CARGO_VERSION_PREFIX="${EXPECTED_CARGO_VERSION_PREFIX:-${EXPECTED_RUST_
 TAILSCALE_AUTHKEY="${TAILSCALE_AUTHKEY:-}"
 TAILSCALE_HOSTNAME="${TAILSCALE_HOSTNAME:-}"
 TAILSCALE_USERSPACE="${TAILSCALE_USERSPACE:-false}"
-TAILSCALE_SERVE_CONFIG="${TAILSCALE_SERVE_CONFIG:-/var/lib/tailscale/serve/frontend-bff.json}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 failures=0
@@ -158,7 +157,6 @@ echo "== Tailscale sidecar prerequisites =="
 print_env_state "TAILSCALE_AUTHKEY" "${TAILSCALE_AUTHKEY}" "set it in .env before user-run tailnet verification"
 print_env_state "TAILSCALE_HOSTNAME" "${TAILSCALE_HOSTNAME}" "optional; defaults to codex-webui-dev when omitted"
 echo "[info] TAILSCALE_USERSPACE: ${TAILSCALE_USERSPACE} (recommended default: false for /dev/net/tun kernel networking)"
-echo "[info] TAILSCALE_SERVE_CONFIG expected path: ${TAILSCALE_SERVE_CONFIG}"
 echo "[info] Set TAILSCALE_USERSPACE=true only if the host cannot provide /dev/net/tun; that is a fallback with different networking behavior."
 
 echo

@@ -18,7 +18,6 @@ services:
       TS_HOSTNAME: ${TAILSCALE_HOSTNAME:-codex-webui-dev}
       TS_USERSPACE: ${TAILSCALE_USERSPACE:-false}
       TS_STATE_DIR: ${TAILSCALE_STATE_DIR:-/var/lib/tailscale}
-      TS_SERVE_CONFIG: ${TAILSCALE_SERVE_CONFIG:-/var/lib/tailscale/serve/frontend-bff.json}
       TS_EXTRA_ARGS: ${TAILSCALE_EXTRA_ARGS:---accept-dns=false}
     restart: unless-stopped
 

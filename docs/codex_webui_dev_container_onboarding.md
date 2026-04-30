@@ -1,6 +1,6 @@
 # Codex WebUI dev container onboarding
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## 1. Purpose
 
@@ -10,6 +10,7 @@ It covers:
 
 - the repo-root `Dockerfile`
 - the repo-root `docker-compose.yml`
+- the repo-root `docker-compose.tailscale-browser.yml` browser-check helper
 - the `code tunnel` helper for remote development access
 - the supported Tailscale sidecar + Tailscale Serve flow for remote WebUI verification
 
@@ -21,12 +22,16 @@ The repository root includes the following development entrypoints:
 
 - `Dockerfile`: development image for this repository
 - `docker-compose.yml`: recommended way to run the dev container and the Tailscale sidecar
+- `docker-compose.tailscale-browser.yml`: separate Tailscale sidecar plus noVNC browser verification stack
+- `scripts/tailscale-browser-compose.sh`, `scripts/tailscale-browser-compose.ps1`, and `scripts/tailscale-browser-compose.bat`: short wrappers for the separate browser verification compose stack
 - `scripts/start-codex-webui.sh`: starts the local runtime service and `frontend-bff` inside the shared sidecar namespace
 - `scripts/stop-codex-webui.sh`: stops local WebUI dev processes from this checkout
 - `scripts/start-tunnel.sh`: starts `code tunnel`
 - `scripts/doctor.sh`: validates the development container toolchain and prints user-run Tailscale verification steps
 
 The container is intended to mount this repository as `/workspace`.
+
+For the separate containerized Chrome/noVNC verification stack, use [`docs/codex_webui_tailscale_browser_check.md`](./codex_webui_tailscale_browser_check.md).
 
 ## 3. Recommended workflow
 
@@ -43,7 +48,6 @@ Set at least the following before you bring up the sidecar:
 - `TAILSCALE_AUTHKEY`: auth key for the target tailnet
 - `TAILSCALE_HOSTNAME`: optional stable hostname for this dev node
 - `TAILSCALE_USERSPACE`: defaults to `false` for the kernel-networking sidecar path with `/dev/net/tun`
-- `TAILSCALE_SERVE_CONFIG`: optional override for the persisted Serve config path; default is `/var/lib/tailscale/serve/frontend-bff.json`
 
 The supported remote-browser path assumes tailnet membership and Tailscale ACLs are the access boundary. Public internet exposure is out of scope, and `tailscale funnel` is not a supported command for this repo workflow.
 
@@ -151,12 +155,6 @@ Expected Serve behavior:
 - the access boundary is tailnet membership plus ACLs
 - `tailscale funnel` is not used and is not supported for this repo workflow
 
-If you need to inspect the persisted Serve config path:
-
-```bash
-docker compose --env-file .env exec tailscale sh -lc 'echo "$TS_SERVE_CONFIG" && test -f "$TS_SERVE_CONFIG" && sed -n "1,160p" "$TS_SERVE_CONFIG"'
-```
-
 ### 5.3 User-run live verification
 
 Live browser verification is intentionally user-run outside this agent session.
@@ -193,7 +191,6 @@ Expected evidence:
 - `TAILSCALE_AUTHKEY`: auth key used by the sidecar container
 - `TAILSCALE_HOSTNAME`: optional tailnet hostname override for the sidecar container
 - `TAILSCALE_USERSPACE`: defaults to `false`; set `true` only as a fallback when the host cannot provide `/dev/net/tun`
-- `TAILSCALE_SERVE_CONFIG`: persisted Serve config path inside the sidecar state volume
 - `TAILSCALE_EXTRA_ARGS`: optional extra `tailscale up` flags; the documented default disables Tailscale-managed DNS rewrites
 - `CODEX_WEBUI_FRONTEND_PORT`: defaults to `3000`
 - `CODEX_WEBUI_WORKSPACE_ROOT`: optional override for the runtime workspace root

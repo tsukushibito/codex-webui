@@ -1,6 +1,6 @@
 # Codex WebUI LLM Wiki Index
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## Purpose
 
@@ -41,6 +41,7 @@ Read this file first when you need to locate maintained knowledge across source-
 - [AGENTS.md](../AGENTS.md): repo-wide workflow rules, including wiki promotion and update triggers
 - [docs/codex_webui_mvp_roadmap_v0_1.md](./codex_webui_mvp_roadmap_v0_1.md): phase breakdown and delivery order; for UX questions, treat it as sequencing guidance and use the v0.9 UI layout spec plus v0.9 requirements/specs as the current UX source of truth
 - [docs/codex_webui_dev_container_onboarding.md](./codex_webui_dev_container_onboarding.md): development container, Tailscale sidecar, Tailscale Serve, and tunnel workflow
+- [docs/codex_webui_tailscale_browser_check.md](./codex_webui_tailscale_browser_check.md): usage guide for the separate Tailscale sidecar plus noVNC browser verification compose stack
 - [docs/README.md](./README.md): wiki maintenance workflow and category-specific placement rules
 
 ## Update expectations

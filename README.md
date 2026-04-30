@@ -41,12 +41,14 @@ For a repo-local development container and launcher workflow, this repository al
 
 - [`Dockerfile`](./Dockerfile)
 - [`docker-compose.yml`](./docker-compose.yml) for the dev container plus Tailscale sidecar workflow
+- [`docker-compose.tailscale-browser.yml`](./docker-compose.tailscale-browser.yml) for a separate Tailscale sidecar plus noVNC browser verification stack
+- [`scripts/tailscale-browser-compose.sh`](./scripts/tailscale-browser-compose.sh), [`scripts/tailscale-browser-compose.ps1`](./scripts/tailscale-browser-compose.ps1), and [`scripts/tailscale-browser-compose.bat`](./scripts/tailscale-browser-compose.bat) as short wrappers for the browser verification compose stack
 - [`scripts/start-tunnel.sh`](./scripts/start-tunnel.sh) for `code tunnel`
 - [`scripts/start-codex-webui.sh`](./scripts/start-codex-webui.sh) for local `codex-runtime` + `frontend-bff` startup inside the shared sidecar namespace
 - [`scripts/stop-codex-webui.sh`](./scripts/stop-codex-webui.sh) for stopping local `codex-runtime` + `frontend-bff` dev processes
 - [`docs/codex_webui_dev_container_onboarding.md`](./docs/codex_webui_dev_container_onboarding.md) for the full container, Tailscale Serve, and tunnel workflow
 
-Use the onboarding document for the full setup and usage flow instead of relying on the root README for step-by-step operational detail.
+Use the onboarding document for the full setup and usage flow instead of relying on the root README for step-by-step operational detail. Use [`docs/codex_webui_tailscale_browser_check.md`](./docs/codex_webui_tailscale_browser_check.md) for the separate containerized Chrome/noVNC verification stack.
 
 ## Workflow notes
 

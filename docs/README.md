@@ -28,6 +28,7 @@ This directory is the area for source-of-truth documents such as requirements, s
 - `notes/README.md`
 - `codex_webui_mvp_roadmap_v0_1.md`
 - `codex_webui_dev_container_onboarding.md`
+- `codex_webui_tailscale_browser_check.md`
 - `codex_webui_llm_wiki_adoption_note_v0_1.md`
 
 ## Responsibility Boundaries with Related Directories

@@ -1,6 +1,6 @@
 # Codex WebUI LLM Wiki Log
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## Purpose
 
@@ -28,6 +28,38 @@ After the heading, keep the body concise:
 - short note on what changed or remains deferred
 
 ## Entries
+
+## [2026-04-30] ingest | Tailscale browser-check compose usage
+
+Source:
+
+- user request for `docker-compose.tailscale-browser.yml` usage documentation
+- `docker-compose.tailscale-browser.yml`
+- `.env.tailscale-browser.example`
+- `scripts/tailscale-browser-compose.sh`
+- `scripts/tailscale-browser-compose.ps1`
+- `scripts/tailscale-browser-compose.bat`
+
+Updated:
+
+- `README.md`
+- `.gitignore`
+- `scripts/tailscale-browser-compose.sh`
+- `scripts/tailscale-browser-compose.ps1`
+- `scripts/tailscale-browser-compose.bat`
+- `docs/codex_webui_tailscale_browser_check.md`
+- `docs/README.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- added a maintained usage guide for the separate Tailscale sidecar plus noVNC browser verification stack
+- added a short wrapper script so users do not need to repeat the compose file and env file flags
+- added a PowerShell wrapper and a thin Command Prompt wrapper that delegates to it for Windows users
+- ignored the local `.env.tailscale-browser` file while keeping `.env.tailscale-browser.example` trackable
+- documented startup, noVNC access, shared sidecar network model, common checks, stop/reset commands, and troubleshooting
+- kept the guide separate from the primary dev container onboarding path
 
 ## [2026-04-29] ingest | Issue #318 Tailscale sidecar remote-browser path
 

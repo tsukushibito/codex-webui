@@ -1,0 +1,43 @@
+name: ${COMPOSE_PROJECT_NAME:-codex-webui-tailscale-browser-check}
+
+services:
+  tailscale:
+    image: tailscale/tailscale:stable
+    container_name: ${TAILSCALE_CONTAINER_NAME:-codex-webui-browser-check-tailscale}
+    hostname: ${TAILSCALE_HOSTNAME:-codex-webui-browser-check}
+    init: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - "127.0.0.1:${NOVNC_HOST_PORT:-7900}:7900"
+    volumes:
+      - codex_webui_browser_check_tailscale_state:${TAILSCALE_STATE_DIR:-/var/lib/tailscale}
+    environment:
+      TS_AUTHKEY: ${TAILSCALE_AUTHKEY:-}
+      TS_HOSTNAME: ${TAILSCALE_HOSTNAME:-codex-webui-browser-check}
+      TS_USERSPACE: ${TAILSCALE_USERSPACE:-false}
+      TS_STATE_DIR: ${TAILSCALE_STATE_DIR:-/var/lib/tailscale}
+      TS_EXTRA_ARGS: ${TAILSCALE_EXTRA_ARGS:---accept-dns=false}
+    restart: unless-stopped
+
+  browser:
+    image: ${BROWSER_IMAGE:-selenium/standalone-chrome:latest}
+    container_name: ${BROWSER_CONTAINER_NAME:-codex-webui-browser-check}
+    init: true
+    shm_size: ${BROWSER_SHM_SIZE:-2gb}
+    depends_on:
+      - tailscale
+    network_mode: service:tailscale
+    environment:
+      SE_VNC_NO_PASSWORD: ${SE_VNC_NO_PASSWORD:-true}
+      SE_SCREEN_WIDTH: ${BROWSER_SCREEN_WIDTH:-1920}
+      SE_SCREEN_HEIGHT: ${BROWSER_SCREEN_HEIGHT:-1080}
+      SE_SCREEN_DEPTH: ${BROWSER_SCREEN_DEPTH:-24}
+      SE_NODE_MAX_SESSIONS: ${SE_NODE_MAX_SESSIONS:-1}
+    restart: unless-stopped
+
+volumes:
+  codex_webui_browser_check_tailscale_state:
