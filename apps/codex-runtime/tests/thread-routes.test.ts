@@ -79,6 +79,16 @@ class FailingSendNativeSessionGateway extends StubNativeSessionGateway {
   }
 }
 
+class FailingResumeNativeSessionGateway extends StubNativeSessionGateway {
+  override async resumeSession(input: { sessionId: string }): Promise<{ sessionId: string }> {
+    this.resumeSessions.push(input);
+    throw new RuntimeError(502, "app_server_request_failed", "resume request rejected", {
+      rpc_method: "thread/resume",
+      rpc_error_code: "invalid_state",
+    });
+  }
+}
+
 class MissingThreadNativeSessionGateway extends StubNativeSessionGateway {
   override async sendUserMessage(_input: {
     sessionId: string;
@@ -90,6 +100,20 @@ class MissingThreadNativeSessionGateway extends StubNativeSessionGateway {
       rpc_error_code: "not_found",
       rpc_error_data: {
         threadId: _input.sessionId,
+        reason: "persisted thread missing after restart",
+      },
+    });
+  }
+}
+
+class MissingThreadOnResumeNativeSessionGateway extends StubNativeSessionGateway {
+  override async resumeSession(input: { sessionId: string }): Promise<{ sessionId: string }> {
+    this.resumeSessions.push(input);
+    throw new RuntimeError(502, "app_server_request_failed", "thread not found in app server", {
+      rpc_method: "thread/resume",
+      rpc_error_code: "not_found",
+      rpc_error_data: {
+        threadId: input.sessionId,
         reason: "persisted thread missing after restart",
       },
     });
@@ -354,6 +378,81 @@ describe("thread routes", () => {
         },
       },
     });
+
+    await app.close();
+  });
+
+  it("surfaces non-missing native thread/resume failures on thread reads", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("thread-routes-root");
+    const database = await createTempDatabase("thread-routes-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway: new FailingResumeNativeSessionGateway(),
+      },
+    });
+
+    database.db
+      .insert(workspaces)
+      .values({
+        workspaceId: "ws_alpha",
+        workspaceName: "alpha",
+        directoryName: "alpha",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:00:00.000Z",
+      })
+      .run();
+
+    database.db
+      .insert(sessions)
+      .values({
+        sessionId: "thread_001",
+        workspaceId: "ws_alpha",
+        title: "Existing thread",
+        status: "waiting_input",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:01:00.000Z",
+        startedAt: "2026-04-09T00:00:00.000Z",
+        lastMessageAt: null,
+        activeApprovalId: null,
+        currentTurnId: null,
+        pendingAssistantMessageId: null,
+        appSessionOverlayState: "open",
+      })
+      .run();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/threads/thread_001",
+    });
+
+    expect(response.statusCode).toBe(502);
+    expect(response.json()).toEqual({
+      error: {
+        code: "app_server_request_failed",
+        message: "resume request rejected",
+        details: {
+          rpc_method: "thread/resume",
+          rpc_error_code: "invalid_state",
+        },
+      },
+    });
+
+    const persistedSession = database.db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.sessionId, "thread_001"))
+      .get();
+    expect(persistedSession?.appSessionOverlayState).toBe("open");
 
     await app.close();
   });
@@ -1491,6 +1590,151 @@ describe("thread routes", () => {
     await app.close();
   });
 
+  it("marks stale db-only waiting-input threads recovery_pending on list/read/view when native resume reports missing", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("thread-routes-root");
+    const database = await createTempDatabase("thread-routes-db");
+    const nativeSessionGateway = new MissingThreadOnResumeNativeSessionGateway();
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    database.db
+      .insert(workspaces)
+      .values({
+        workspaceId: "ws_alpha",
+        workspaceName: "alpha",
+        directoryName: "alpha",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:00:00.000Z",
+      })
+      .run();
+
+    database.db
+      .insert(sessions)
+      .values({
+        sessionId: "thread_001",
+        workspaceId: "ws_alpha",
+        title: "Recovered thread",
+        status: "waiting_input",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:01:00.000Z",
+        startedAt: "2026-04-09T00:00:00.000Z",
+        lastMessageAt: "2026-04-09T00:00:30.000Z",
+        activeApprovalId: null,
+        currentTurnId: null,
+        pendingAssistantMessageId: null,
+        appSessionOverlayState: "open",
+      })
+      .run();
+
+    const initialWorkspace = database.db
+      .select()
+      .from(workspaces)
+      .where(eq(workspaces.workspaceId, "ws_alpha"))
+      .get();
+    expect(initialWorkspace).not.toBeUndefined();
+
+    const threadResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/threads/thread_001",
+    });
+    expect(threadResponse.statusCode).toBe(200);
+    expect(threadResponse.json()).toMatchObject({
+      thread_id: "thread_001",
+      derived_hints: {
+        accepting_user_input: false,
+        blocked_reason: "thread_recovery_pending",
+      },
+    });
+
+    const persistedSession = database.db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.sessionId, "thread_001"))
+      .get();
+    expect(persistedSession).toMatchObject({
+      sessionId: "thread_001",
+      appSessionOverlayState: "recovery_pending",
+    });
+    expect(persistedSession?.updatedAt).not.toBe("2026-04-09T00:01:00.000Z");
+
+    const persistedWorkspace = database.db
+      .select()
+      .from(workspaces)
+      .where(eq(workspaces.workspaceId, "ws_alpha"))
+      .get();
+    expect(persistedWorkspace?.updatedAt).toBe(persistedSession?.updatedAt);
+
+    const viewResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/threads/thread_001/view",
+    });
+    expect(viewResponse.statusCode).toBe(200);
+    expect(viewResponse.json()).toMatchObject({
+      thread: {
+        thread_id: "thread_001",
+        derived_hints: {
+          accepting_user_input: false,
+          blocked_reason: "thread_recovery_pending",
+        },
+      },
+    });
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/workspaces/ws_alpha/threads",
+    });
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json()).toMatchObject({
+      items: [
+        expect.objectContaining({
+          thread_id: "thread_001",
+          derived_hints: expect.objectContaining({
+            accepting_user_input: false,
+            blocked_reason: "thread_recovery_pending",
+          }),
+        }),
+      ],
+    });
+
+    expect(nativeSessionGateway.resumeSessions).toEqual([{ sessionId: "thread_001" }]);
+
+    const retryResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/threads/thread_001/inputs",
+      payload: {
+        client_request_id: "req_followup_missing_002",
+        content: "Retry after runtime restart",
+      },
+    });
+
+    expect(retryResponse.statusCode).toBe(409);
+    expect(retryResponse.json()).toMatchObject({
+      error: {
+        code: "thread_recovery_pending",
+        details: {
+          thread_id: "thread_001",
+        },
+      },
+    });
+    expect(nativeSessionGateway.sendUserMessages).toHaveLength(0);
+    expect(nativeSessionGateway.resumeSessions).toEqual([{ sessionId: "thread_001" }]);
+
+    await app.close();
+  });
+
   it("accepts existing-thread input even when another thread is currently active", async () => {
     const workspaceRoot = await createTempWorkspaceRoot("thread-routes-root");
     const database = await createTempDatabase("thread-routes-db");
@@ -2275,6 +2519,79 @@ describe("thread routes", () => {
         ]),
       );
     });
+
+    await app.close();
+  });
+
+  it("maps real app-server thread/resume missing-thread errors to recovery_pending on thread reads", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("thread-routes-root");
+    const database = await createTempDatabase("thread-routes-db");
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+    await fs.mkdir(path.join(workspaceRoot, "alpha"), { recursive: true });
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerBridgeEnabled: true,
+        appServerCommand: process.execPath,
+        appServerArgs: [
+          fileURLToPath(new URL("./fixtures/fake-codex-app-server.mjs", import.meta.url)),
+          "--resume-mode=missing",
+        ],
+      },
+      database,
+    });
+
+    database.db
+      .insert(workspaces)
+      .values({
+        workspaceId: "ws_alpha",
+        workspaceName: "alpha",
+        directoryName: "alpha",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:00:00.000Z",
+      })
+      .run();
+
+    database.db
+      .insert(sessions)
+      .values({
+        sessionId: "thread_persisted_001",
+        workspaceId: "ws_alpha",
+        title: "Persisted thread",
+        status: "waiting_input",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:01:00.000Z",
+        startedAt: "2026-04-09T00:00:00.000Z",
+        lastMessageAt: "2026-04-09T00:00:30.000Z",
+        activeApprovalId: null,
+        currentTurnId: null,
+        pendingAssistantMessageId: null,
+        appSessionOverlayState: "open",
+      })
+      .run();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/v1/threads/thread_persisted_001",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      thread_id: "thread_persisted_001",
+      derived_hints: {
+        accepting_user_input: false,
+        blocked_reason: "thread_recovery_pending",
+      },
+    });
+
+    const persistedSession = database.db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.sessionId, "thread_persisted_001"))
+      .get();
+    expect(persistedSession?.appSessionOverlayState).toBe("recovery_pending");
 
     await app.close();
   });

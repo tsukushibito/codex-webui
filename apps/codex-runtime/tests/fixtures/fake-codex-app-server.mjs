@@ -6,6 +6,8 @@ let turnCounter = 1;
 let itemCounter = 1;
 const turnStartMode =
   process.argv.find((arg) => arg.startsWith("--turn-start-mode="))?.split("=")[1] ?? "normal";
+const resumeMode =
+  process.argv.find((arg) => arg.startsWith("--resume-mode="))?.split("=")[1] ?? "normal";
 const requireResumeBeforeTurn = process.argv.includes("--require-resume-before-turn");
 const loadedThreadIds = new Set();
 
@@ -67,6 +69,22 @@ lineReader.on("line", (line) => {
 
   if (method === "thread/resume") {
     const threadId = String(message.params?.threadId ?? "");
+    if (resumeMode === "missing") {
+      send({
+        jsonrpc: "2.0",
+        id: message.id,
+        error: {
+          code: "thread_not_found",
+          message: `thread ${threadId} is missing`,
+          data: {
+            threadId,
+            reason: "persisted thread missing after restart",
+          },
+        },
+      });
+      return;
+    }
+
     loadedThreadIds.add(threadId);
     send({
       jsonrpc: "2.0",
