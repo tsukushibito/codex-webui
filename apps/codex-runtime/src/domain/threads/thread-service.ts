@@ -443,7 +443,15 @@ export class ThreadService {
   }
 
   async listThreadFeed(threadId: string) {
-    await this.getThread(threadId);
+    const thread = await this.getThread(threadId);
+    if (thread.derived_hints.blocked_reason === "thread_recovery_pending") {
+      return {
+        items: [],
+        next_cursor: null,
+        has_more: false,
+      };
+    }
+
     const events = this.database.db
       .select()
       .from(sessionEvents)
@@ -466,7 +474,15 @@ export class ThreadService {
   }
 
   async listTimeline(threadId: string) {
-    await this.getThread(threadId);
+    const thread = await this.getThread(threadId);
+    if (thread.derived_hints.blocked_reason === "thread_recovery_pending") {
+      return {
+        items: [],
+        next_cursor: null,
+        has_more: false,
+      };
+    }
+
     const events = this.database.db
       .select()
       .from(sessionEvents)

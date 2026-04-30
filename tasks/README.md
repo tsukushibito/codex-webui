@@ -73,6 +73,7 @@ None.
 
 ## Archived Task Packages
 
+- [issue-324-thin-transcript-persistence](./archive/issue-324-thin-transcript-persistence/README.md)
 - [issue-323-native-reachability](./archive/issue-323-native-reachability/README.md)
 - [issue-322-persistence-boundary](./archive/issue-322-persistence-boundary/README.md)
 - [issue-318-tailscale-sidecar](./archive/issue-318-tailscale-sidecar/README.md)

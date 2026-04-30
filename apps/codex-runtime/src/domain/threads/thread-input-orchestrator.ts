@@ -37,6 +37,34 @@ export class ThreadInputOrchestrator {
       content: string;
     },
   ): Promise<MessageProjection> {
+    const session = firstRow(
+      this.database.db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.sessionId, threadId))
+        .limit(1)
+        .all(),
+    );
+
+    if (!session) {
+      throw new RuntimeError(404, "session_not_found", "session was not found", {
+        session_id: threadId,
+      });
+    }
+
+    if (session.appSessionOverlayState === "recovery_pending") {
+      throw new RuntimeError(
+        409,
+        "thread_recovery_pending",
+        "thread requires recovery before accepting input",
+        {
+          thread_id: threadId,
+          status: session.status,
+          app_session_overlay_state: session.appSessionOverlayState,
+        },
+      );
+    }
+
     const existingMessage = firstRow(
       this.database.db
         .select()
@@ -72,34 +100,6 @@ export class ThreadInputOrchestrator {
         created_at: existingMessage.createdAt,
         source_item_type: existingMessage.sourceItemType as MessageProjection["source_item_type"],
       };
-    }
-
-    const session = firstRow(
-      this.database.db
-        .select()
-        .from(sessions)
-        .where(eq(sessions.sessionId, threadId))
-        .limit(1)
-        .all(),
-    );
-
-    if (!session) {
-      throw new RuntimeError(404, "session_not_found", "session was not found", {
-        session_id: threadId,
-      });
-    }
-
-    if (session.appSessionOverlayState === "recovery_pending") {
-      throw new RuntimeError(
-        409,
-        "thread_recovery_pending",
-        "thread requires recovery before accepting input",
-        {
-          thread_id: threadId,
-          status: session.status,
-          app_session_overlay_state: session.appSessionOverlayState,
-        },
-      );
     }
 
     if (session.status !== "waiting_input") {

@@ -1735,6 +1735,182 @@ describe("thread routes", () => {
     await app.close();
   });
 
+  it("quarantines persisted transcript cache rows after native reachability marks a thread recovery_pending", async () => {
+    const workspaceRoot = await createTempWorkspaceRoot("thread-routes-root");
+    const database = await createTempDatabase("thread-routes-db");
+    const nativeSessionGateway = new MissingThreadOnResumeNativeSessionGateway();
+    cleanupPaths.push(workspaceRoot, path.dirname(database.sqlite.name));
+
+    const app = await buildApp({
+      config: {
+        workspaceRoot,
+        databasePath: database.sqlite.name,
+        appServerBridgeEnabled: false,
+        appServerCommand: process.execPath,
+        appServerArgs: ["-e", "process.exit(0)"],
+      },
+      database,
+      services: {
+        nativeSessionGateway,
+      },
+    });
+
+    database.db
+      .insert(workspaces)
+      .values({
+        workspaceId: "ws_alpha",
+        workspaceName: "alpha",
+        directoryName: "alpha",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:00:00.000Z",
+      })
+      .run();
+
+    database.db
+      .insert(sessions)
+      .values({
+        sessionId: "thread_001",
+        workspaceId: "ws_alpha",
+        title: "Recovered thread",
+        status: "waiting_input",
+        createdAt: "2026-04-09T00:00:00.000Z",
+        updatedAt: "2026-04-09T00:01:00.000Z",
+        startedAt: "2026-04-09T00:00:00.000Z",
+        lastMessageAt: "2026-04-09T00:00:30.000Z",
+        activeApprovalId: null,
+        currentTurnId: null,
+        pendingAssistantMessageId: null,
+        appSessionOverlayState: "open",
+      })
+      .run();
+
+    database.db
+      .insert(messages)
+      .values({
+        messageId: "msg_user_cached_001",
+        sessionId: "thread_001",
+        role: "user",
+        content: "Retry after runtime restart",
+        createdAt: "2026-04-09T00:00:30.000Z",
+        sourceItemType: "user_message",
+        clientMessageId: "req_followup_missing_cached_001",
+      })
+      .run();
+
+    database.db
+      .insert(sessionEvents)
+      .values({
+        eventId: "evt_cached_001",
+        sessionId: "thread_001",
+        eventType: "message.user",
+        sequence: 1,
+        occurredAt: "2026-04-09T00:00:30.000Z",
+        payload: JSON.stringify({
+          message_id: "msg_user_cached_001",
+          content: "Retry after runtime restart",
+        }),
+        nativeEventName: null,
+      })
+      .run();
+
+    const threadResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/threads/thread_001",
+    });
+
+    expect(threadResponse.statusCode).toBe(200);
+    expect(threadResponse.json()).toMatchObject({
+      thread_id: "thread_001",
+      derived_hints: {
+        accepting_user_input: false,
+        blocked_reason: "thread_recovery_pending",
+      },
+    });
+
+    const messagesBeforeRetry = database.db
+      .select()
+      .from(messages)
+      .where(eq(messages.sessionId, "thread_001"))
+      .all();
+    const eventsBeforeRetry = database.db
+      .select()
+      .from(sessionEvents)
+      .where(eq(sessionEvents.sessionId, "thread_001"))
+      .all();
+
+    const retryResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/threads/thread_001/inputs",
+      payload: {
+        client_request_id: "req_followup_missing_cached_001",
+        content: "Retry after runtime restart",
+      },
+    });
+
+    expect(retryResponse.statusCode).toBe(409);
+    expect(retryResponse.json()).toMatchObject({
+      error: {
+        code: "thread_recovery_pending",
+        details: {
+          thread_id: "thread_001",
+        },
+      },
+    });
+    expect(retryResponse.json()).not.toHaveProperty("accepted_input");
+    expect(nativeSessionGateway.sendUserMessages).toHaveLength(0);
+    expect(nativeSessionGateway.resumeSessions).toEqual([{ sessionId: "thread_001" }]);
+
+    const messagesAfterRetry = database.db
+      .select()
+      .from(messages)
+      .where(eq(messages.sessionId, "thread_001"))
+      .all();
+    const eventsAfterRetry = database.db
+      .select()
+      .from(sessionEvents)
+      .where(eq(sessionEvents.sessionId, "thread_001"))
+      .all();
+    expect(messagesAfterRetry).toEqual(messagesBeforeRetry);
+    expect(eventsAfterRetry).toEqual(eventsBeforeRetry);
+
+    const feedResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/threads/thread_001/feed",
+    });
+    expect(feedResponse.statusCode).toBe(200);
+    expect(feedResponse.json()).toEqual({
+      items: [],
+      next_cursor: null,
+      has_more: false,
+    });
+
+    const timelineResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/threads/thread_001/timeline",
+    });
+    expect(timelineResponse.statusCode).toBe(200);
+    expect(timelineResponse.json()).toEqual({
+      items: [],
+      next_cursor: null,
+      has_more: false,
+    });
+
+    await expect(app.runtimeServices.sessionService.listMessages("thread_001")).resolves.toEqual({
+      items: [],
+      next_cursor: null,
+      has_more: false,
+    });
+    await expect(
+      app.runtimeServices.sessionService.listSessionEvents("thread_001"),
+    ).resolves.toEqual({
+      items: [],
+      next_cursor: null,
+      has_more: false,
+    });
+
+    await app.close();
+  });
+
   it("accepts existing-thread input even when another thread is currently active", async () => {
     const workspaceRoot = await createTempWorkspaceRoot("thread-routes-root");
     const database = await createTempDatabase("thread-routes-db");
