@@ -6,29 +6,18 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 RUNTIME_DIR="${REPO_ROOT}/apps/codex-runtime"
 FRONTEND_DIR="${REPO_ROOT}/apps/frontend-bff"
 
-RUNTIME_PORT="${CODEX_WEBUI_RUNTIME_PORT:-3001}"
-FRONTEND_PORT="${CODEX_WEBUI_FRONTEND_PORT:-3000}"
-NGROK_PORT="${CODEX_WEBUI_NGROK_PORT:-${FRONTEND_PORT}}"
-
 DRY_RUN=false
 FORCE=false
-STOP_NGROK=false
 
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/stop-codex-webui.sh [--with-ngrok] [--force] [--dry-run] [--help]
+  scripts/stop-codex-webui.sh [--force] [--dry-run] [--help]
 
 Options:
-  --with-ngrok  Also stop a local ngrok process for CODEX_WEBUI_NGROK_PORT
   --force       Send SIGKILL to processes that do not exit after SIGTERM
   --dry-run     Print matching processes without stopping them
   --help        Show this help text
-
-Environment:
-  CODEX_WEBUI_RUNTIME_PORT=<port>    Runtime port to target; default: 3001
-  CODEX_WEBUI_FRONTEND_PORT=<port>   Frontend port to target; default: 3000
-  CODEX_WEBUI_NGROK_PORT=<port>      ngrok port to target; default: frontend port
 EOF
 }
 
@@ -44,9 +33,6 @@ fail() {
 parse_args() {
   while (($# > 0)); do
     case "$1" in
-      --with-ngrok)
-        STOP_NGROK=true
-        ;;
       --force)
         FORCE=true
         ;;
@@ -123,27 +109,6 @@ find_app_processes() {
   done
 }
 
-find_ngrok_processes() {
-  local proc=""
-  local pid=""
-  local cmd=""
-
-  for proc in /proc/[0-9]*; do
-    [[ -d "${proc}" ]] || continue
-    pid="${proc##*/}"
-    [[ "${pid}" != "$$" && "${pid}" != "${BASHPID}" ]] || continue
-
-    cmd="$(read_cmdline "${pid}")"
-    [[ -n "${cmd}" ]] || continue
-
-    case "${cmd}" in
-      ngrok\ http\ "${NGROK_PORT}"*|*/ngrok\ http\ "${NGROK_PORT}"*)
-        add_pid "${pid}"
-        ;;
-    esac
-  done
-}
-
 print_matches() {
   local pid=""
   local cmd=""
@@ -188,10 +153,6 @@ PIDS=()
 
 parse_args "$@"
 find_app_processes
-
-if [[ "${STOP_NGROK}" == "true" ]]; then
-  find_ngrok_processes
-fi
 
 if (( ${#PIDS[@]} == 0 )); then
   log "no matching codex-webui processes found"

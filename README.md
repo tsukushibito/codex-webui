@@ -40,11 +40,11 @@ Work from the app directory you are changing and use its local README for setup 
 For a repo-local development container and launcher workflow, this repository also provides:
 
 - [`Dockerfile`](./Dockerfile)
-- [`docker-compose.yml`](./docker-compose.yml)
+- [`docker-compose.yml`](./docker-compose.yml) for the dev container plus Tailscale sidecar workflow
 - [`scripts/start-tunnel.sh`](./scripts/start-tunnel.sh) for `code tunnel`
-- [`scripts/start-codex-webui.sh`](./scripts/start-codex-webui.sh) for `codex-runtime` + `frontend-bff` + `devtunnel`
+- [`scripts/start-codex-webui.sh`](./scripts/start-codex-webui.sh) for local `codex-runtime` + `frontend-bff` startup inside the shared sidecar namespace
 - [`scripts/stop-codex-webui.sh`](./scripts/stop-codex-webui.sh) for stopping local `codex-runtime` + `frontend-bff` dev processes
-- [`docs/codex_webui_dev_container_onboarding.md`](./docs/codex_webui_dev_container_onboarding.md) for the full container and tunnel workflow
+- [`docs/codex_webui_dev_container_onboarding.md`](./docs/codex_webui_dev_container_onboarding.md) for the full container, Tailscale Serve, and tunnel workflow
 
 Use the onboarding document for the full setup and usage flow instead of relying on the root README for step-by-step operational detail.
 

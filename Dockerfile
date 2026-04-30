@@ -15,7 +15,6 @@ ARG VULKAN_SDK_VERSION=1.4.341.0
 ARG USERNAME=dev
 ARG USER_UID=1000
 ARG USER_GID=1000
-ARG NGROK_VERSION=3.30.0
 ARG DEVTUNNEL_DOWNLOAD_URL=https://aka.ms/TunnelsCliDownload/linux-x64
 
 ENV TZ=Asia/Tokyo
@@ -164,11 +163,6 @@ RUN mkdir -p /opt/node \
     && ln -sf /opt/node/bin/npx /usr/local/bin/npx \
     && npm install -g "npm@${NPM_VERSION}" \
     && rm -f "node-v${NODE_VERSION}-linux-x64.tar.xz"
-
-RUN curl -fsSL "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v${NGROK_VERSION}-linux-amd64.tgz" -o /tmp/ngrok.tgz \
-    && tar -xzf /tmp/ngrok.tgz -C /usr/local/bin ngrok \
-    && chmod +x /usr/local/bin/ngrok \
-    && rm -f /tmp/ngrok.tgz
 
 # Keep devtunnel installed until #154 migrates the launcher off the legacy path.
 RUN curl -fsSL "${DEVTUNNEL_DOWNLOAD_URL}" -o /usr/local/bin/devtunnel \

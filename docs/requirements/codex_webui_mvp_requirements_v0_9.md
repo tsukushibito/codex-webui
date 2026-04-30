@@ -4,7 +4,7 @@
 
 This document defines the requirements for CodexWebUI v0.9, reorganized around the **public contract of Codex App Server**.
 
-The supported remote-browser path for v0.9 is ngrok. ngrok Basic Auth is the access-control boundary for browser access, while OAuth / SSO / app-owned accounts remain out of scope for MVP.
+The supported remote-browser path for v0.9 is a Tailscale Docker sidecar plus Tailscale Serve. Tailnet membership and Tailscale ACLs are the access-control boundary for browser access, while OAuth / SSO / app-owned accounts remain out of scope for MVP. Public internet exposure through Tailscale Funnel is out of scope.
 
 The primary goal of v0.9 is to provide a natural UX, close to Codex CLI / TUI, in PC and smartphone web browsers.  
 To achieve that, WebUI must not introduce a thick, independent conversation state machine. Instead, it must treat the **native conversation model exposed by Codex App Server as the primary domain**, and keep WebUI-specific concepts limited to workspace handling and the minimum browser-facing facade concepts required.
@@ -65,7 +65,7 @@ WebUI must not foreground its own `thread create / start` as a primary concept.
 - support for both PC and smartphone
 - conversation, execution, approval, and confirmation flows backed by Codex App Server
 - workspace operations limited to directories under `/workspaces`
-- browser access through ngrok
+- browser access through Tailscale Serve on a tailnet-reachable `frontend-bff` endpoint
 
 ### 3.2 Out of scope
 - turning the product into a general-purpose IDE
@@ -81,10 +81,11 @@ WebUI must not foreground its own `thread create / start` as a primary concept.
 ### 3.3 System and operational boundaries
 - the only externally exposed entry point must be `frontend-bff` or an equivalent facade backend
 - `codex-runtime` must not be exposed externally
-- authentication is delegated to ngrok Basic Auth, and WebUI-specific authentication / authorization is out of scope for MVP
+- authentication is delegated to tailnet membership and Tailscale ACLs, and WebUI-specific authentication / authorization is out of scope for MVP
 - the product assumes a single user and does not handle consistency or access control for concurrent multi-user actions
-- the security boundary is ngrok Basic Auth and host-side operations; fine-grained in-app authorization is not an MVP requirement
-- the supported remote-browser path does not require a fixed public URL; free-plan ngrok endpoints may change between sessions, and the workflow only assumes the currently assigned public URL is usable for the active session
+- the security boundary is tailnet membership, Tailscale ACLs, and host-side operations; fine-grained in-app authorization is not an MVP requirement
+- the supported remote-browser path exposes only `frontend-bff` through Tailscale Serve, which must target `http://127.0.0.1:3000` inside the shared sidecar namespace
+- Tailscale Funnel or any public-internet exposure is not supported for the maintained workflow
 - OAuth, SSO, and app-owned account management are out of scope for MVP
 - although this document is UX-focused, the public boundary, authentication responsibility, and single-user assumption are treated as fixed conditions
 
@@ -126,7 +127,7 @@ Concrete field names, response shapes, and transport-level representations may b
 - WebUI does not replace the App Server source of truth
 - the WebUI backend handles only operational concepts not present in App Server and browser-facing reshaping
 - App Server may allow multiple active threads, and WebUI must not restrict that unnecessarily
-- the only external entry point is the WebUI behind ngrok; runtime and App Server are not exposed directly
+- the only external entry point is the WebUI behind Tailscale Serve; runtime and App Server are not exposed directly
 - MVP assumes a single user and does not handle concurrent editing / approval coordination across multiple users
 
 ---
@@ -353,7 +354,7 @@ The priority is that users can return directly to the necessary thread from the 
 - ensures client request idempotency
 - detects and assists convergence of partial failures
 - stores or derives thread-scoped ordering metadata
-- provides the minimum public boundary as the ngrok-facing entry point
+- provides the minimum public boundary as the Tailscale-Serve-facing entry point
 
 #### Frontend
 - constructs thread view
@@ -365,7 +366,7 @@ The priority is that users can return directly to the necessary thread from the 
 ### 10.3 Public boundary
 - only `frontend-bff` or an equivalent facade backend may be exposed externally
 - `codex-runtime` and App Server are for internal communication only
-- MVP does not add app-specific authentication; authentication is delegated to ngrok Basic Auth
+- MVP does not add app-specific authentication; authentication is delegated to tailnet membership and Tailscale ACLs
 
 ---
 
@@ -781,7 +782,7 @@ The backend must satisfy at least the following:
 - only the browser-facing facade may be exposed externally
 - runtime and App Server must not be exposed directly to the browser
 - MVP assumes a single user and does not handle conflict resolution for multi-user usage
-- authentication assumes ngrok Basic Auth, and additional in-app authentication is not part of the mandatory requirements
+- authentication assumes tailnet membership and Tailscale ACLs, and additional in-app authentication is not part of the mandatory requirements
 
 ---
 
@@ -828,7 +829,7 @@ v0.9 MVP is considered established when the following are satisfied:
 - browser UX based on REST + SSE
 - minimum app-owned metadata for idempotency and reconnect convergence
 - thread-scoped ordering foundation
-- ngrok-based public boundary
+- Tailscale-Serve-based public boundary
 
 ### 22.2 Should
 - stronger thread list UX
@@ -890,6 +891,6 @@ The following are not goals in v0.9:
 - a canonical-feed-like helper projection may be retained, but it must not become a substitute source of truth for App Server full history
 - the system must have a thread-scoped stable ordering foundation, and REST reacquisition is authoritative after reconnect
 - request helpers are assumed to remain reachable from thread context for pending requests and just-resolved requests
-- the facade backend is the only public entry point, and authentication is delegated to ngrok Basic Auth
+- the facade backend is the only public entry point, and authentication is delegated to tailnet membership and Tailscale ACLs
 - the single-user assumption is a fixed condition in v0.9
 - `App Server Contract Matrix v0.9` is a prerequisite artifact before implementation starts

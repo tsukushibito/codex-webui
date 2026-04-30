@@ -1,9 +1,28 @@
 name: ${COMPOSE_PROJECT_NAME:-codex-webui-dev}
 
 services:
+  tailscale:
+    image: tailscale/tailscale:stable
+    container_name: ${TAILSCALE_CONTAINER_NAME:-codex-webui-tailscale}
+    hostname: ${TAILSCALE_HOSTNAME:-codex-webui-dev}
+    init: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - codex_webui_tailscale_state:${TAILSCALE_STATE_DIR:-/var/lib/tailscale}
+    environment:
+      TS_AUTHKEY: ${TAILSCALE_AUTHKEY:-}
+      TS_HOSTNAME: ${TAILSCALE_HOSTNAME:-codex-webui-dev}
+      TS_USERSPACE: ${TAILSCALE_USERSPACE:-false}
+      TS_STATE_DIR: ${TAILSCALE_STATE_DIR:-/var/lib/tailscale}
+      TS_SERVE_CONFIG: ${TAILSCALE_SERVE_CONFIG:-/var/lib/tailscale/serve/frontend-bff.json}
+      TS_EXTRA_ARGS: ${TAILSCALE_EXTRA_ARGS:---accept-dns=false}
+    restart: unless-stopped
+
   dev:
-    env_file:
-      - .env
     build:
       context: .
       dockerfile: Dockerfile
@@ -23,13 +42,13 @@ services:
     stdin_open: true
     tty: true
     runtime: nvidia
+    depends_on:
+      - tailscale
+    network_mode: service:tailscale
     group_add:
       - "0"
     gpus: all
     working_dir: /workspace
-    ports:
-      - "${CODEX_WEBUI_FRONTEND_PORT:-3000}:${CODEX_WEBUI_FRONTEND_PORT:-3000}"
-      - "${CODEX_WEBUI_RUNTIME_PORT:-3001}:${CODEX_WEBUI_RUNTIME_PORT:-3001}"
     volumes:
       - ./:/workspace
       - ${DOCKER_SOCK_PATH:-/var/run/docker.sock.raw}:/var/run/docker.sock
@@ -56,10 +75,9 @@ services:
       EXPECTED_NPM_PREFIX: ${EXPECTED_NPM_PREFIX:-/home/dev/.npm-global}
       DOCTOR_REQUIRE_GPU: ${DOCTOR_REQUIRE_GPU:-true}
       DOCTOR_RUN_WINIT_SMOKE: ${DOCTOR_RUN_WINIT_SMOKE:-false}
-      CODEX_WEBUI_RUNTIME_PORT: ${CODEX_WEBUI_RUNTIME_PORT:-3001}
       CODEX_WEBUI_FRONTEND_PORT: ${CODEX_WEBUI_FRONTEND_PORT:-3000}
-      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
-      NGROK_BASIC_AUTH: ${NGROK_BASIC_AUTH:-}
+      CODEX_WEBUI_RUNTIME_HOST: ${CODEX_WEBUI_RUNTIME_HOST:-127.0.0.1}
+      CODEX_WEBUI_FRONTEND_HOST: ${CODEX_WEBUI_FRONTEND_HOST:-127.0.0.1}
       CODEX_WEBUI_DEVTUNNEL_ID: ${CODEX_WEBUI_DEVTUNNEL_ID:-}
       CODEX_WEBUI_WORKSPACE_ROOT: ${CODEX_WEBUI_WORKSPACE_ROOT:-}
       CODEX_WEBUI_DATABASE_PATH: ${CODEX_WEBUI_DATABASE_PATH:-}
@@ -70,3 +88,4 @@ volumes:
   codex_webui_dev_codex_npm:
   codex_webui_dev_gh_auth:
   codex_webui_dev_vscode_cli:
+  codex_webui_tailscale_state:
