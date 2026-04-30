@@ -73,6 +73,7 @@ None.
 
 ## Archived Task Packages
 
+- [issue-318-tailscale-sidecar](./archive/issue-318-tailscale-sidecar/README.md)
 - [issue-316-inline-status](./archive/issue-316-inline-status/README.md)
 - [issue-312-submit-feedback](./archive/issue-312-submit-feedback/README.md)
 - [issue-313-settings-dialog](./archive/issue-313-settings-dialog/README.md)

@@ -1,6 +1,6 @@
 # Codex WebUI dev container onboarding
 
-Last updated: 2026-04-27
+Last updated: 2026-04-29
 
 ## 1. Purpose
 
@@ -11,7 +11,7 @@ It covers:
 - the repo-root `Dockerfile`
 - the repo-root `docker-compose.yml`
 - the `code tunnel` helper for remote development access
-- the ngrok flow for WebUI verification
+- the supported Tailscale sidecar + Tailscale Serve flow for remote WebUI verification
 
 This is an onboarding and operational guide. It does not replace the maintained product requirements or API specifications under `docs/requirements/` and `docs/specs/`.
 
@@ -20,36 +20,55 @@ This is an onboarding and operational guide. It does not replace the maintained 
 The repository root includes the following development entrypoints:
 
 - `Dockerfile`: development image for this repository
-- `docker-compose.yml`: recommended way to run the dev container
-- `scripts/start-codex-webui.sh`: starts `codex-runtime` and `frontend-bff`, with optional interactive ngrok launch
-- `scripts/stop-codex-webui.sh`: stops local `codex-runtime` and `frontend-bff` dev processes, with optional ngrok cleanup
+- `docker-compose.yml`: recommended way to run the dev container and the Tailscale sidecar
+- `scripts/start-codex-webui.sh`: starts the local runtime service and `frontend-bff` inside the shared sidecar namespace
+- `scripts/stop-codex-webui.sh`: stops local WebUI dev processes from this checkout
 - `scripts/start-tunnel.sh`: starts `code tunnel`
-- `scripts/doctor.sh`: validates the development container toolchain
+- `scripts/doctor.sh`: validates the development container toolchain and prints user-run Tailscale verification steps
 
 The container is intended to mount this repository as `/workspace`.
 
 ## 3. Recommended workflow
 
-### 3.1 Build and start the dev container
+### 3.1 Prepare environment values
 
 From the repository root:
 
 ```bash
 cp .env.example .env
-docker compose up -d --build dev
-docker compose exec dev bash
 ```
 
-The `dev` service also declares `env_file: .env`, so the same file is used as the container-side source for values such as `NGROK_AUTHTOKEN` and `NGROK_BASIC_AUTH`.
+Set at least the following before you bring up the sidecar:
+
+- `TAILSCALE_AUTHKEY`: auth key for the target tailnet
+- `TAILSCALE_HOSTNAME`: optional stable hostname for this dev node
+- `TAILSCALE_USERSPACE`: defaults to `false` for the kernel-networking sidecar path with `/dev/net/tun`
+- `TAILSCALE_SERVE_CONFIG`: optional override for the persisted Serve config path; default is `/var/lib/tailscale/serve/frontend-bff.json`
+
+The supported remote-browser path assumes tailnet membership and Tailscale ACLs are the access boundary. Public internet exposure is out of scope, and `tailscale funnel` is not a supported command for this repo workflow.
+
+### 3.2 Build and start the dev container plus sidecar
+
+From the repository root:
+
+```bash
+docker compose --env-file .env up -d --build tailscale dev
+docker compose --env-file .env exec dev bash
+```
 
 The recommended path is `docker compose`, not a direct `docker run`, because the compose file already defines:
 
 - the repo mount to `/workspace`
 - persistent auth/cache volumes
 - Docker socket access
-- expected environment defaults
+- the shared network namespace between `dev` and the Tailscale sidecar
+- the persistent Tailscale state volume used for node state and Serve configuration
 
-### 3.2 Install app dependencies
+The sidecar owns the network namespace. The local browser-facing entrypoint inside that namespace is `http://127.0.0.1:3000/`. Do not publish or expose the private runtime service directly.
+
+The supported default is kernel networking with `/dev/net/tun`, container caps, and `TS_USERSPACE=false`. Set `TAILSCALE_USERSPACE=true` only if your host cannot provide `/dev/net/tun`; that is a fallback path with different networking behavior, not the primary recommended setup.
+
+### 3.3 Install app dependencies
 
 Inside the container:
 
@@ -67,7 +86,7 @@ npm run build --prefix apps/codex-runtime
 npm run build --prefix apps/frontend-bff
 ```
 
-### 3.3 Validate the container toolchain
+### 3.4 Validate the container toolchain
 
 Inside the container:
 
@@ -75,7 +94,7 @@ Inside the container:
 scripts/doctor.sh
 ```
 
-This checks the expected CLI/toolchain installation, including `code`, `codex`, `ngrok`, Node.js, Python, Rust, and Vulkan tooling.
+This checks the expected CLI/toolchain installation, plus static prerequisites for the supported Tailscale sidecar path. It does not authenticate Tailscale or perform live tailnet verification.
 
 When you run a Vulkan workload directly inside the container, prefer the helper wrapper so an NVIDIA ICD manifest can be synthesized when the graphics libraries are mounted but the manifest is missing:
 
@@ -95,90 +114,91 @@ scripts/start-tunnel.sh
 
 This wrapper is intentionally separate from the WebUI launcher. It is for development access, not for exposing the application to a browser.
 
-## 5. WebUI verification with ngrok
+## 5. Supported remote-browser workflow
 
-Use `ngrok` when you want to verify the WebUI from a remote browser, including smartphone access.
+The supported v0.9 remote-browser path is Tailscale sidecar + Tailscale Serve. The browser-facing surface must remain `frontend-bff` on `http://127.0.0.1:3000/` inside the shared namespace. The private runtime service and App Server must stay unreachable from the browser.
 
-### 5.1 One-time tunnel setup
+### 5.1 Start the local WebUI stack
 
-Inside the container:
-
-```bash
-ngrok config add-authtoken <token>
-```
-
-Set Basic Auth credentials for the remote-browser boundary. A simple shell export is usually enough:
+Inside the dev container:
 
 ```bash
-export NGROK_BASIC_AUTH="<user>:<password>"
+scripts/start-codex-webui.sh
 ```
 
-The supported workflow does not require a fixed public URL or a reserved hostname. A free-plan ngrok URL is acceptable as long as it is available for the current verification session.
+The launcher starts only local services. It binds both processes to `127.0.0.1` by default so they remain inside the sidecar namespace. The frontend keeps its runtime base URL on the private loopback address internally, but that private address is not a supported browser target.
 
-### 5.2 Start the local WebUI stack
-
-The recommended launcher is:
-
-```bash
-scripts/start-codex-webui.sh --interactive
-```
-
-In interactive mode, the launcher can ask whether to start ngrok for the current session and lets you decide the Basic Auth and extra ngrok arguments before it launches the local stack.
-
-If you already know the intended ngrok settings and want a non-interactive run, you can start everything in one command:
-
-```bash
-scripts/start-codex-webui.sh --with-ngrok --ngrok-basic-auth="$NGROK_BASIC_AUTH"
-```
-
-The launcher still supports local-only startup when you omit ngrok flags. App-local commands from `apps/codex-runtime/README.md` and `apps/frontend-bff/README.md` remain valid when you want to run the services separately.
-
-The local browser-facing port remains `3000`, and the runtime stays on `3001`.
-
-If an earlier local WebUI run is still using the default ports, stop it before starting a fresh launcher session:
+If an earlier local WebUI run is still active, stop it before starting again:
 
 ```bash
 scripts/stop-codex-webui.sh
 ```
 
-The stop helper targets local `codex-runtime` and `frontend-bff` dev processes from this checkout. It leaves an existing ngrok tunnel running by default so a subsequent launcher run can reuse it; pass `--with-ngrok` when the tunnel should also be stopped.
+### 5.2 Publish only the frontend through Tailscale Serve
 
-### 5.3 Expose the browser entrypoint with ngrok
-
-If you used `scripts/start-codex-webui.sh --interactive` or `--with-ngrok`, the launcher starts ngrok for you and prints the public URL after the local services are ready.
-
-If an ngrok agent is already running locally for the same frontend port, the launcher reuses that tunnel instead of starting a duplicate. When a fixed ngrok URL is passed through `--ngrok-arg --url --ngrok-arg <url>` or `--ngrok-arg=--url=<url>`, the launcher probes the URL before startup and stops early if the endpoint is already online elsewhere; stop the existing endpoint first, or pass `--ngrok-arg=--pooling-enabled` only when load balancing is intentional.
-
-You can still start ngrok manually when you prefer to keep the launcher local-only:
-
-Inside the container:
+Run these commands from the host checkout or from any shell that can reach the Docker daemon:
 
 ```bash
-ngrok http 3000 --basic-auth="$NGROK_BASIC_AUTH"
+docker compose --env-file .env exec tailscale tailscale status
+docker compose --env-file .env exec tailscale tailscale serve --bg 3000
+docker compose --env-file .env exec tailscale tailscale serve status
 ```
 
-The ngrok URL is the public browser entrypoint for the active session. It fronts only `frontend-bff`; `codex-runtime` and the App Server remain private on the container network.
+Expected Serve behavior:
 
-### 5.4 Verify access
+- the active handler targets only `http://127.0.0.1:3000`
+- the exposed HTTPS URL resolves inside the tailnet only
+- the access boundary is tailnet membership plus ACLs
+- `tailscale funnel` is not used and is not supported for this repo workflow
 
-Verify both desktop and smartphone access against the ngrok URL:
+If you need to inspect the persisted Serve config path:
 
-- open the ngrok URL in a desktop browser
-- confirm the ngrok Basic Auth prompt appears before the UI
-- confirm the WebUI loads successfully after authentication
-- open the same URL from a smartphone browser
-- confirm the local `http://127.0.0.1:3000/` URL still works inside the container for debugging
-- if the ngrok session restarts, use the new public URL; no fixed public URL is required
+```bash
+docker compose --env-file .env exec tailscale sh -lc 'echo "$TS_SERVE_CONFIG" && test -f "$TS_SERVE_CONFIG" && sed -n "1,160p" "$TS_SERVE_CONFIG"'
+```
+
+### 5.3 User-run live verification
+
+Live browser verification is intentionally user-run outside this agent session.
+
+Desktop and smartphone verification steps:
+
+1. Confirm the node is online in the target tailnet:
+
+```bash
+docker compose --env-file .env exec tailscale tailscale status --json
+```
+
+2. Confirm Serve is still pointed at the frontend only:
+
+```bash
+docker compose --env-file .env exec tailscale tailscale serve status --json
+```
+
+3. Capture the tailnet-reachable HTTPS URL from `tailscale status` or the Tailscale admin UI and open it from a desktop browser that is already on the same tailnet.
+4. Confirm the WebUI loads successfully.
+5. Open the same HTTPS URL from a smartphone browser that is also on the same tailnet.
+6. Confirm the smartphone can load the same `frontend-bff` surface.
+7. Confirm the browser workflow does not require or expose a direct private runtime URL.
+
+Expected evidence:
+
+- a desktop screenshot of the WebUI over the tailnet URL
+- a smartphone screenshot of the same WebUI over the tailnet URL
+- `tailscale serve status --json` output showing the handler mapped to `http://127.0.0.1:3000`
+- no browser step, command, or screenshot that depends on direct access to the private runtime service
 
 ## 6. Useful environment variables
 
-- `NGROK_AUTHTOKEN`: optional shell-side convenience variable for the ngrok auth token
-- `NGROK_BASIC_AUTH`: optional shell-side convenience variable for the ngrok Basic Auth credential pair
-- `CODEX_WEBUI_RUNTIME_PORT`: defaults to `3001`
+- `TAILSCALE_AUTHKEY`: auth key used by the sidecar container
+- `TAILSCALE_HOSTNAME`: optional tailnet hostname override for the sidecar container
+- `TAILSCALE_USERSPACE`: defaults to `false`; set `true` only as a fallback when the host cannot provide `/dev/net/tun`
+- `TAILSCALE_SERVE_CONFIG`: persisted Serve config path inside the sidecar state volume
+- `TAILSCALE_EXTRA_ARGS`: optional extra `tailscale up` flags; the documented default disables Tailscale-managed DNS rewrites
 - `CODEX_WEBUI_FRONTEND_PORT`: defaults to `3000`
 - `CODEX_WEBUI_WORKSPACE_ROOT`: optional override for the runtime workspace root
 - `CODEX_WEBUI_DATABASE_PATH`: optional override for the runtime SQLite path
-- `CODEX_WEBUI_RUNTIME_BASE_URL`: optional override for the BFF runtime base URL
+- `CODEX_WEBUI_RUNTIME_BASE_URL`: optional override for the internal BFF runtime base URL
 - `CODEX_WEBUI_APP_SERVER_BRIDGE_ENABLED`: optional override for the runtime bridge flag; defaults to enabled, set it to `false` only when you intentionally want the synthetic gateway path
 
 ## 7. Direct Docker usage
@@ -189,60 +209,48 @@ The repo-root `Dockerfile` can also be built directly:
 docker build -t codex-webui/dev .
 ```
 
-However, direct `docker run` is not the primary documented workflow because you would need to recreate the compose-managed volume mounts and runtime options yourself.
+However, direct `docker run` is not the primary documented workflow because you would need to recreate the compose-managed volume mounts, GPU options, and the shared Tailscale sidecar namespace yourself.
 
 Use `docker-compose.yml` unless you have a specific reason not to.
 
 ## 8. Troubleshooting
 
-### 8.1 `ngrok` command not found
+### 8.1 Tailscale sidecar does not authenticate
 
-Rebuild the image:
-
-```bash
-docker compose up -d --build dev
-```
-
-### 8.2 ngrok authentication is missing
-
-Export `NGROK_AUTHTOKEN` or run `ngrok config add-authtoken <token>` before starting the tunnel.
-
-### 8.3 ngrok cannot reach port `3000`
-
-Run:
+Confirm that `.env` contains a valid `TAILSCALE_AUTHKEY`, then recreate the sidecar:
 
 ```bash
-ngrok http 3000 --basic-auth="$NGROK_BASIC_AUTH"
+docker compose --env-file .env up -d --build tailscale dev
+docker compose --env-file .env logs tailscale
 ```
 
-Or rerun the launcher in interactive mode:
+If your host cannot provide `/dev/net/tun`, set `TAILSCALE_USERSPACE=true` and recreate the sidecar. This is a fallback, not the preferred path, because the documented default assumes kernel networking with tun plus the required caps.
+
+### 8.2 Tailscale Serve does not point at the frontend
+
+Reapply the supported Serve command:
 
 ```bash
-scripts/start-codex-webui.sh --interactive
+docker compose --env-file .env exec tailscale tailscale serve --bg 3000
+docker compose --env-file .env exec tailscale tailscale serve status
 ```
 
-If the browser still cannot load the UI, confirm the frontend is listening on `127.0.0.1:3000` inside the container.
+The supported Serve target is only `http://127.0.0.1:3000`.
 
-### 8.4 Port `3000` is already in use
+### 8.3 Port `3000` is already in use inside the shared namespace
 
-If the launcher reports `EADDRINUSE` for `0.0.0.0:3000`, an earlier `frontend-bff` process is still bound to the browser-facing port. Stop the local WebUI processes and start again:
+If the launcher reports `EADDRINUSE` for `127.0.0.1:3000`, an earlier `frontend-bff` process is still active in this checkout. Stop local WebUI processes and start again:
 
 ```bash
 scripts/stop-codex-webui.sh
-scripts/start-codex-webui.sh --interactive
+scripts/start-codex-webui.sh
 ```
 
-Use `scripts/stop-codex-webui.sh --with-ngrok` when you also want to stop the local ngrok agent for the frontend port.
-
-### 8.5 ngrok endpoint is already online
-
-For fixed ngrok URLs, `ERR_NGROK_334` means another endpoint with the same URL is already online. Stop the existing ngrok process or dashboard endpoint, then rerun the launcher. If the existing process is a local ngrok agent for the same frontend port, the launcher should detect and reuse it automatically.
-
-### 8.6 The runtime fails because the workspace root does not exist
+### 8.4 The runtime fails because the workspace root does not exist
 
 The local startup process creates the default workspace root for you. If you override `CODEX_WEBUI_WORKSPACE_ROOT`, make sure the target path is valid and writable inside the container.
 
-### 8.7 `vulkaninfo` only shows `llvmpipe`
+### 8.5 `vulkaninfo` only shows `llvmpipe`
 
 If `nvidia-smi` works but `vulkaninfo --summary` still falls back to `llvmpipe`, the container runtime is exposing compute/NVML but not the NVIDIA graphics stack or Vulkan ICD.
 
@@ -250,7 +258,7 @@ This repository now ships `scripts/with-vulkan-driver.sh`, which can repair the 
 
 If the helper still cannot surface an NVIDIA Vulkan device, the host runtime is not providing the required graphics libraries. Native Linux Docker Engine with NVIDIA Container Toolkit is the recommended path for containerized Vulkan validation. Docker Desktop on Windows with the WSL2 backend is reliable for GPU compute, but may not expose the full graphics/Vulkan stack needed for Vulkan app development inside containers.
 
-### 8.8 Vulkan SDK download 404s during image build
+### 8.6 Vulkan SDK download 404s during image build
 
 The Dockerfile uses LunarG's automated download API with the generic Linux file name, `vulkan_sdk.tar.xz`, instead of constructing the embedded-version tarball name directly.
 

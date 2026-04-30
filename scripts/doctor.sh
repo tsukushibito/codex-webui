@@ -13,8 +13,10 @@ DOCTOR_RUN_WINIT_SMOKE="${DOCTOR_RUN_WINIT_SMOKE:-false}"
 DOCTOR_DEBUG="${DOCTOR_DEBUG:-false}"
 DOCTOR_DEBUG_LINES="${DOCTOR_DEBUG_LINES:-120}"
 EXPECTED_CARGO_VERSION_PREFIX="${EXPECTED_CARGO_VERSION_PREFIX:-${EXPECTED_RUST_VERSION%.*}}"
-NGROK_AUTHTOKEN="${NGROK_AUTHTOKEN:-}"
-NGROK_BASIC_AUTH="${NGROK_BASIC_AUTH:-}"
+TAILSCALE_AUTHKEY="${TAILSCALE_AUTHKEY:-}"
+TAILSCALE_HOSTNAME="${TAILSCALE_HOSTNAME:-}"
+TAILSCALE_USERSPACE="${TAILSCALE_USERSPACE:-false}"
+TAILSCALE_SERVE_CONFIG="${TAILSCALE_SERVE_CONFIG:-/var/lib/tailscale/serve/frontend-bff.json}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 failures=0
@@ -106,15 +108,15 @@ check_command() {
   fi
 }
 
-check_required_env() {
+print_env_state() {
   local label="$1"
   local value="$2"
+  local missing_message="$3"
 
   if [[ -n "${value}" ]]; then
     echo "[ok] ${label}: set"
   else
-    echo "[ng] ${label}: required for the supported ngrok remote-browser path"
-    failures=$((failures + 1))
+    echo "[info] ${label}: ${missing_message}"
   fi
 }
 
@@ -131,7 +133,6 @@ fi
 echo "== command checks =="
 check_command "VS Code CLI" "code"
 check_command "Codex CLI" "codex"
-check_command "ngrok CLI" "ngrok"
 check_command "Python" "python"
 check_command "uv" "uv"
 check_command "Node.js" "node"
@@ -139,6 +140,7 @@ check_command "npm" "npm"
 check_command "rustc" "rustc"
 check_command "cargo" "cargo"
 check_command "vulkaninfo" "vulkaninfo"
+check_command "Docker CLI" "docker"
 
 echo
 echo "== version checks =="
@@ -152,17 +154,29 @@ check_contains "vulkan sdk path" "${VULKAN_SDK:-unset}" "${EXPECTED_VULKAN_SDK_V
 check_contains "npm prefix" "$(npm config get prefix || true)" "${EXPECTED_NPM_PREFIX}"
 
 echo
-echo "== ngrok prerequisites =="
-check_required_env "NGROK_AUTHTOKEN" "${NGROK_AUTHTOKEN}"
-check_required_env "NGROK_BASIC_AUTH" "${NGROK_BASIC_AUTH}"
+echo "== Tailscale sidecar prerequisites =="
+print_env_state "TAILSCALE_AUTHKEY" "${TAILSCALE_AUTHKEY}" "set it in .env before user-run tailnet verification"
+print_env_state "TAILSCALE_HOSTNAME" "${TAILSCALE_HOSTNAME}" "optional; defaults to codex-webui-dev when omitted"
+echo "[info] TAILSCALE_USERSPACE: ${TAILSCALE_USERSPACE} (recommended default: false for /dev/net/tun kernel networking)"
+echo "[info] TAILSCALE_SERVE_CONFIG expected path: ${TAILSCALE_SERVE_CONFIG}"
+echo "[info] Set TAILSCALE_USERSPACE=true only if the host cannot provide /dev/net/tun; that is a fallback with different networking behavior."
+
+echo
+echo "== Tailscale sidecar live checks (user-run, not validated here) =="
+echo "[info] docker compose up -d --build tailscale dev"
+echo "[info] docker compose exec dev bash -lc 'scripts/start-codex-webui.sh'"
+echo "[info] docker compose exec tailscale tailscale status"
+echo "[info] docker compose exec tailscale tailscale serve --bg 3000"
+echo "[info] docker compose exec tailscale tailscale serve status"
+echo "[info] Expected live evidence: Serve targets only http://127.0.0.1:3000 and the MagicDNS / tailnet URL loads frontend-bff from desktop and smartphone."
 
 echo
 echo "== legacy launcher note =="
 if command -v devtunnel >/dev/null 2>&1; then
-  echo "[info] devtunnel is still installed as temporary legacy tooling for scripts/start-codex-webui.sh; cleanup is deferred to #154."
+  echo "[info] devtunnel is still installed as temporary legacy tooling for scripts/start-tunnel.sh; cleanup is deferred to its legacy follow-up."
   echo "[info] devtunnel --version: $(devtunnel --version || true)"
 else
-  echo "[info] devtunnel is not required for the supported ngrok path; launcher migration/removal is deferred to #154."
+  echo "[info] devtunnel is optional legacy tooling and is not required for the supported Tailscale sidecar path."
 fi
 
 echo

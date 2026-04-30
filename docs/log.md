@@ -1,6 +1,6 @@
 # Codex WebUI LLM Wiki Log
 
-Last updated: 2026-04-27
+Last updated: 2026-04-29
 
 ## Purpose
 
@@ -28,6 +28,42 @@ After the heading, keep the body concise:
 - short note on what changed or remains deferred
 
 ## Entries
+
+## [2026-04-29] ingest | Issue #318 Tailscale sidecar remote-browser path
+
+Source:
+
+- approved sprint slice for Issue `#318`
+- `docker-compose.yml`
+- `.env.example`
+- `Dockerfile`
+- `scripts/start-codex-webui.sh`
+- `scripts/stop-codex-webui.sh`
+- `scripts/doctor.sh`
+- `docs/codex_webui_dev_container_onboarding.md`
+- `docs/requirements/codex_webui_mvp_requirements_v0_9.md`
+
+Updated:
+
+- `README.md`
+- `docker-compose.yml`
+- `.env.example`
+- `Dockerfile`
+- `scripts/start-codex-webui.sh`
+- `scripts/stop-codex-webui.sh`
+- `scripts/doctor.sh`
+- `docs/codex_webui_dev_container_onboarding.md`
+- `docs/requirements/codex_webui_mvp_requirements_v0_9.md`
+- `docs/index.md`
+- `docs/log.md`
+
+Notes:
+
+- replaced the supported ngrok browser path with a Tailscale Docker sidecar plus Tailscale Serve
+- kept `frontend-bff` as the only browser-facing entrypoint and documented that Serve must target only `http://127.0.0.1:3000`
+- removed supported ngrok launcher, stop-helper, env-example, and image-installation guidance
+- documented that tailnet membership plus ACLs are the access boundary and that Tailscale Funnel is not supported
+- left live Docker/Tailscale desktop and smartphone verification as an explicit user-run step
 
 ## [2026-04-27] query | desktop thread view composer and header refinement
 
