@@ -12,6 +12,7 @@ Archive entries preserve the work instructions that were used at the time, while
 
 ## Packages
 
+- [issue-322-persistence-boundary](./issue-322-persistence-boundary/README.md)
 - [issue-318-tailscale-sidecar](./issue-318-tailscale-sidecar/README.md)
 - [issue-218-feedback-recovery](./issue-218-feedback-recovery/README.md)
 - [issue-217-navigation-return-surface](./issue-217-navigation-return-surface/README.md)
