@@ -21,6 +21,7 @@ import type {
 } from "../sessions/types.js";
 import type { WorkspaceFilesystem } from "../workspaces/workspace-filesystem.js";
 import type { WorkspaceRegistry } from "../workspaces/workspace-registry.js";
+import { indicatesMissingNativeThread } from "./native-thread-reachability.js";
 import { ThreadInputOrchestrator } from "./thread-input-orchestrator.js";
 import { buildThreadRequestHelperLifecycleState } from "./thread-request-helper-lifecycle.js";
 import {
@@ -301,8 +302,12 @@ export class ThreadService {
       .orderBy(desc(sessions.updatedAt), desc(sessions.sessionId))
       .all();
 
+    const reachableItems = await Promise.all(
+      items.map((item) => this.ensureThreadReadableCandidateReachability(item)),
+    );
+
     return {
-      items: items.map((item) => toThreadSummary(item)),
+      items: reachableItems.map((item) => toThreadSummary(item)),
       next_cursor: null,
       has_more: false,
     };
@@ -324,7 +329,8 @@ export class ThreadService {
       });
     }
 
-    return toThreadSummary(thread);
+    const reachableThread = await this.ensureThreadReadableCandidateReachability(thread);
+    return toThreadSummary(reachableThread);
   }
 
   async startThreadFromInput(
@@ -906,5 +912,53 @@ export class ThreadService {
         .where(eq(workspaces.workspaceId, thread.workspaceId))
         .run();
     })();
+  }
+
+  private async ensureThreadReadableCandidateReachability(thread: SessionRow) {
+    if (
+      thread.appSessionOverlayState === "recovery_pending" ||
+      thread.appSessionOverlayState !== "open" ||
+      thread.status !== "waiting_input"
+    ) {
+      return thread;
+    }
+
+    try {
+      await this.nativeSessionGateway.resumeSession({
+        sessionId: thread.sessionId,
+      });
+      return thread;
+    } catch (error) {
+      const runtimeError = asRuntimeError(error);
+      if (!runtimeError || !indicatesMissingNativeThread(runtimeError)) {
+        throw error;
+      }
+
+      const recoveryMarkedAt = this.now().toISOString();
+      this.database.sqlite.transaction(() => {
+        this.database.db
+          .update(sessions)
+          .set({
+            updatedAt: recoveryMarkedAt,
+            appSessionOverlayState: "recovery_pending",
+          })
+          .where(eq(sessions.sessionId, thread.sessionId))
+          .run();
+
+        this.database.db
+          .update(workspaces)
+          .set({
+            updatedAt: recoveryMarkedAt,
+          })
+          .where(eq(workspaces.workspaceId, thread.workspaceId))
+          .run();
+      })();
+
+      return {
+        ...thread,
+        updatedAt: recoveryMarkedAt,
+        appSessionOverlayState: "recovery_pending",
+      };
+    }
   }
 }
